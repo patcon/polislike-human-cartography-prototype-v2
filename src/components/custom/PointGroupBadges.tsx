@@ -157,26 +157,54 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
               </Badge>
             );
           } else {
-            // Standard proportional width calculation
-            const totalGapWidth = (proportionalData.totalBadges - 1) * proportionalData.gapWidth;
-            return (
-              <Badge
-                key={group.colorIndex}
-                className="text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2"
-                style={{
-                  backgroundColor: color,
-                  width: `calc(${group.widthPercent}% - ${totalGapWidth * (group.widthPercent / 100)}px)`,
-                  minWidth: 'fit-content',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
-                  transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
-                }}
-              >
-                {group.label}
-              </Badge>
-            );
+            // When unpainted is grouped and large, use min-width approach for colored badges
+            const isUnpaintedGroupedAndLarge = proportionalData.unpaintedGroup &&
+              !proportionalData.unpaintedGroup.useMinimalWidth &&
+              proportionalData.unpaintedGroup.widthPercent > 80; // Large unpainted group threshold
+            
+            if (isUnpaintedGroupedAndLarge) {
+              // Use min-width based on actual proportion, but allow shrinking
+              return (
+                <Badge
+                  key={group.colorIndex}
+                  className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+                  style={{
+                    backgroundColor: color,
+                    minWidth: `${group.widthPercent}%`, // Use actual proportion as min-width
+                    width: 'auto',
+                    flexShrink: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    textAlign: 'left',
+                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+                  }}
+                >
+                  {group.label}
+                </Badge>
+              );
+            } else {
+              // Standard proportional width calculation
+              const totalGapWidth = (proportionalData.totalBadges - 1) * proportionalData.gapWidth;
+              return (
+                <Badge
+                  key={group.colorIndex}
+                  className="text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2"
+                  style={{
+                    backgroundColor: color,
+                    width: `calc(${group.widthPercent}% - ${totalGapWidth * (group.widthPercent / 100)}px)`,
+                    minWidth: 'fit-content',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    textAlign: 'left',
+                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+                  }}
+                >
+                  {group.label}
+                </Badge>
+              );
+            }
           }
         })}
 
@@ -185,19 +213,31 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
           <Badge
             variant="outline"
             className={cn(
-              "cursor-pointer border text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2",
+              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2",
               isUnpaintedGrouped
                 ? "bg-black text-white border-black hover:bg-gray-800"
-                : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400"
+                : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400",
+              // Make unpainted group flexible when it's large and grouped
+              proportionalData.unpaintedGroup.widthPercent > 80 && !proportionalData.unpaintedGroup.useMinimalWidth
+                ? "flex-shrink-1"
+                : "flex-shrink-0"
             )}
             onClick={handleUnpaintedClick}
             style={{
               ...(isUnpaintedGrouped
                 ? { backgroundColor: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }
                 : { color: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }),
-              width: proportionalData.unpaintedGroup.useMinimalWidth
-                ? 'fit-content'
-                : `calc(${proportionalData.unpaintedGroup.widthPercent}% - ${(proportionalData.totalBadges - 1) * proportionalData.gapWidth * (proportionalData.unpaintedGroup.widthPercent / 100)}px)`,
+              ...(proportionalData.unpaintedGroup.useMinimalWidth
+                ? { width: 'fit-content' }
+                : proportionalData.unpaintedGroup.widthPercent > 80
+                  ? {
+                      width: 'auto',
+                      flex: '1 1 auto', // Allow it to grow and shrink, taking remaining space
+                    }
+                  : {
+                      width: `calc(${proportionalData.unpaintedGroup.widthPercent}% - ${(proportionalData.totalBadges - 1) * proportionalData.gapWidth * (proportionalData.unpaintedGroup.widthPercent / 100)}px)`,
+                    }
+              ),
               minWidth: 'fit-content',
               display: 'flex',
               alignItems: 'center',
