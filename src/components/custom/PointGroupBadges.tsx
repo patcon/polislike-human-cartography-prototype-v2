@@ -214,7 +214,7 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
           <Badge
             variant="outline"
             className={cn(
-              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 transition-colors border-2",
+              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
               isUnpaintedGrouped
                 ? "bg-black text-white border-black hover:bg-gray-800"
                 : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400",
@@ -241,7 +241,6 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
               alignItems: 'center',
               justifyContent: 'flex-start',
               textAlign: 'left',
-              transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
             }}
           >
             <div className="flex items-center gap-1">
@@ -288,7 +287,7 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
         <Badge
           variant="outline"
           className={cn(
-            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 transition-colors border-2",
+            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
             isUnpaintedGrouped
               ? "bg-black text-white border-black hover:bg-gray-800"
               : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400"
@@ -299,7 +298,6 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
             alignItems: 'center',
             justifyContent: 'flex-start',
             textAlign: 'left',
-            transition: 'background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
           }}
         >
           <div className="flex items-center gap-1">
