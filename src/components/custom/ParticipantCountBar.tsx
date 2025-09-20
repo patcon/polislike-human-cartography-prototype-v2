@@ -264,37 +264,29 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   }
 
   // Non-proportional layout (original)
-  const hasColoredGroups = groupData.coloredGroups.length > 0;
-  
   return (
-    <div className={cn(
-      "flex gap-1 flex-wrap items-center",
-      hasColoredGroups ? "justify-between" : "justify-end",
-      className
-    )}>
-      {/* Colored groups on the left */}
-      {hasColoredGroups && (
-        <div className="flex gap-1 flex-wrap">
-          {groupData.coloredGroups.map((group) => {
-            const color = PALETTE_COLORS[group.colorIndex!];
-            return (
-              <Badge
-                key={group.colorIndex}
-                className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
-                style={{
-                  backgroundColor: color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
-                }}
-              >
-                {group.label}
-              </Badge>
-            );
-          })}
-        </div>
-      )}
+    <div className={cn("flex gap-1 flex-wrap items-center justify-between", className)}>
+      {/* Colored groups container - always present for consistent layout */}
+      <div className="flex gap-1 flex-wrap">
+        {groupData.coloredGroups.map((group) => {
+          const color = PALETTE_COLORS[group.colorIndex!];
+          return (
+            <Badge
+              key={group.colorIndex}
+              className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+              style={{
+                backgroundColor: color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                textAlign: 'left',
+              }}
+            >
+              {group.label}
+            </Badge>
+          );
+        })}
+      </div>
 
       {/* Unpainted group on the right */}
       {groupData.unpaintedGroup && (
