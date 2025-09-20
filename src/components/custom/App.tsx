@@ -339,9 +339,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
         />
       </div>
 
-      {/* PointGroupBadges at the very bottom of the screen */}
-      <div className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
-        <div className="pb-1 px-1 pointer-events-auto">
+      {/* PointGroupBadges at the very bottom of the screen - positioned relative to screen-safe viewport */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none" style={{ height: '100dvh', pointerEvents: 'none' }}>
+        <div className="absolute bottom-0 left-0 right-0 pb-1 px-1 pointer-events-auto">
           <ParticipantCountBar
             pointGroups={pointGroups}
             isProportional={true}
