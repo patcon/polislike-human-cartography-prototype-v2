@@ -4,7 +4,7 @@ import * as React from "react";
 import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getParticipantDataForStatement, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
@@ -236,7 +236,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
         // get the color index for this point
         const pointColorIndex = pointGroups[idx];
         
-        if (pointColorIndex !== null) {
+        if (!isUnpainted(pointColorIndex)) {
           const targetTab = `group-${pointColorIndex}`;
           console.log('  - Opening drawer to', targetTab);
           
