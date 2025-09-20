@@ -42,6 +42,11 @@ export const D3Map: React.FC<D3MapProps> = ({
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
+  const lassoStateRef = React.useRef<{
+    path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
+    coords: [number, number][];
+    cleanup: (() => void) | null;
+  }>({ path: null, coords: [], cleanup: null });
   React.useEffect(() => { modeRef.current = mode; }, [mode]);
 
   // Animation state
@@ -239,6 +244,16 @@ export const D3Map: React.FC<D3MapProps> = ({
         }
         return modeRef.current === "move";
       })
+      .on("start", (event) => {
+        // Clean up lasso when zoom starts (especially for multi-touch)
+        if (event.sourceEvent && event.sourceEvent.type.startsWith("touch")) {
+          const touches = event.sourceEvent.touches?.length ?? 0;
+          if (touches >= 2 && lassoStateRef.current.cleanup) {
+            console.log('🔍 Zoom start detected with multi-touch, cleaning up lasso');
+            lassoStateRef.current.cleanup();
+          }
+        }
+      })
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
         container.selectAll("circle").attr("r", BASE_RADIUS / (FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1) );
@@ -329,16 +344,28 @@ export const D3Map: React.FC<D3MapProps> = ({
     }
 
     if (mode === "paint") {
-      let lassoPath: d3.Selection<SVGPathElement, unknown, null, undefined> | null = null;
-      let coords: [number, number][] = [];
+      function cleanupLasso() {
+        console.log('🎨 Lasso CLEANUP');
+        if (lassoStateRef.current.path) {
+          lassoStateRef.current.path.remove();
+          lassoStateRef.current.path = null;
+        }
+        lassoStateRef.current.coords = [];
+      }
+
+      // Store cleanup function in ref so zoom can access it
+      lassoStateRef.current.cleanup = cleanupLasso;
 
       function lassoStart(event: any) {
         console.log('🎨 Lasso START:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) return;
+        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
+          cleanupLasso();
+          return;
+        }
 
-        coords = [];
-        if (lassoPath) lassoPath.remove();
-        lassoPath = svg.append("path")
+        lassoStateRef.current.coords = [];
+        if (lassoStateRef.current.path) lassoStateRef.current.path.remove();
+        lassoStateRef.current.path = svg.append("path")
           .attr("fill", "rgba(0,0,0,0.1)")
           .attr("stroke", "#666")
           .attr("stroke-width", 1.5)
@@ -348,26 +375,33 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       function lassoDrag(event: any) {
         console.log('🎨 Lasso DRAG:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) return;
-        coords.push([event.x, event.y]);
-        if (lassoPath) lassoPath.attr("d", d3.line()(coords));
+        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
+          cleanupLasso();
+          return;
+        }
+        lassoStateRef.current.coords.push([event.x, event.y]);
+        if (lassoStateRef.current.path) {
+          lassoStateRef.current.path.attr("d", d3.line()(lassoStateRef.current.coords));
+        }
       }
 
       function lassoEnd() {
-        console.log('🎨 Lasso END, coords:', coords.length);
+        console.log('🎨 Lasso END, coords:', lassoStateRef.current.coords.length);
 
-        if (!coords.length) return;
+        if (!lassoStateRef.current.coords.length) {
+          cleanupLasso();
+          return;
+        }
         const transform = d3.zoomTransform(container.node()!);
         const circles = container.selectAll("circle");
         const selected = circles.data().filter((d: any) => {
           const sx = transform.applyX((container as any).xScale(d.x));
           const sy = transform.applyY((container as any).yScale(d.y));
-          return pointInPolygon([sx, sy], coords);
+          return pointInPolygon([sx, sy], lassoStateRef.current.coords);
         });
         if (onSelectionChange) onSelectionChange(selected.map((d: any) => d.i));
 
-        if (lassoPath) { lassoPath.remove(); lassoPath = null; }
-        coords = [];
+        cleanupLasso();
       }
 
       console.log('🎨 Setting up lasso drag behavior');
@@ -393,6 +427,15 @@ export const D3Map: React.FC<D3MapProps> = ({
       .on("touchstart.zoom", null)
       .on("touchmove.zoom", null)
       .on("touchend.zoom", null);
+
+      // Cleanup function when mode changes
+      return () => {
+        cleanupLasso();
+        lassoStateRef.current.cleanup = null;
+      };
+    } else {
+      // Clear cleanup function when not in paint mode
+      lassoStateRef.current.cleanup = null;
     }
   }, [mode, onSelectionChange, xScale, yScale]);
 
