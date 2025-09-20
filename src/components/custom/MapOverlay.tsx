@@ -134,7 +134,7 @@ export function MapOverlay({
         <AboutDialog autoOpen />
       </div>
 
-      <div className="absolute left-4 right-4 bottom-10 z-50 flex justify-between items-center px-0 pointer-events-auto">
+      <div className="absolute left-4 right-4 bottom-11 z-50 flex justify-between items-center px-0 pointer-events-auto">
         <ToggleToolBar value={toggles} onValueChange={handleTogglesChange} />
 
         <div className="flex items-center gap-2">
