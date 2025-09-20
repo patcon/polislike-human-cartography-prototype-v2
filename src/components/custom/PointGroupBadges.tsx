@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { PALETTE_COLORS, UNPAINTED_COLOR } from "@/constants";
 import { cn } from "@/lib/utils";
+import { SquaresSubtract as ExcludesUnpainted, SquaresUnite as IncludesUnpainted } from "lucide-react";
 
 type PointGroupData = {
   label: string;
@@ -213,10 +214,10 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
           <Badge
             variant="outline"
             className={cn(
-              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2",
+              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 transition-colors border-2",
               isUnpaintedGrouped
                 ? "bg-black text-white border-black hover:bg-gray-800"
-                : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400",
+                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400",
               // Make unpainted group flexible when it's large and grouped
               proportionalData.unpaintedGroup.widthPercent > 80 && !proportionalData.unpaintedGroup.useMinimalWidth
                 ? "flex-shrink-1"
@@ -224,9 +225,6 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
             )}
             onClick={handleUnpaintedClick}
             style={{
-              ...(isUnpaintedGrouped
-                ? { backgroundColor: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }
-                : { color: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }),
               ...(proportionalData.unpaintedGroup.useMinimalWidth
                 ? { width: 'fit-content' }
                 : proportionalData.unpaintedGroup.widthPercent > 80
@@ -246,7 +244,14 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
               transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
             }}
           >
-            {proportionalData.unpaintedGroup.label}
+            <div className="flex items-center gap-1">
+              {isUnpaintedGrouped ? (
+                <IncludesUnpainted className="h-3 w-3" strokeWidth={3} />
+              ) : (
+                <ExcludesUnpainted className="h-3 w-3" strokeWidth={3} />
+              )}
+              {proportionalData.unpaintedGroup.label}
+            </div>
           </Badge>
         )}
       </div>
@@ -283,16 +288,13 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
         <Badge
           variant="outline"
           className={cn(
-            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2",
+            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 transition-colors border-2",
             isUnpaintedGrouped
               ? "bg-black text-white border-black hover:bg-gray-800"
-              : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400"
+              : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400"
           )}
           onClick={handleUnpaintedClick}
           style={{
-            ...(isUnpaintedGrouped
-              ? { backgroundColor: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }
-              : { color: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-start',
@@ -300,7 +302,14 @@ export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
             transition: 'background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
           }}
         >
-          {groupData.unpaintedGroup.label}
+          <div className="flex items-center gap-1">
+            {isUnpaintedGrouped ? (
+              <IncludesUnpainted className="h-3 w-3" strokeWidth={3} />
+            ) : (
+              <ExcludesUnpainted className="h-3 w-3" strokeWidth={3} />
+            )}
+            {groupData.unpaintedGroup.label}
+          </div>
         </Badge>
       )}
     </div>
