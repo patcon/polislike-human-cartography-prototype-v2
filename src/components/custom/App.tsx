@@ -245,7 +245,17 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
           setDrawerOpen(true);
           return true; // Successfully processed - prevent other behaviors
         } else {
-          return false; // No action taken - allow lasso painting etc.
+          // Handle unpainted points when isUnpaintedGrouped is true
+          if (isUnpaintedGrouped) {
+            console.log('  - Opening drawer to unpainted tab');
+            
+            // open drawer to the unpainted group tab
+            setDrawerTab("unpainted");
+            setDrawerOpen(true);
+            return true; // Successfully processed - prevent other behaviors
+          } else {
+            return false; // No action taken - allow lasso painting etc.
+          }
         }
       } else if (layerMode === "votes") {
         // In votes mode, could show vote information
