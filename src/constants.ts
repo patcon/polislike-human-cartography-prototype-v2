@@ -17,6 +17,24 @@ export const UNPAINTED_COLOR = "#000000";
 // Index value representing unpainted/eraser selection
 export const UNPAINTED_INDEX = -1;
 
+/**
+ * Type representing a point group assignment.
+ * - number (0-9): Colored group index corresponding to PALETTE_COLORS
+ * - null: Unpainted (legacy representation)
+ * - -1: Unpainted (UNPAINTED_INDEX constant)
+ *
+ * Note: Both null and -1 are treated as unpainted for backward compatibility.
+ */
+export type PointGroupAssignment = number | null;
+
+/**
+ * Helper function to check if a point group assignment represents an unpainted point.
+ * Returns true for both null and -1 (UNPAINTED_INDEX).
+ */
+export function isUnpainted(assignment: PointGroupAssignment): boolean {
+  return assignment === null || assignment === UNPAINTED_INDEX;
+}
+
 export const INITIAL_ACTION = "paint-groups";
 
 // Chart colors for vote visualization

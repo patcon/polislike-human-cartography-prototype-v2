@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
-import { PALETTE_COLORS, UNPAINTED_COLOR } from "@/constants";
+import { PALETTE_COLORS, type PointGroupAssignment, isUnpainted } from "@/constants";
 import { cn } from "@/lib/utils";
 import { SquaresSubtract as ExcludesUnpainted, SquaresUnite as IncludesUnpainted } from "lucide-react";
 
@@ -13,7 +13,7 @@ type PointGroupData = {
 };
 
 type ParticipantCountBarProps = {
-  pointGroups: (number | null)[];
+  pointGroups: PointGroupAssignment[];
   isUnpaintedGrouped?: boolean;
   onUnpaintedGroupedChange?: (isGrouped: boolean) => void;
   isProportional?: boolean;
@@ -45,8 +45,14 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
       groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
     });
 
-    // Handle unpainted group separately
-    const unpaintedCount = groupCounts.get(null) || 0;
+    // Handle unpainted group separately - count both null and -1 as unpainted
+    let unpaintedCount = 0;
+    pointGroups.forEach(group => {
+      if (isUnpainted(group)) {
+        unpaintedCount++;
+      }
+    });
+    
     if (unpaintedCount > 0) {
       unpaintedGroup = {
         label: unpaintedCount.toString(),
@@ -91,7 +97,9 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
       availableWidthPercent = 100; // Colored badges will use flex-grow to fill remaining space
     } else {
       // All badges (including unpainted if grouped) share space proportionally
-      coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? groupData.unpaintedGroup.count : 0);
+      // Calculate total excluding unpainted points when they're not grouped
+      const unpaintedPoints = pointGroups.filter(isUnpainted).length;
+      coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? unpaintedPoints : 0);
       availableWidthPercent = 100;
     }
 

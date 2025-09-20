@@ -16,7 +16,7 @@ import { StatementTable } from "./StatementTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatementExplorerButton } from "./StatementExplorerButton";
 import { Badge } from "@/components/ui/badge";
-import { PALETTE_COLORS, UNPAINTED_INDEX, VOTE_COLORS } from "@/constants";
+import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
 import type { FinalizedCommentStats } from "@/lib/stats";
 
@@ -89,7 +89,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
   const letterForIndex = (index: number) => String.fromCharCode(65 + index);
   const sortedColors = React.useMemo(() =>
-    [...activeColors].filter(index => index !== UNPAINTED_INDEX).sort((a, b) => a - b),
+    [...activeColors].filter(index => !isUnpainted(index)).sort((a, b) => a - b),
     [activeColors]
   );
 

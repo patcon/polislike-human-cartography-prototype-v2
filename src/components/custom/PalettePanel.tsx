@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card } from "@/components/ui/card";
-import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_INDEX } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_INDEX } from "@/constants";
 import { Eraser } from "lucide-react";
 
 type PalettePanelProps = {

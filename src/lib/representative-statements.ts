@@ -4,7 +4,7 @@
  */
 
 import { analyzePaintedClusters } from '@/lib/stats';
-import { UNPAINTED_INDEX } from '@/constants';
+import { isUnpainted } from '@/constants';
 import type {
   FinalizedCommentStats,
   ConsensusStatement,
@@ -95,9 +95,9 @@ export function getLabelArrayWithOptionalUngrouped(
 
   for (let i = 0; i < colorByIndex.length; i++) {
     const colorIndex = colorByIndex[i];
-    // Treat UNPAINTED_INDEX the same as null (unpainted/ungrouped points)
-    if (colorIndex !== null && colorIndex !== undefined && colorIndex !== UNPAINTED_INDEX) {
-      labels.push(colorIndex.toString());
+    // Use isUnpainted helper to check for both null and UNPAINTED_INDEX
+    if (colorIndex !== undefined && !isUnpainted(colorIndex)) {
+      labels.push(colorIndex!.toString());
     } else if (includeUnpainted) {
       labels.push("unpainted"); // Treat unpainted points as a group
     } else {

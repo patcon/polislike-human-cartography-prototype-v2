@@ -7,7 +7,7 @@ import { StatementExplorerDrawer } from "./StatementExplorerDrawer";
 import { PalettePopover } from "./PalettePopover";
 import { ToggleToolBar } from "./ToggleToolBar";
 import { AboutDialog } from "./AboutDialog";
-import { INITIAL_ACTION } from "@/constants";
+import { INITIAL_ACTION, isUnpainted } from "@/constants";
 import type { Statement } from "./StatementExplorerDrawer";
 import type { FinalizedCommentStats } from "@/lib/stats";
 
@@ -88,7 +88,7 @@ export function MapOverlay({
 
   // --- NEW: compute activeColors from pointGroups ---
   const activeColors = React.useMemo(
-    () => [...new Set(pointGroups.filter((x): x is number => x !== null))],
+    () => [...new Set(pointGroups.filter((x): x is number => !isUnpainted(x)))],
     [pointGroups]
   );
 

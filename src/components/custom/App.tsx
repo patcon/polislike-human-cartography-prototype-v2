@@ -117,7 +117,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
             const participantVoteData = participantData.find(p => p.participantId === participantId.toString());
             
             if (!participantVoteData || participantVoteData.vote === null) {
-              // Participant has no vote - should be black (null index)
+              // Participant has no vote - should be black (unpainted)
               return null;
             }
             
@@ -156,7 +156,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     // Get label array for analysis
     const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, false);
 
-    // Check if we can perform analysis - count unique non-null groups
+    // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
     const canAnalyze = uniqueGroups.size >= 2;
 
