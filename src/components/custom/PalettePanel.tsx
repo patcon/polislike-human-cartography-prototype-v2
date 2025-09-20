@@ -48,14 +48,11 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
               }`}
             >
               {/* Small black dot on the left, same size as other color dots */}
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: UNPAINTED_COLOR }}
-              />
+              <div className="w-4 h-4 rounded-full bg-unpainted" />
               
               {/* Large eraser icon on the right */}
               <div className="flex items-center justify-center pr-0">
-                <Eraser size={18} color={UNPAINTED_COLOR} />
+                <Eraser size={18} className="text-unpainted" />
               </div>
             </div>
           </button>

@@ -222,8 +222,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
             className={cn(
               "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
               isUnpaintedGrouped
-                ? "bg-black text-white border-black hover:bg-gray-800"
-                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400",
+                ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800"
+                : "bg-white text-unpainted-600 border-unpainted-300 hover:bg-unpainted-200 hover:border-unpainted-400",
               // Make unpainted group flexible when it's large and grouped
               proportionalData.unpaintedGroup.widthPercent > 80 && !proportionalData.unpaintedGroup.useMinimalWidth
                 ? "flex-shrink-1"
@@ -295,8 +295,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           className={cn(
             "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
             isUnpaintedGrouped
-              ? "bg-black text-white border-black hover:bg-gray-800"
-              : "bg-white text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400"
+              ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800"
+              : "bg-white text-unpainted-600 border-unpainted-300 hover:bg-unpainted-200 hover:border-unpainted-400"
           )}
           onClick={handleUnpaintedClick}
           style={{

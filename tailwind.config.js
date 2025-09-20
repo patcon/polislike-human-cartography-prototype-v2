@@ -21,7 +21,17 @@ module.exports = {
     'w-screen-safe',
     'min-h-screen-safe',
     'max-h-screen-safe',
-    // add as high as you’ll ever need
+    // Unpainted color classes
+    'bg-unpainted',
+    'text-unpainted',
+    'border-unpainted',
+    'hover:bg-unpainted-800',
+    'bg-unpainted-50',
+    'text-unpainted-600',
+    'border-unpainted-300',
+    'hover:bg-unpainted-200',
+    'hover:border-unpainted-400',
+    // add as high as you'll ever need
   ],
   plugins: [
   ],

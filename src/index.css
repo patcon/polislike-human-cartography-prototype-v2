@@ -51,6 +51,18 @@ label[for] {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-unpainted: #000000;
+  --color-unpainted-50: #f6f6f6;
+  --color-unpainted-100: #e7e7e7;
+  --color-unpainted-200: #d1d1d1;
+  --color-unpainted-300: #b0b0b0;
+  --color-unpainted-400: #888888;
+  --color-unpainted-500: #6d6d6d;
+  --color-unpainted-600: #5d5d5d;
+  --color-unpainted-700: #4f4f4f;
+  --color-unpainted-800: #454545;
+  --color-unpainted-900: #3d3d3d;
+  --color-unpainted-950: #000000;
 }
 
 :root {
