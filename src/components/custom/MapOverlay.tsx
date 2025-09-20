@@ -30,6 +30,7 @@ type MapOverlayProps = {
   onStatementIdChange?: (statementId: string) => void;
   highlightPassVotes?: boolean;
   onHighlightPassVotesChange?: (value: boolean) => void;
+  isUnpaintedGrouped?: boolean;
 
   // Representative statements props
   representativeStatements?: Record<string, FinalizedCommentStats[]>;
@@ -56,6 +57,7 @@ export function MapOverlay({
   onStatementIdChange,
   highlightPassVotes = true,
   onHighlightPassVotesChange,
+  isUnpaintedGrouped = false,
 
   // Representative statements props
   representativeStatements = {},
@@ -125,6 +127,8 @@ export function MapOverlay({
           representativeStatements={representativeStatements}
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
+          isUnpaintedGrouped={isUnpaintedGrouped}
+          pointGroups={pointGroups}
           open={drawerOpen}
           onOpenChange={handleDrawerOpenChange}
           tabValue={drawerTab}

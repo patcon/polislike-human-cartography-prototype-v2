@@ -49,6 +49,8 @@ type StatementExplorerDrawerProps = {
   representativeStatements?: Record<string, FinalizedCommentStats[]>;
   isCalculatingRepStatements?: boolean;
   repStatementsError?: string | null;
+  isUnpaintedGrouped?: boolean;
+  pointGroups?: (number | null)[]; // Add pointGroups to check for unpainted participants
 
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -67,6 +69,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   representativeStatements = {},
   isCalculatingRepStatements = false,
   repStatementsError = null,
+  isUnpaintedGrouped = false,
+  pointGroups = [],
 
   open,
   onOpenChange,
@@ -92,6 +96,11 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     [...activeColors].filter(index => !isUnpainted(index)).sort((a, b) => a - b),
     [activeColors]
   );
+
+  // Check if unpainted group should be shown as a tab
+  const hasUnpaintedGroup = React.useMemo(() => {
+    return isUnpaintedGrouped && pointGroups.some(group => isUnpainted(group));
+  }, [isUnpaintedGrouped, pointGroups]);
 
   // Create statement text map from statements
   const statementTextMap = React.useMemo(() => {
@@ -123,6 +132,31 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   const getStatementColors = (colorIndex: number): Record<number, string> => {
     const groupKey = String(colorIndex);
     const repStats = representativeStatements[groupKey] || [];
+    const colors: Record<number, string> = {};
+    
+    repStats.forEach((repStat) => {
+      const statementId = typeof repStat.tid === 'string' ? parseInt(repStat.tid) : repStat.tid;
+      if (repStat.repful_for === 'agree') {
+        colors[statementId] = VOTE_COLORS.agree;
+      } else if (repStat.repful_for === 'disagree') {
+        colors[statementId] = VOTE_COLORS.disagree;
+      }
+    });
+    
+    return colors;
+  };
+
+  // Get representative statements for unpainted group
+  const getRepresentativeStatementsForUnpainted = (): Statement[] => {
+    const unpaintedKey = 'unpainted'; // Use 'unpainted' as the key for unpainted group
+    const repStats = representativeStatements[unpaintedKey] || [];
+    return convertRepStatementsToStatements(repStats);
+  };
+
+  // Generate statement colors for unpainted group
+  const getStatementColorsForUnpainted = (): Record<number, string> => {
+    const unpaintedKey = 'unpainted';
+    const repStats = representativeStatements[unpaintedKey] || [];
     const colors: Record<number, string> = {};
     
     repStats.forEach((repStat) => {
@@ -178,6 +212,15 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       </Badge>
                     </TabsTrigger>
                   ))}
+                  {hasUnpaintedGroup && (
+                    <TabsTrigger value="unpainted">
+                      <Badge
+                        className="h-5 rounded-xlg bg-black text-white"
+                      >
+                        Rest
+                      </Badge>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </div>
 
@@ -241,6 +284,62 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   </TabsContent>
                 );
               })}
+
+              {/* Unpainted group tab */}
+              {hasUnpaintedGroup && (
+                <TabsContent value="unpainted" className="select-text">
+                  {(() => {
+                    const unpaintedRepStatements = getRepresentativeStatementsForUnpainted();
+                    const hasRepStatements = unpaintedRepStatements.length > 0;
+                    const statementColors = getStatementColorsForUnpainted();
+
+                    return (
+                      <>
+                        {isCalculatingRepStatements ? (
+                          <div className="px-4 py-8 text-center">
+                            <div className="flex items-center justify-center space-x-2 text-gray-500">
+                              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                              <span className="text-sm">Calculating representative statements...</span>
+                            </div>
+                          </div>
+                        ) : repStatementsError ? (
+                          <div className="px-4 py-8 text-center">
+                            <div className="text-red-500 text-sm">
+                              <p className="mb-2">Error calculating representative statements:</p>
+                              <p className="text-xs">{repStatementsError}</p>
+                            </div>
+                          </div>
+                        ) : hasRepStatements ? (
+                          <div className="space-y-4">
+                            <div className="px-4 py-2 bg-gray-50 rounded-lg">
+                              <h3 className="font-medium text-sm text-gray-700 mb-1">
+                                Representative Statements for Rest Group
+                              </h3>
+                              <p className="text-xs text-gray-500">
+                                These statements are most representative of the remaining participants' opinion patterns.
+                              </p>
+                            </div>
+                            <StatementTable
+                              statements={unpaintedRepStatements}
+                              onStatementClick={onStatementClick}
+                              statementColors={statementColors}
+                            />
+                          </div>
+                        ) : (
+                          <div className="px-4 py-8 text-center">
+                            <div className="text-gray-500 text-sm">
+                              <p className="mb-2">No representative statements found for the rest group.</p>
+                              <p className="text-xs">
+                                Make selections to calculate representative statements for remaining participants.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </DrawerContent>

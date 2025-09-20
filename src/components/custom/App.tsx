@@ -65,6 +65,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
   const [isCalculatingRepStatements, setIsCalculatingRepStatements] = React.useState(false);
   const [repStatementsError, setRepStatementsError] = React.useState<string | null>(null);
 
+  // Unpainted grouping state
+  const [isUnpaintedGrouped, setIsUnpaintedGrouped] = React.useState(false);
+
   // Load data and initialize DuckDB on component mount
   React.useEffect(() => {
     const init = async () => {
@@ -153,8 +156,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     // Create statement text map
     const statementTextMap = createStatementTextMap(statements);
 
-    // Get label array for analysis
-    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, false);
+    // Get label array for analysis - include unpainted as a group if isUnpaintedGrouped is true
+    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, isUnpaintedGrouped);
 
     // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
@@ -194,7 +197,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     } finally {
       setIsCalculatingRepStatements(false);
     }
-  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset]);
+  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, isUnpaintedGrouped]);
 
   // update both selectedIds and pointGroups when selection changes (only in groups mode)
   function handleSelectionChange(ids: (number | string)[]) {
@@ -322,6 +325,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
           representativeStatements={representativeStatements}
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
+          isUnpaintedGrouped={isUnpaintedGrouped}
         />
       </div>
 
@@ -331,6 +335,16 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
           <ParticipantCountBar
             pointGroups={pointGroups}
             isProportional={true}
+            isUnpaintedGrouped={isUnpaintedGrouped}
+            onUnpaintedGroupedChange={(newValue) => {
+              setIsUnpaintedGrouped(newValue);
+              // Trigger recalculation of representative statements when grouping changes
+              if (layerMode === "groups" && pointGroups.length > 0) {
+                setTimeout(() => {
+                  calculateRepStatements();
+                }, 100);
+              }
+            }}
           />
         </div>
       </div>
