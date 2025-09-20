@@ -274,10 +274,10 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
             style={{
               ...(proportionalData.unpaintedGroup.useMinimalWidth
                 ? { width: 'fit-content' }
-                : proportionalData.unpaintedGroup.widthPercent > 80
+                : isUnpaintedGrouped
                   ? {
-                      width: 'auto',
-                      flex: '1 1 auto', // Allow it to grow and shrink, taking remaining space
+                      flex: '1 1 0', // Take remaining space when grouped, regardless of calculated percentage
+                      minWidth: 'fit-content',
                     }
                   : {
                       width: `calc(${proportionalData.unpaintedGroup.widthPercent}% - ${(proportionalData.totalBadges - 1) * proportionalData.gapWidth * (proportionalData.unpaintedGroup.widthPercent / 100)}px)`,
