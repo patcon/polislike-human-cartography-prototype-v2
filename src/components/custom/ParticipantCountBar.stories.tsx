@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { PointGroupBadges } from "./PointGroupBadges";
+import { ParticipantCountBar } from "./ParticipantCountBar";
 
 const meta = {
-  title: "Components/PointGroupBadges",
-  component: PointGroupBadges,
+  title: "Components/ParticipantCountBar",
+  component: ParticipantCountBar,
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof PointGroupBadges>;
+} satisfies Meta<typeof ParticipantCountBar>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -73,7 +73,7 @@ export const Default: Story = {
     
     return (
       <div className="w-full">
-        <PointGroupBadges
+        <ParticipantCountBar
           {...args}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}
@@ -90,7 +90,7 @@ export const UncontrolledState: Story = {
   render: (args) => {
     return (
       <div className="w-full">
-        <PointGroupBadges {...args} />
+        <ParticipantCountBar {...args} />
       </div>
     );
   },
@@ -103,7 +103,7 @@ export const OnlyUnpainted: Story = {
   render: (args) => {
     return (
       <div className="w-full">
-        <PointGroupBadges {...args} />
+        <ParticipantCountBar {...args} />
       </div>
     );
   },
@@ -120,7 +120,7 @@ export const NoUnpainted: Story = {
   render: (args) => {
     return (
       <div className="w-full">
-        <PointGroupBadges {...args} />
+        <ParticipantCountBar {...args} />
       </div>
     );
   },
@@ -136,7 +136,7 @@ export const NotProportional: Story = {
     
     return (
       <div className="w-full">
-        <PointGroupBadges
+        <ParticipantCountBar
           {...args}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}
@@ -153,7 +153,7 @@ export const EmptyGroups: Story = {
   render: (args) => {
     return (
       <div className="w-full">
-        <PointGroupBadges {...args} />
+        <ParticipantCountBar {...args} />
       </div>
     );
   },
@@ -168,7 +168,7 @@ export const SmallSelectionMediumConvo: Story = {
     
     return (
       <div className="w-full">
-        <PointGroupBadges
+        <ParticipantCountBar
           {...args}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}
@@ -187,7 +187,7 @@ export const SmallSelectionLargeConvo: Story = {
     
     return (
       <div className="w-full">
-        <PointGroupBadges
+        <ParticipantCountBar
           {...args}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}
@@ -222,7 +222,7 @@ export const RandomMediumConvo: Story = {
             Regenerate
           </button>
         </div>
-        <PointGroupBadges
+        <ParticipantCountBar
           pointGroups={pointGroups}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}
@@ -257,7 +257,7 @@ export const RandomLargeConvo: Story = {
             Regenerate
           </button>
         </div>
-        <PointGroupBadges
+        <ParticipantCountBar
           pointGroups={pointGroups}
           isUnpaintedGrouped={isUnpaintedGrouped}
           onUnpaintedGroupedChange={setIsUnpaintedGrouped}

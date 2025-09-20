@@ -12,7 +12,7 @@ type PointGroupData = {
   colorIndex: number | null; // null for unpainted group
 };
 
-type PointGroupBadgesProps = {
+type ParticipantCountBarProps = {
   pointGroups: (number | null)[];
   isUnpaintedGrouped?: boolean;
   onUnpaintedGroupedChange?: (isGrouped: boolean) => void;
@@ -20,7 +20,7 @@ type PointGroupBadgesProps = {
   className?: string;
 };
 
-export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
+export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   pointGroups,
   isUnpaintedGrouped: controlledIsUnpaintedGrouped,
   onUnpaintedGroupedChange,
