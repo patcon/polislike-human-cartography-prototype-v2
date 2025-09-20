@@ -83,9 +83,9 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     const totalPoints = pointGroups.length;
     if (totalPoints === 0) return null;
 
-    // Calculate total number of badges to account for gaps
+    // Calculate total number of badges - no gaps between colored badges now
     const totalBadges = groupData.coloredGroups.length + (groupData.unpaintedGroup ? 1 : 0);
-    const gapWidth = 4; // gap-1 = 4px in Tailwind
+    const gapWidth = 4; // gap-1 = 4px in Tailwind (only between colored group and unpainted group)
     
     // When unpainted is not grouped, it takes minimal space, colored badges divide the rest
     let coloredPointsTotal: number;
@@ -147,16 +147,41 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
         !hasColoredGroups ? "justify-end" : "",
         className
       )}>
-        {/* Colored groups taking proportional space */}
-        {proportionalData.coloredGroups.map((group) => {
+        {/* Colored groups taking proportional space - continuous design using styled badges */}
+        {proportionalData.coloredGroups.map((group, index) => {
           const color = PALETTE_COLORS[group.colorIndex!];
+          const isFirst = index === 0;
+          const isLast = index === proportionalData.coloredGroups.length - 1;
+          
+          // Determine border radius override classes and margin for continuous appearance
+          let borderRadiusOverride = '';
+          let marginClass = '';
+          if (isFirst && isLast) {
+            borderRadiusOverride = ''; // Single badge keeps default rounding
+          } else if (isFirst) {
+            borderRadiusOverride = 'rounded-r-none'; // First badge: remove right rounding
+          } else if (isLast) {
+            borderRadiusOverride = 'rounded-l-none'; // Last badge: remove left rounding
+          } else {
+            borderRadiusOverride = 'rounded-none'; // Middle badges: remove all rounding
+            marginClass = '-ml-1'; // Pull middle badges left to close gaps
+          }
+          if (!isFirst && !isLast && proportionalData.coloredGroups.length > 2) {
+            marginClass = '-ml-1'; // Pull non-first badges left to close gaps
+          } else if (!isFirst) {
+            marginClass = '-ml-1'; // Pull non-first badges left to close gaps
+          }
           
           if (group.useFlexGrow) {
             // When unpainted is minimal, use flex-grow for colored badges
             return (
               <Badge
                 key={group.colorIndex}
-                className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+                className={cn(
+                  "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2",
+                  borderRadiusOverride,
+                  marginClass
+                )}
                 style={{
                   backgroundColor: color,
                   flexGrow: group.count, // Flex-grow proportional to count
@@ -182,7 +207,11 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
               return (
                 <Badge
                   key={group.colorIndex}
-                  className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+                  className={cn(
+                    "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2",
+                    borderRadiusOverride,
+                    marginClass
+                  )}
                   style={{
                     backgroundColor: color,
                     minWidth: `${group.widthPercent}%`, // Use actual proportion as min-width
@@ -204,7 +233,11 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
               return (
                 <Badge
                   key={group.colorIndex}
-                  className="text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2"
+                  className={cn(
+                    "text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2",
+                    borderRadiusOverride,
+                    marginClass
+                  )}
                   style={{
                     backgroundColor: color,
                     width: `calc(${group.widthPercent}% - ${totalGapWidth * (group.widthPercent / 100)}px)`,
@@ -274,14 +307,37 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   // Non-proportional layout (original)
   return (
     <div className={cn("flex gap-1 flex-wrap items-center justify-between", className)}>
-      {/* Colored groups container - always present for consistent layout */}
+      {/* Colored groups container - continuous design using styled badges */}
       <div className="flex gap-1 flex-wrap">
-        {groupData.coloredGroups.map((group) => {
+        {groupData.coloredGroups.map((group, index) => {
           const color = PALETTE_COLORS[group.colorIndex!];
+          const isFirst = index === 0;
+          const isLast = index === groupData.coloredGroups.length - 1;
+          
+          // Determine border radius override classes and margin for continuous appearance
+          let borderRadiusOverride = '';
+          let marginClass = '';
+          if (isFirst && isLast) {
+            borderRadiusOverride = ''; // Single badge keeps default rounding
+          } else if (isFirst) {
+            borderRadiusOverride = 'rounded-r-none'; // First badge: remove right rounding
+          } else if (isLast) {
+            borderRadiusOverride = 'rounded-l-none'; // Last badge: remove left rounding
+          } else {
+            borderRadiusOverride = 'rounded-none'; // Middle badges: remove all rounding
+          }
+          if (!isFirst) {
+            marginClass = '-ml-1'; // Pull non-first badges left to close gaps
+          }
+          
           return (
             <Badge
               key={group.colorIndex}
-              className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+              className={cn(
+                "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2",
+                borderRadiusOverride,
+                marginClass
+              )}
               style={{
                 backgroundColor: color,
                 display: 'flex',
