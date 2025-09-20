@@ -3,6 +3,7 @@
 import * as React from "react";
 import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
+import { PointGroupBadges } from "./PointGroupBadges";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getParticipantDataForStatement, initializeDuckDB } from "../../lib/duckdb";
@@ -322,6 +323,16 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
         />
+      </div>
+
+      {/* PointGroupBadges at the very bottom of the screen */}
+      <div className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
+        <div className="pb-0 pointer-events-auto">
+          <PointGroupBadges
+            pointGroups={pointGroups}
+            isProportional={true}
+          />
+        </div>
       </div>
     </div>
   );
