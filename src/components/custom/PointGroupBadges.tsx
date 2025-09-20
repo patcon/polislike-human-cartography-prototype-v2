@@ -1,0 +1,268 @@
+"use client";
+
+import * as React from "react";
+import { Badge } from "@/components/ui/badge";
+import { PALETTE_COLORS, UNPAINTED_COLOR } from "@/constants";
+import { cn } from "@/lib/utils";
+
+type PointGroupData = {
+  label: string;
+  count: number;
+  colorIndex: number | null; // null for unpainted group
+};
+
+type PointGroupBadgesProps = {
+  pointGroups: (number | null)[];
+  isUnpaintedGrouped?: boolean;
+  onUnpaintedGroupedChange?: (isGrouped: boolean) => void;
+  isProportional?: boolean;
+  className?: string;
+};
+
+export const PointGroupBadges: React.FC<PointGroupBadgesProps> = ({
+  pointGroups,
+  isUnpaintedGrouped: controlledIsUnpaintedGrouped,
+  onUnpaintedGroupedChange,
+  isProportional = true,
+  className,
+}) => {
+  // Internal state for uncontrolled mode
+  const [internalIsUnpaintedGrouped, setInternalIsUnpaintedGrouped] = React.useState(false);
+  
+  // Determine if we're in controlled mode
+  const isControlled = controlledIsUnpaintedGrouped !== undefined;
+  const isUnpaintedGrouped = isControlled ? controlledIsUnpaintedGrouped : internalIsUnpaintedGrouped;
+
+  // Calculate group data from pointGroups
+  const groupData = React.useMemo(() => {
+    const coloredGroups: PointGroupData[] = [];
+    let unpaintedGroup: PointGroupData | null = null;
+    const groupCounts = new Map<number | null, number>();
+
+    // Count occurrences of each group
+    pointGroups.forEach(group => {
+      groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
+    });
+
+    // Handle unpainted group separately
+    const unpaintedCount = groupCounts.get(null) || 0;
+    if (unpaintedCount > 0) {
+      unpaintedGroup = {
+        label: unpaintedCount.toString(),
+        count: unpaintedCount,
+        colorIndex: null,
+      };
+    }
+
+    // Add other groups in order (just show numbers)
+    for (let i = 0; i < PALETTE_COLORS.length; i++) {
+      const count = groupCounts.get(i) || 0;
+      if (count > 0) {
+        coloredGroups.push({
+          label: count.toString(),
+          count,
+          colorIndex: i,
+        });
+      }
+    }
+
+    return { coloredGroups, unpaintedGroup };
+  }, [pointGroups]);
+
+  // Calculate proportional widths if needed
+  const proportionalData = React.useMemo(() => {
+    if (!isProportional) return null;
+
+    const totalPoints = pointGroups.length;
+    if (totalPoints === 0) return null;
+
+    // Calculate total number of badges to account for gaps
+    const totalBadges = groupData.coloredGroups.length + (groupData.unpaintedGroup ? 1 : 0);
+    const gapWidth = 4; // gap-1 = 4px in Tailwind
+    
+    // When unpainted is not grouped, it takes minimal space, colored badges divide the rest
+    let coloredPointsTotal: number;
+    let availableWidthPercent: number;
+    
+    if (groupData.unpaintedGroup && !isUnpaintedGrouped) {
+      // Unpainted badge takes minimal space, colored badges get proportional share of remaining space
+      coloredPointsTotal = groupData.coloredGroups.reduce((sum, group) => sum + group.count, 0);
+      availableWidthPercent = 100; // Colored badges will use flex-grow to fill remaining space
+    } else {
+      // All badges (including unpainted if grouped) share space proportionally
+      coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? groupData.unpaintedGroup.count : 0);
+      availableWidthPercent = 100;
+    }
+
+    const coloredGroupsWithWidth = groupData.coloredGroups.map(group => ({
+      ...group,
+      widthPercent: coloredPointsTotal > 0 ? (group.count / coloredPointsTotal) * availableWidthPercent : 0,
+      useFlexGrow: groupData.unpaintedGroup && !isUnpaintedGrouped, // Use flex-grow when unpainted is minimal
+    }));
+
+    const unpaintedGroupWithWidth = groupData.unpaintedGroup ? {
+      ...groupData.unpaintedGroup,
+      widthPercent: isUnpaintedGrouped ? (groupData.unpaintedGroup.count / totalPoints) * availableWidthPercent : 0,
+      useMinimalWidth: !isUnpaintedGrouped,
+    } : null;
+
+    return {
+      coloredGroups: coloredGroupsWithWidth,
+      unpaintedGroup: unpaintedGroupWithWidth,
+      totalBadges,
+      gapWidth
+    };
+  }, [groupData, isProportional, pointGroups.length, isUnpaintedGrouped]);
+
+  const handleUnpaintedClick = () => {
+    const newValue = !isUnpaintedGrouped;
+    
+    if (isControlled) {
+      onUnpaintedGroupedChange?.(newValue);
+    } else {
+      setInternalIsUnpaintedGrouped(newValue);
+    }
+  };
+
+  if (groupData.coloredGroups.length === 0 && !groupData.unpaintedGroup) {
+    return null;
+  }
+
+  if (isProportional && proportionalData) {
+    // Proportional layout
+    return (
+      <div className={cn("flex gap-1 items-center w-full", className)}>
+        {/* Colored groups taking proportional space */}
+        {proportionalData.coloredGroups.map((group) => {
+          const color = PALETTE_COLORS[group.colorIndex!];
+          
+          if (group.useFlexGrow) {
+            // When unpainted is minimal, use flex-grow for colored badges
+            return (
+              <Badge
+                key={group.colorIndex}
+                className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+                style={{
+                  backgroundColor: color,
+                  flexGrow: group.count, // Flex-grow proportional to count
+                  minWidth: 'fit-content',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+                }}
+              >
+                {group.label}
+              </Badge>
+            );
+          } else {
+            // Standard proportional width calculation
+            const totalGapWidth = (proportionalData.totalBadges - 1) * proportionalData.gapWidth;
+            return (
+              <Badge
+                key={group.colorIndex}
+                className="text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2"
+                style={{
+                  backgroundColor: color,
+                  width: `calc(${group.widthPercent}% - ${totalGapWidth * (group.widthPercent / 100)}px)`,
+                  minWidth: 'fit-content',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+                }}
+              >
+                {group.label}
+              </Badge>
+            );
+          }
+        })}
+
+        {/* Unpainted group - proportional if grouped, minimal if not */}
+        {proportionalData.unpaintedGroup && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "cursor-pointer border text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2",
+              isUnpaintedGrouped
+                ? "bg-black text-white border-black hover:bg-gray-800"
+                : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400"
+            )}
+            onClick={handleUnpaintedClick}
+            style={{
+              ...(isUnpaintedGrouped
+                ? { backgroundColor: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }
+                : { color: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }),
+              width: proportionalData.unpaintedGroup.useMinimalWidth
+                ? 'fit-content'
+                : `calc(${proportionalData.unpaintedGroup.widthPercent}% - ${(proportionalData.totalBadges - 1) * proportionalData.gapWidth * (proportionalData.unpaintedGroup.widthPercent / 100)}px)`,
+              minWidth: 'fit-content',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              textAlign: 'left',
+              transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
+            }}
+          >
+            {proportionalData.unpaintedGroup.label}
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
+  // Non-proportional layout (original)
+  return (
+    <div className={cn("flex gap-1 flex-wrap justify-between items-center", className)}>
+      {/* Colored groups on the left */}
+      <div className="flex gap-1 flex-wrap">
+        {groupData.coloredGroups.map((group) => {
+          const color = PALETTE_COLORS[group.colorIndex!];
+          return (
+            <Badge
+              key={group.colorIndex}
+              className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+              style={{
+                backgroundColor: color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                textAlign: 'left',
+              }}
+            >
+              {group.label}
+            </Badge>
+          );
+        })}
+      </div>
+
+      {/* Unpainted group on the right */}
+      {groupData.unpaintedGroup && (
+        <Badge
+          variant="outline"
+          className={cn(
+            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2",
+            isUnpaintedGrouped
+              ? "bg-black text-white border-black hover:bg-gray-800"
+              : "bg-transparent text-gray-500 border-gray-300 hover:border-gray-400"
+          )}
+          onClick={handleUnpaintedClick}
+          style={{
+            ...(isUnpaintedGrouped
+              ? { backgroundColor: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }
+              : { color: UNPAINTED_COLOR, borderColor: UNPAINTED_COLOR }),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            transition: 'background-color 300ms ease-in-out, border-color 300ms ease-in-out, color 300ms ease-in-out',
+          }}
+        >
+          {groupData.unpaintedGroup.label}
+        </Badge>
+      )}
+    </div>
+  );
+};
