@@ -155,8 +155,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
                   minWidth: 'fit-content',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
+                  justifyContent: 'flex-end',
+                  textAlign: 'right',
                   transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
                 }}
               >
@@ -182,8 +182,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
                     flexShrink: 1,
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    textAlign: 'left',
+                    justifyContent: 'flex-end',
+                    textAlign: 'right',
                     transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
                   }}
                 >
@@ -203,8 +203,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
                     minWidth: 'fit-content',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    textAlign: 'left',
+                    justifyContent: 'flex-end',
+                    textAlign: 'right',
                     transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
                   }}
                 >
@@ -245,8 +245,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
               minWidth: 'fit-content',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-start',
-              textAlign: 'left',
+              justifyContent: 'flex-end',
+              textAlign: 'right',
             }}
           >
             <div className="flex items-center gap-1">
@@ -278,8 +278,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
                 backgroundColor: color,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'flex-start',
-                textAlign: 'left',
+                justifyContent: 'flex-end',
+                textAlign: 'right',
               }}
             >
               {group.label}
@@ -302,8 +302,8 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            textAlign: 'left',
+            justifyContent: 'flex-end',
+            textAlign: 'right',
           }}
         >
           <div className="flex items-center gap-1">
