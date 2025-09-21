@@ -8,16 +8,81 @@
 # If no pipeline name is provided, defaults to interactive selection
 # Supports file selection and optional suffix for target filenames
 
-# Function to show interactive pipeline selection
-select_pipeline_interactive() {
+# Function to show interactive conversation selection
+select_conversation_interactive() {
     local data_dir="$HOME/repos/kedro-polis-pipelines/data"
+    local conversations=()
+    local count=0
+    
+    echo "Available conversations:" >&2
+    
+    if [ -d "$data_dir" ]; then
+        for conv_dir in "$data_dir"/*; do
+            if [ -d "$conv_dir" ]; then
+                local conv_name=$(basename "$conv_dir")
+                # Check if directory name starts with a number
+                if [[ "$conv_name" =~ ^[0-9] ]]; then
+                    # Check if this conversation has any valid pipelines
+                    local has_pipelines=false
+                    for pipeline in "$conv_dir"/*; do
+                        if [ -d "$pipeline" ]; then
+                            local primary_dir="$pipeline/03_primary"
+                            local projections_file="$primary_dir/projections.json"
+                            if [ -d "$primary_dir" ] && [ -f "$projections_file" ]; then
+                                has_pipelines=true
+                                break
+                            fi
+                        fi
+                    done
+                    
+                    if [ "$has_pipelines" = true ]; then
+                        count=$((count + 1))
+                        printf "%3d. %s\n" "$count" "$conv_name" >&2
+                        conversations+=("$conv_name")
+                    fi
+                fi
+            fi
+        done
+    fi
+    
+    if [ $count -eq 0 ]; then
+        echo "No valid conversations found with pipeline data files." >&2
+        exit 1
+    fi
+    
+    echo "" >&2
+    echo "Enter conversation number (1-$count) or press Enter to quit:" >&2
+    
+    read -r choice
+    
+    # If empty input (just Enter), quit
+    if [ -z "$choice" ]; then
+        echo "Exiting." >&2
+        exit 0
+    fi
+    
+    # Validate numeric input
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt $count ]; then
+        echo "Invalid selection. Please enter a number between 1 and $count." >&2
+        exit 1
+    fi
+    
+    # Return selected conversation name (only this goes to stdout)
+    echo "${conversations[$((choice-1))]}"
+}
+
+# Function to show interactive pipeline selection within a conversation
+select_pipeline_interactive() {
+    local conversation="$1"
+    local data_dir="$HOME/repos/kedro-polis-pipelines/data"
+    local conv_dir="$data_dir/$conversation"
     local pipelines=()
     local count=0
     
-    echo "Available pipelines:" >&2
+    echo "Available pipelines in conversation '$conversation':" >&2
     
-    if [ -d "$data_dir" ]; then
-        for pipeline in "$data_dir"/*; do
+    if [ -d "$conv_dir" ]; then
+        for pipeline in "$conv_dir"/*; do
             if [ -d "$pipeline" ]; then
                 local pipeline_name=$(basename "$pipeline")
                 local primary_dir="$pipeline/03_primary"
@@ -33,7 +98,7 @@ select_pipeline_interactive() {
     fi
     
     if [ $count -eq 0 ]; then
-        echo "No valid pipelines found with required data files." >&2
+        echo "No valid pipelines found in conversation '$conversation' with required data files." >&2
         exit 1
     fi
     
@@ -58,19 +123,27 @@ select_pipeline_interactive() {
     echo "${pipelines[$((choice-1))]}"
 }
 
-# Function to get available pipelines (for error messages)
+# Function to get available conversations and pipelines (for error messages)
 get_available_pipelines() {
     local data_dir="$HOME/repos/kedro-polis-pipelines/data"
     
     if [ -d "$data_dir" ]; then
-        for pipeline in "$data_dir"/*; do
-            if [ -d "$pipeline" ]; then
-                local pipeline_name=$(basename "$pipeline")
-                local primary_dir="$pipeline/03_primary"
-                local projections_file="$primary_dir/projections.json"
-                
-                if [ -d "$primary_dir" ] && [ -f "$projections_file" ]; then
-                    echo "$pipeline_name"
+        for conv_dir in "$data_dir"/*; do
+            if [ -d "$conv_dir" ]; then
+                local conv_name=$(basename "$conv_dir")
+                # Check if directory name starts with a number
+                if [[ "$conv_name" =~ ^[0-9] ]]; then
+                    for pipeline in "$conv_dir"/*; do
+                        if [ -d "$pipeline" ]; then
+                            local pipeline_name=$(basename "$pipeline")
+                            local primary_dir="$pipeline/03_primary"
+                            local projections_file="$primary_dir/projections.json"
+                            
+                            if [ -d "$primary_dir" ] && [ -f "$projections_file" ]; then
+                                echo "$conv_name/$pipeline_name"
+                            fi
+                        fi
+                    done
                 fi
             fi
         done
@@ -142,15 +215,41 @@ get_suffix_interactive() {
 
 # If no argument provided, show interactive selection
 if [ $# -eq 0 ]; then
-    PIPELINE_NAME=$(select_pipeline_interactive)
+    CONVERSATION_NAME=$(select_conversation_interactive)
+    PIPELINE_NAME=$(select_pipeline_interactive "$CONVERSATION_NAME")
+    FULL_PIPELINE_PATH="$CONVERSATION_NAME/$PIPELINE_NAME"
 else
-    PIPELINE_NAME="$1"
+    # Argument provided - expect format "conversation/pipeline" or just "pipeline" (legacy)
+    if [[ "$1" == *"/"* ]]; then
+        FULL_PIPELINE_PATH="$1"
+    else
+        # Legacy format - try to find the pipeline in any conversation
+        PIPELINE_NAME="$1"
+        FULL_PIPELINE_PATH=""
+        data_dir="$HOME/repos/kedro-polis-pipelines/data"
+        
+        for conv_dir in "$data_dir"/*; do
+            if [ -d "$conv_dir" ]; then
+                local conv_name=$(basename "$conv_dir")
+                if [[ "$conv_name" =~ ^[0-9] ]] && [ -d "$conv_dir/$PIPELINE_NAME/03_primary" ]; then
+                    FULL_PIPELINE_PATH="$conv_name/$PIPELINE_NAME"
+                    break
+                fi
+            fi
+        done
+        
+        if [ -z "$FULL_PIPELINE_PATH" ]; then
+            echo "Error: Pipeline '$PIPELINE_NAME' not found in any conversation directory."
+            echo "Please use format 'conversation/pipeline' or run without arguments for interactive selection."
+            exit 1
+        fi
+    fi
 fi
 
-SOURCE_DIR="$HOME/repos/kedro-polis-pipelines/data/$PIPELINE_NAME/03_primary"
+SOURCE_DIR="$HOME/repos/kedro-polis-pipelines/data/$FULL_PIPELINE_PATH/03_primary"
 TARGET_DIR="public"
 
-echo "Copying data files from Kedro pipeline: $PIPELINE_NAME"
+echo "Copying data files from Kedro pipeline: $FULL_PIPELINE_PATH"
 echo "Source: $SOURCE_DIR"
 echo "Target: $TARGET_DIR"
 
