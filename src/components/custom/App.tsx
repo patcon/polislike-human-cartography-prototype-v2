@@ -208,7 +208,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     } finally {
       setIsCalculatingRepStatements(false);
     }
-  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, isUnpaintedGrouped, drawerTab, setDrawerTab]);
+  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, drawerTab, setDrawerTab]);
 
   // update both selectedIds and pointGroups when selection changes (only in groups mode)
   function handleSelectionChange(ids: (number | string)[]) {
