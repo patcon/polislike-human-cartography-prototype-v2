@@ -147,17 +147,20 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
   const mode: "move" | "paint" = action === "paint-groups" ? "paint" : "move";
 
   // Calculate representative statements
-  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: (number | null)[]) => {
+  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: (number | null)[], updatedIsUnpaintedGrouped?: boolean) => {
     if (layerMode !== "groups" || isCalculatingRepStatements) return;
 
     // Use the provided updated groups or fall back to current state
     const groupsToAnalyze = updatedPointGroups || pointGroups;
+    
+    // Use the provided updated unpainted grouped state or fall back to current state
+    const unpaintedGroupedToUse = updatedIsUnpaintedGrouped !== undefined ? updatedIsUnpaintedGrouped : isUnpaintedGrouped;
 
     // Create statement text map
     const statementTextMap = createStatementTextMap(statements);
 
     // Get label array for analysis - include unpainted as a group if isUnpaintedGrouped is true
-    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, isUnpaintedGrouped);
+    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse);
 
     // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
@@ -167,6 +170,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
 
     if (!canAnalyze) {
       console.log('Cannot analyze: need at least 2 groups, found:', uniqueGroups.size);
+      // Clear representative statements when below threshold to prevent stale data
+      setRepresentativeStatements({});
+      setRepStatementsError(null);
+      
+      // Reset drawer to "all" tab when below threshold to prevent showing stale group tabs
+      if (drawerTab !== "all") {
+        setDrawerTab("all");
+      }
       return;
     }
 
@@ -197,7 +208,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     } finally {
       setIsCalculatingRepStatements(false);
     }
-  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, isUnpaintedGrouped]);
+  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, isUnpaintedGrouped, drawerTab, setDrawerTab]);
 
   // update both selectedIds and pointGroups when selection changes (only in groups mode)
   function handleSelectionChange(ids: (number | string)[]) {
@@ -217,7 +228,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
         // Pass the updated state directly to avoid timing issues
         setTimeout(() => {
           calculateRepStatements(next);
-        }, 100);
+        }, 50);
 
         return next;
       });
@@ -350,9 +361,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
               setIsUnpaintedGrouped(newValue);
               // Trigger recalculation of representative statements when grouping changes
               if (layerMode === "groups" && pointGroups.length > 0) {
+                // Use setTimeout to ensure state update has been processed
                 setTimeout(() => {
-                  calculateRepStatements();
-                }, 100);
+                  calculateRepStatements(undefined, newValue);
+                }, 50);
               }
             }}
           />
