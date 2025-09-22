@@ -4,18 +4,19 @@
 # This copies projections.json, statements.json, and votes.parquet
 # from the specified Kedro pipeline data directory
 #
-# Usage: ./copy-data.sh [PIPELINE_NAME]
+# Usage: ./copy-data.sh [PIPELINE_NAME[,PIPELINE_NAME2,...]]
 # If no pipeline name is provided, defaults to interactive selection
-# Supports file selection and optional suffix for target filenames
+# Supports multiple pipelines (comma-separated), file selection, and optional suffixes
+# For multiple pipelines, provide comma-separated suffixes in the same order
 
 # Function to show interactive conversation selection
 select_conversation_interactive() {
     local data_dir="$HOME/repos/kedro-polis-pipelines/data"
     local conversations=()
     local count=0
-    
+
     echo "Available conversations:" >&2
-    
+
     if [ -d "$data_dir" ]; then
         for conv_dir in "$data_dir"/*; do
             if [ -d "$conv_dir" ]; then
@@ -34,7 +35,7 @@ select_conversation_interactive() {
                             fi
                         fi
                     done
-                    
+
                     if [ "$has_pipelines" = true ]; then
                         count=$((count + 1))
                         printf "%3d. %s\n" "$count" "$conv_name" >&2
@@ -44,29 +45,29 @@ select_conversation_interactive() {
             fi
         done
     fi
-    
+
     if [ $count -eq 0 ]; then
         echo "No valid conversations found with pipeline data files." >&2
         exit 1
     fi
-    
+
     echo "" >&2
     echo "Enter conversation number (1-$count) or press Enter to quit:" >&2
-    
+
     read -r choice
-    
+
     # If empty input (just Enter), quit
     if [ -z "$choice" ]; then
         echo "Exiting." >&2
         exit 0
     fi
-    
+
     # Validate numeric input
     if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt $count ]; then
         echo "Invalid selection. Please enter a number between 1 and $count." >&2
         exit 1
     fi
-    
+
     # Return selected conversation name (only this goes to stdout)
     echo "${conversations[$((choice-1))]}"
 }
@@ -78,16 +79,16 @@ select_pipeline_interactive() {
     local conv_dir="$data_dir/$conversation"
     local pipelines=()
     local count=0
-    
+
     echo "Available pipelines in conversation '$conversation':" >&2
-    
+
     if [ -d "$conv_dir" ]; then
         for pipeline in "$conv_dir"/*; do
             if [ -d "$pipeline" ]; then
                 local pipeline_name=$(basename "$pipeline")
                 local primary_dir="$pipeline/03_primary"
                 local projections_file="$primary_dir/projections.json"
-                
+
                 if [ -d "$primary_dir" ] && [ -f "$projections_file" ]; then
                     count=$((count + 1))
                     printf "%3d. %s\n" "$count" "$pipeline_name" >&2
@@ -96,37 +97,58 @@ select_pipeline_interactive() {
             fi
         done
     fi
-    
+
     if [ $count -eq 0 ]; then
         echo "No valid pipelines found in conversation '$conversation' with required data files." >&2
         exit 1
     fi
-    
+
     echo "" >&2
-    echo "Enter pipeline number (1-$count) or press Enter to quit:" >&2
-    
+    echo "Enter pipeline numbers (1-$count) separated by commas, or press Enter to quit:" >&2
+    echo "Example: 1,3,5 to select pipelines 1, 3, and 5" >&2
+
     read -r choice
-    
+
     # If empty input (just Enter), quit
     if [ -z "$choice" ]; then
         echo "Exiting." >&2
         exit 0
     fi
-    
-    # Validate numeric input
-    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt $count ]; then
-        echo "Invalid selection. Please enter a number between 1 and $count." >&2
-        exit 1
-    fi
-    
-    # Return selected pipeline name (only this goes to stdout)
-    echo "${pipelines[$((choice-1))]}"
+
+    # Parse comma-separated input
+    local selected_pipelines=()
+    IFS=',' read -ra PIPELINE_NUMS <<< "$choice"
+
+    for num in "${PIPELINE_NUMS[@]}"; do
+        # Trim whitespace
+        num=$(echo "$num" | xargs)
+
+        # Validate numeric input
+        if ! [[ "$num" =~ ^[0-9]+$ ]] || [ "$num" -lt 1 ] || [ "$num" -gt $count ]; then
+            echo "Invalid selection: $num. Please enter numbers between 1 and $count." >&2
+            exit 1
+        fi
+
+        # Add selected pipeline
+        selected_pipelines+=("${pipelines[$((num-1))]}")
+    done
+
+    # Remove duplicates
+    local unique_pipelines=()
+    for pipeline in "${selected_pipelines[@]}"; do
+        if [[ ! " ${unique_pipelines[@]} " =~ " ${pipeline} " ]]; then
+            unique_pipelines+=("$pipeline")
+        fi
+    done
+
+    # Return selected pipeline names (one per line)
+    printf '%s\n' "${unique_pipelines[@]}"
 }
 
 # Function to get available conversations and pipelines (for error messages)
 get_available_pipelines() {
     local data_dir="$HOME/repos/kedro-polis-pipelines/data"
-    
+
     if [ -d "$data_dir" ]; then
         for conv_dir in "$data_dir"/*; do
             if [ -d "$conv_dir" ]; then
@@ -138,7 +160,7 @@ get_available_pipelines() {
                             local pipeline_name=$(basename "$pipeline")
                             local primary_dir="$pipeline/03_primary"
                             local projections_file="$primary_dir/projections.json"
-                            
+
                             if [ -d "$primary_dir" ] && [ -f "$projections_file" ]; then
                                 echo "$conv_name/$pipeline_name"
                             fi
@@ -154,7 +176,7 @@ get_available_pipelines() {
 select_files_interactive() {
     local files=("projections.json" "statements.json" "votes.parquet")
     local selected_files=()
-    
+
     echo "Available files to copy:" >&2
     for i in "${!files[@]}"; do
         printf "%3d. %s\n" "$((i+1))" "${files[$i]}" >&2
@@ -162,9 +184,9 @@ select_files_interactive() {
     echo "  4. All files" >&2
     echo "" >&2
     echo "Enter file numbers (1-4) separated by spaces, or press Enter for all files:" >&2
-    
+
     read -r choice
-    
+
     # If empty input (just Enter), select all files
     if [ -z "$choice" ]; then
         selected_files=("${files[@]}")
@@ -189,7 +211,7 @@ select_files_interactive() {
             fi
         done
     fi
-    
+
     # Remove duplicates
     local unique_files=()
     for file in "${selected_files[@]}"; do
@@ -197,70 +219,160 @@ select_files_interactive() {
             unique_files+=("$file")
         fi
     done
-    
+
     # Return selected files (one per line)
     printf '%s\n' "${unique_files[@]}"
 }
 
-# Function to get suffix interactively
-get_suffix_interactive() {
-    echo "Enter optional suffix for filenames (e.g., 'foo' will create projections.foo.json):" >&2
-    echo "Press Enter for no suffix:" >&2
-    
-    read -r suffix
-    
-    # Return suffix (empty if none provided)
-    echo "$suffix"
+# Function to get suffixes interactively for multiple pipelines
+get_suffixes_interactive() {
+    local pipeline_count="$1"
+    shift
+    local pipelines=("$@")
+
+    if [ "$pipeline_count" -eq 1 ]; then
+        echo "Enter optional suffix for filenames (e.g., 'foo' will create projections.foo.json):" >&2
+        echo "Press Enter for no suffix:" >&2
+
+        read -r suffix
+        echo "$suffix"
+    else
+        echo "Enter comma-separated suffixes for the $pipeline_count selected pipelines:" >&2
+        echo "Pipelines: ${pipelines[*]}" >&2
+        echo "Example: 'baseline,,experiment' (empty string for no suffix on 2nd pipeline)" >&2
+        echo "Press Enter to use no suffixes for any pipeline:" >&2
+
+        read -r suffixes_input
+
+        if [ -z "$suffixes_input" ]; then
+            # Return empty suffixes for all pipelines
+            for ((i=0; i<pipeline_count; i++)); do
+                echo ""
+            done
+        else
+            # Parse comma-separated suffixes
+            IFS=',' read -ra SUFFIX_ARRAY <<< "$suffixes_input"
+
+            # Ensure we have the right number of suffixes
+            local provided_count=${#SUFFIX_ARRAY[@]}
+            if [ "$provided_count" -ne "$pipeline_count" ]; then
+                echo "Error: Expected $pipeline_count suffixes but got $provided_count." >&2
+                echo "Please provide exactly $pipeline_count comma-separated suffixes." >&2
+                exit 1
+            fi
+
+            # Return suffixes (one per line)
+            for suffix in "${SUFFIX_ARRAY[@]}"; do
+                # Trim whitespace and return (empty string is valid)
+                echo "$(echo "$suffix" | xargs)"
+            done
+        fi
+    fi
 }
 
 # If no argument provided, show interactive selection
 if [ $# -eq 0 ]; then
     CONVERSATION_NAME=$(select_conversation_interactive)
-    PIPELINE_NAME=$(select_pipeline_interactive "$CONVERSATION_NAME")
-    FULL_PIPELINE_PATH="$CONVERSATION_NAME/$PIPELINE_NAME"
+    PIPELINE_NAMES_OUTPUT=$(select_pipeline_interactive "$CONVERSATION_NAME")
+    PIPELINE_NAMES=()
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            PIPELINE_NAMES+=("$line")
+        fi
+    done <<< "$PIPELINE_NAMES_OUTPUT"
+
+    FULL_PIPELINE_PATHS=()
+    for pipeline_name in "${PIPELINE_NAMES[@]}"; do
+        FULL_PIPELINE_PATHS+=("$CONVERSATION_NAME/$pipeline_name")
+    done
 else
-    # Argument provided - expect format "conversation/pipeline" or just "pipeline" (legacy)
-    if [[ "$1" == *"/"* ]]; then
-        FULL_PIPELINE_PATH="$1"
-    else
-        # Legacy format - try to find the pipeline in any conversation
-        PIPELINE_NAME="$1"
-        FULL_PIPELINE_PATH=""
-        data_dir="$HOME/repos/kedro-polis-pipelines/data"
-        
-        for conv_dir in "$data_dir"/*; do
-            if [ -d "$conv_dir" ]; then
-                local conv_name=$(basename "$conv_dir")
-                if [[ "$conv_name" =~ ^[0-9] ]] && [ -d "$conv_dir/$PIPELINE_NAME/03_primary" ]; then
-                    FULL_PIPELINE_PATH="$conv_name/$PIPELINE_NAME"
-                    break
+    # Argument provided - expect format "conversation/pipeline" or comma-separated list
+    if [[ "$1" == *","* ]]; then
+        # Comma-separated list of pipelines
+        IFS=',' read -ra PIPELINE_LIST <<< "$1"
+        FULL_PIPELINE_PATHS=()
+
+        for pipeline_spec in "${PIPELINE_LIST[@]}"; do
+            pipeline_spec=$(echo "$pipeline_spec" | xargs)  # Trim whitespace
+
+            if [[ "$pipeline_spec" == *"/"* ]]; then
+                FULL_PIPELINE_PATHS+=("$pipeline_spec")
+            else
+                # Legacy format - try to find the pipeline in any conversation
+                PIPELINE_NAME="$pipeline_spec"
+                FOUND_PATH=""
+                data_dir="$HOME/repos/kedro-polis-pipelines/data"
+
+                for conv_dir in "$data_dir"/*; do
+                    if [ -d "$conv_dir" ]; then
+                        local conv_name=$(basename "$conv_dir")
+                        if [[ "$conv_name" =~ ^[0-9] ]] && [ -d "$conv_dir/$PIPELINE_NAME/03_primary" ]; then
+                            FOUND_PATH="$conv_name/$PIPELINE_NAME"
+                            break
+                        fi
+                    fi
+                done
+
+                if [ -z "$FOUND_PATH" ]; then
+                    echo "Error: Pipeline '$PIPELINE_NAME' not found in any conversation directory."
+                    echo "Please use format 'conversation/pipeline' or run without arguments for interactive selection."
+                    exit 1
                 fi
+
+                FULL_PIPELINE_PATHS+=("$FOUND_PATH")
             fi
         done
-        
-        if [ -z "$FULL_PIPELINE_PATH" ]; then
-            echo "Error: Pipeline '$PIPELINE_NAME' not found in any conversation directory."
-            echo "Please use format 'conversation/pipeline' or run without arguments for interactive selection."
-            exit 1
+    else
+        # Single pipeline
+        if [[ "$1" == *"/"* ]]; then
+            FULL_PIPELINE_PATHS=("$1")
+        else
+            # Legacy format - try to find the pipeline in any conversation
+            PIPELINE_NAME="$1"
+            FOUND_PATH=""
+            data_dir="$HOME/repos/kedro-polis-pipelines/data"
+
+            for conv_dir in "$data_dir"/*; do
+                if [ -d "$conv_dir" ]; then
+                    local conv_name=$(basename "$conv_dir")
+                    if [[ "$conv_name" =~ ^[0-9] ]] && [ -d "$conv_dir/$PIPELINE_NAME/03_primary" ]; then
+                        FOUND_PATH="$conv_name/$PIPELINE_NAME"
+                        break
+                    fi
+                fi
+            done
+
+            if [ -z "$FOUND_PATH" ]; then
+                echo "Error: Pipeline '$PIPELINE_NAME' not found in any conversation directory."
+                echo "Please use format 'conversation/pipeline' or run without arguments for interactive selection."
+                exit 1
+            fi
+
+            FULL_PIPELINE_PATHS=("$FOUND_PATH")
         fi
     fi
 fi
 
-SOURCE_DIR="$HOME/repos/kedro-polis-pipelines/data/$FULL_PIPELINE_PATH/03_primary"
 TARGET_DIR="public"
 
-echo "Copying data files from Kedro pipeline: $FULL_PIPELINE_PATH"
-echo "Source: $SOURCE_DIR"
-echo "Target: $TARGET_DIR"
+echo "Selected pipelines for copying:"
+for path in "${FULL_PIPELINE_PATHS[@]}"; do
+    echo "  - $path"
+done
+echo ""
 
-# Check if source directory exists
-if [ ! -d "$SOURCE_DIR" ]; then
-    echo "Error: Source directory does not exist: $SOURCE_DIR"
-    echo ""
-    echo "Available pipelines:"
-    get_available_pipelines | sed 's/^/  /'
-    exit 1
-fi
+# Validate all source directories exist
+for FULL_PIPELINE_PATH in "${FULL_PIPELINE_PATHS[@]}"; do
+    SOURCE_DIR="$HOME/repos/kedro-polis-pipelines/data/$FULL_PIPELINE_PATH/03_primary"
+
+    if [ ! -d "$SOURCE_DIR" ]; then
+        echo "Error: Source directory does not exist: $SOURCE_DIR"
+        echo ""
+        echo "Available pipelines:"
+        get_available_pipelines | sed 's/^/  /'
+        exit 1
+    fi
+done
 
 # Check if target directory exists
 if [ ! -d "$TARGET_DIR" ]; then
@@ -278,15 +390,20 @@ while IFS= read -r line; do
     fi
 done <<< "$SELECTED_FILES_OUTPUT"
 
-# Get suffix
+# Get suffixes for multiple pipelines
 echo ""
-SUFFIX=$(get_suffix_interactive)
+PIPELINE_COUNT=${#FULL_PIPELINE_PATHS[@]}
+SUFFIXES_OUTPUT=$(get_suffixes_interactive "$PIPELINE_COUNT" "${FULL_PIPELINE_PATHS[@]}")
+SUFFIXES=()
+while IFS= read -r line; do
+    SUFFIXES+=("$line")
+done <<< "$SUFFIXES_OUTPUT"
 
 # Build target filename function
 get_target_filename() {
     local source_file="$1"
     local suffix="$2"
-    
+
     if [ -z "$suffix" ]; then
         echo "$source_file"
     else
@@ -297,27 +414,41 @@ get_target_filename() {
     fi
 }
 
-# Copy the selected files
+# Copy the selected files from all pipelines
 echo ""
 echo "Copying files..."
 success_count=0
-total_count=${#SELECTED_FILES[@]}
+total_count=$((${#SELECTED_FILES[@]} * ${#FULL_PIPELINE_PATHS[@]}))
 
-for file in "${SELECTED_FILES[@]}"; do
-    source_path="$SOURCE_DIR/$file"
-    target_filename=$(get_target_filename "$file" "$SUFFIX")
-    target_path="$TARGET_DIR/$target_filename"
-    
-    if [ -f "$source_path" ]; then
-        if cp "$source_path" "$target_path"; then
-            echo "✓ $file → $target_filename"
-            success_count=$((success_count + 1))
-        else
-            echo "✗ Failed to copy $file"
-        fi
+for i in "${!FULL_PIPELINE_PATHS[@]}"; do
+    FULL_PIPELINE_PATH="${FULL_PIPELINE_PATHS[$i]}"
+    SUFFIX="${SUFFIXES[$i]}"
+    SOURCE_DIR="$HOME/repos/kedro-polis-pipelines/data/$FULL_PIPELINE_PATH/03_primary"
+
+    echo ""
+    echo "Processing pipeline: $FULL_PIPELINE_PATH"
+    if [ -n "$SUFFIX" ]; then
+        echo "Using suffix: '$SUFFIX'"
     else
-        echo "✗ Source file not found: $file"
+        echo "No suffix applied"
     fi
+
+    for file in "${SELECTED_FILES[@]}"; do
+        source_path="$SOURCE_DIR/$file"
+        target_filename=$(get_target_filename "$file" "$SUFFIX")
+        target_path="$TARGET_DIR/$target_filename"
+
+        if [ -f "$source_path" ]; then
+            if cp "$source_path" "$target_path"; then
+                echo "✓ $file → $target_filename"
+                success_count=$((success_count + 1))
+            else
+                echo "✗ Failed to copy $file"
+            fi
+        else
+            echo "✗ Source file not found: $file"
+        fi
+    done
 done
 
 echo ""
