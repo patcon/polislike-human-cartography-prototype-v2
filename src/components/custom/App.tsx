@@ -15,6 +15,7 @@ import {
   getLabelArrayWithOptionalUngrouped,
 } from "../../lib/representative-statements";
 import type { FinalizedCommentStats } from "@/lib/stats";
+import { fetchAndProcessKedroData } from "@/lib/kedro-api";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [number, [number, number]][], targetId: number | string): number {
@@ -26,13 +27,14 @@ function findDatasetIndex(dataset: [number, [number, number]][], targetId: numbe
 
 type AppProps = {
   testAnimation?: boolean;
+  kedro_base_url?: string;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url }) => {
   const [dataset, setDataset] = React.useState<[number, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  
+
   const [, setSelectedIds] = React.useState<number[]>([]);
   const [action, setAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
 
@@ -43,10 +45,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
 
   // Layer mode: "groups" or "votes"
   const [layerMode, setLayerMode] = React.useState<"groups" | "votes">("groups");
-  
+
   // Statement ID for votes mode (user configurable)
   const [statementId, setStatementId] = React.useState("6");
-  
+
   // Highlight pass votes toggle state
   const [highlightPassVotes, setHighlightPassVotes] = React.useState(true);
 
@@ -72,20 +74,43 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
   React.useEffect(() => {
     const init = async () => {
       try {
-        // Load both datasets in parallel
-        const [projectionsResponse, statementsResponse] = await Promise.all([
-          fetch(resolveAssetPath('/projections.json')),
-          fetch(resolveAssetPath('/statements.json'))
-        ]);
+        if (kedro_base_url) {
+          // Kedro mode: fetch data from Kedro API
+          console.log('Loading data from Kedro API:', kedro_base_url);
 
-        const projectionsData = await projectionsResponse.json();
-        const statementsData = await statementsResponse.json();
+          const [kedroData, statementsResponse] = await Promise.all([
+            fetchAndProcessKedroData(kedro_base_url),
+            fetch(resolveAssetPath('/statements.json'))
+          ]);
 
-        setDataset(projectionsData);
-        setStatements(statementsData);
+          const statementsData = await statementsResponse.json();
 
-        await initializeDuckDB();
-        console.log('DuckDB initialized in App component');
+          setDataset(kedroData);
+          setStatements(statementsData);
+
+          // Note: DuckDB initialization might not be needed for Kedro mode
+          // depending on whether votes functionality is required
+          await initializeDuckDB();
+          console.log('Kedro data loaded and DuckDB initialized');
+        } else {
+          // Normal mode: load local JSON files
+          console.log('Loading data from local JSON files');
+
+          const [projectionsResponse, statementsResponse] = await Promise.all([
+            fetch(resolveAssetPath('/projections.json')),
+            fetch(resolveAssetPath('/statements.json'))
+          ]);
+
+          const projectionsData = await projectionsResponse.json();
+          const statementsData = await statementsResponse.json();
+
+          setDataset(projectionsData);
+          setStatements(statementsData);
+
+          await initializeDuckDB();
+          console.log('Local data loaded and DuckDB initialized');
+        }
+
         setLoading(false);
       } catch (err) {
         console.error('Data loading or DuckDB initialization error:', err);
@@ -94,7 +119,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
     };
 
     init();
-  }, []);
+  }, [kedro_base_url]);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
@@ -111,19 +136,19 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
         try {
           console.log(`Loading votes for statement ${statementId}`);
           const participantData = await getParticipantDataForStatement(statementId);
-          
+
           // Create a map for quick lookup
           // voteMap variable removed as it was unused
-          
+
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
             const participantVoteData = participantData.find(p => p.participantId === participantId.toString());
-            
+
             if (!participantVoteData || participantVoteData.vote === null) {
               // Participant has no vote - should be black (unpainted)
               return null;
             }
-            
+
             // Map actual vote values to indices for color lookup
             switch (participantVoteData.vote) {
               case 1: return 0;    // agree - green
@@ -132,14 +157,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
               default: return null; // no vote - black
             }
           });
-          
+
           setPointVotes(newPointVotes);
           console.log('Loaded votes data for visualization');
         } catch (err) {
           console.error('Error loading votes:', err);
         }
       };
-      
+
       loadVotes();
     }
   }, [layerMode, statementId]);
@@ -152,7 +177,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
 
     // Use the provided updated groups or fall back to current state
     const groupsToAnalyze = updatedPointGroups || pointGroups;
-    
+
     // Use the provided updated unpainted grouped state or fall back to current state
     const unpaintedGroupedToUse = updatedIsUnpaintedGrouped !== undefined ? updatedIsUnpaintedGrouped : isUnpaintedGrouped;
 
@@ -173,7 +198,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
       // Clear representative statements when below threshold to prevent stale data
       setRepresentativeStatements({});
       setRepStatementsError(null);
-      
+
       // Reset drawer to "all" tab when below threshold to prevent showing stale group tabs
       if (drawerTab !== "all") {
         setDrawerTab("all");
@@ -238,19 +263,19 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
   // handle quick select (single point click) - opens drawer to specific tab
   function handleQuickSelect(id: number): boolean {
     console.log('🔍 QuickSelect:', id, '(', typeof id, ')');
-    
+
     // find the index of this point in the dataset
     const idx = findDatasetIndex(dataset, id);
-    
+
     if (idx !== -1) {
       if (layerMode === "groups") {
         // get the color index for this point
         const pointColorIndex = pointGroups[idx];
-        
+
         if (!isUnpainted(pointColorIndex)) {
           const targetTab = `group-${pointColorIndex}`;
           console.log('  - Opening drawer to', targetTab);
-          
+
           // open drawer to the specific group tab
           setDrawerTab(targetTab);
           setDrawerOpen(true);
@@ -259,7 +284,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
           // Handle unpainted points when isUnpaintedGrouped is true
           if (isUnpaintedGrouped) {
             console.log('  - Opening drawer to unpainted tab');
-            
+
             // open drawer to the unpainted group tab
             setDrawerTab("unpainted");
             setDrawerOpen(true);
@@ -271,7 +296,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
       } else if (layerMode === "votes") {
         // In votes mode, could show vote information
         const voteColorIndex = pointVotes[idx];
-        
+
         if (voteColorIndex !== null) {
           const voteType = voteColorIndex === 0 ? 'agree' :
                           voteColorIndex === 1 ? 'disagree' : 'pass';
@@ -282,7 +307,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false }) => {
         }
       }
     }
-    
+
     return false; // Default: allow other behaviors
   }
 
