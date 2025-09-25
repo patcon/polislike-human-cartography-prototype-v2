@@ -163,7 +163,7 @@ export function processKedroNodeData(nodeData: KedroNodeDataResponse): [string, 
   console.log(`  - Using extracted participant IDs:`, merged.slice(0, 5).map(([id]) => id));
   console.log(`  - Sample coordinates:`, merged.slice(0, 5).map(([, coords]) => coords));
   console.log(`  - Participant ID range: ${Math.min(...merged.map(([id]) => parseInt(id)))} - ${Math.max(...merged.map(([id]) => parseInt(id)))}`);
-  
+
   console.log('✅ Using actual participant IDs extracted from hovertext for proper vote alignment.');
 
   return merged;

@@ -106,14 +106,14 @@ export async function loadParquetFile(filePath: string, tableName: string): Prom
   if (!conn) {
     await initializeDuckDB();
   }
-  
+
   try {
     // Create table from parquet file
     await conn!.query(`
       CREATE OR REPLACE TABLE ${tableName} AS
       SELECT * FROM read_parquet('${filePath}')
     `);
-    
+
     console.log(`Loaded parquet file ${filePath} into table ${tableName}`);
   } catch (error) {
     console.error(`Failed to load parquet file ${filePath}:`, error);
@@ -135,14 +135,14 @@ export async function getVotesForParticipants(statementId: string, participantId
   if (!conn) {
     await initializeDuckDB();
   }
-  
+
   try {
     // Ensure votes table is loaded (uses optimized single-load function)
     await ensureVotesTableLoaded();
-    
+
     // Create a comma-separated list of participant IDs for the IN clause
     const participantIdList = participantIds.map(id => `'${id}'`).join(',');
-    
+
     // Query votes for the specific statement and participants in one go
     const result = await conn!.query(`
       SELECT participant_id, vote
@@ -150,22 +150,22 @@ export async function getVotesForParticipants(statementId: string, participantId
       WHERE comment_id = '${statementId}'
         AND participant_id IN (${participantIdList})
     `);
-    
+
     const votes = new Map<string, number>();
-    
+
     // Process the results
     for (let i = 0; i < result.numRows; i++) {
       const participantId = result.getChild('participant_id')?.get(i)?.toString();
       const rawVote = result.getChild('vote')?.get(i);
-      
+
       // Convert BigInt to number if needed
       const vote = typeof rawVote === 'bigint' ? Number(rawVote) : rawVote as number;
-      
+
       if (participantId !== undefined && vote !== undefined) {
         votes.set(participantId, vote);
       }
     }
-    
+
     console.log(`Found ${votes.size} votes for statement ${statementId} from ${participantIds.length} participants`);
     return votes;
   } catch (error) {
@@ -188,14 +188,14 @@ export async function loadProjections(): Promise<Map<string, [number, number]>> 
     const projectionsUrl = resolveAssetPath('/projections.json');
     const response = await fetch(projectionsUrl);
     const projectionsArray = await response.json();
-    
+
     const projections = new Map<string, [number, number]>();
-    
+
     // Convert array format to Map
     projectionsArray.forEach(([participantId, coordinates]: [string, [number, number]]) => {
       projections.set(participantId, coordinates);
     });
-    
+
     console.log(`Loaded ${projections.size} projections`);
     return projections;
   } catch (error) {
@@ -236,10 +236,10 @@ export async function getParticipantDataForStatement(statementId: string): Promi
     // First load all projections to get the participant IDs
     const projections = await loadProjections();
     const participantIds = Array.from(projections.keys());
-    
+
     // Then get votes for all those participants in a single query
     const votes = await getVotesForParticipants(statementId, participantIds);
-    
+
     const participantData: Array<{
       participantId: string;
       coordinates: [number, number];
@@ -247,15 +247,15 @@ export async function getParticipantDataForStatement(statementId: string): Promi
       voteType: keyof typeof VOTE_COLORS;
       color: string;
     }> = [];
-    
+
     // Process all participants from projections, maintaining order
     projections.forEach((coordinates, participantId) => {
       const vote = votes.get(participantId) ?? null; // null if no vote found
-      
+
       // Only assign vote type and color if participant actually voted
       let voteType: keyof typeof VOTE_COLORS;
       let color: string;
-      
+
       if (vote !== null) {
         // Participant has a vote: -1=disagree(red), 0=pass(yellow), 1=agree(green)
         voteType = getVoteType(vote);
@@ -265,7 +265,7 @@ export async function getParticipantDataForStatement(statementId: string): Promi
         voteType = 'pass'; // This is just for the data structure consistency
         color = 'black';
       }
-      
+
       participantData.push({
         participantId,
         coordinates,
@@ -274,7 +274,7 @@ export async function getParticipantDataForStatement(statementId: string): Promi
         color
       });
     });
-    
+
     console.log(`Processed ${participantData.length} participants (${votes.size} with votes) for statement ${statementId}`);
     return participantData;
   } catch (error) {

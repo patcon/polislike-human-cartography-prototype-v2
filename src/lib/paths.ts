@@ -46,10 +46,10 @@ function getBasePath(): string {
  */
 export function resolveAssetPath(path: string): string {
   const basePath = getBasePath();
-  
+
   // Remove leading slash from path if present
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-  
+
   // Combine base path with clean path
   return basePath ? `${basePath}/${cleanPath}` : `/${cleanPath}`;
 }

@@ -133,7 +133,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     const groupKey = String(colorIndex);
     const repStats = representativeStatements[groupKey] || [];
     const colors: Record<number, string> = {};
-    
+
     repStats.forEach((repStat) => {
       const statementId = typeof repStat.tid === 'string' ? parseInt(repStat.tid) : repStat.tid;
       if (repStat.repful_for === 'agree') {
@@ -142,7 +142,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
         colors[statementId] = VOTE_COLORS.disagree;
       }
     });
-    
+
     return colors;
   };
 
@@ -158,7 +158,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     const unpaintedKey = 'unpainted';
     const repStats = representativeStatements[unpaintedKey] || [];
     const colors: Record<number, string> = {};
-    
+
     repStats.forEach((repStat) => {
       const statementId = typeof repStat.tid === 'string' ? parseInt(repStat.tid) : repStat.tid;
       if (repStat.repful_for === 'agree') {
@@ -167,7 +167,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
         colors[statementId] = VOTE_COLORS.disagree;
       }
     });
-    
+
     return colors;
   };
 

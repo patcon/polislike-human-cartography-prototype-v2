@@ -35,11 +35,11 @@ export const MoveMode: Story = {
   render: (args) => {
     const { kedro_base_url, ...d3MapArgs } = args;
     const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url);
-    
+
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return <D3Map {...d3MapArgs} data={dataset} />;
   },
 };
@@ -50,11 +50,11 @@ export const PaintMode: Story = {
   render: (args) => {
     const { kedro_base_url, ...d3MapArgs } = args;
     const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url);
-    
+
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return <D3Map {...d3MapArgs} data={dataset} />;
   },
 };
@@ -66,11 +66,11 @@ export const PaintModeWithSelection: Story = {
     const { kedro_base_url, ...d3MapArgs } = args;
     const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
-    
+
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return (
       <>
         <D3Map
@@ -118,7 +118,7 @@ export const QuickSelectDemo: Story = {
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return (
       <>
         <D3Map
@@ -151,11 +151,11 @@ export const KedroMode: Story = {
     // Extract kedro_base_url from args and remove it before passing to D3Map
     const { kedro_base_url, ...d3MapArgs } = args as any;
     const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url);
-    
+
     if (loading) return <div>Loading data...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return <D3Map {...d3MapArgs} data={dataset} />;
   },
   args: {
@@ -171,11 +171,11 @@ export const LocalKedroMode: Story = {
     // Extract kedro_base_url from args and remove it before passing to D3Map
     const { kedro_base_url, ...d3MapArgs } = args as any;
     const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url);
-    
+
     if (loading) return <div>Loading data...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!dataset) return <div>No data available</div>;
-    
+
     return <D3Map {...d3MapArgs} data={dataset} />;
   },
   args: {

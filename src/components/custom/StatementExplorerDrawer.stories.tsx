@@ -16,13 +16,13 @@ type Story = StoryObj<typeof StatementExplorerDrawer>;
 export const Default: Story = {
   render: () => {
     const [statementsData, setStatementsData] = useState(null);
-    
+
     useEffect(() => {
       fetch(resolveAssetPath('/statements.json'))
         .then(response => response.json())
         .then(data => setStatementsData(data));
     }, []);
-    
+
     if (!statementsData) return <div>Loading...</div>;
     return (
       <div className="p-8">
@@ -37,13 +37,13 @@ export const Default: Story = {
 export const SevenTabs: Story = {
   render: () => {
     const [statementsData, setStatementsData] = useState(null);
-    
+
     useEffect(() => {
       fetch(resolveAssetPath('/statements.json'))
         .then(response => response.json())
         .then(data => setStatementsData(data));
     }, []);
-    
+
     if (!statementsData) return <div>Loading...</div>;
     return (
       <div className="p-8">
@@ -58,13 +58,13 @@ export const SevenTabs: Story = {
 export const EveryColor: Story = {
   render: () => {
     const [statementsData, setStatementsData] = useState(null);
-    
+
     useEffect(() => {
       fetch(resolveAssetPath('/statements.json'))
         .then(response => response.json())
         .then(data => setStatementsData(data));
     }, []);
-    
+
     if (!statementsData) return <div>Loading...</div>;
     return (
       <div className="p-8">
@@ -81,7 +81,7 @@ export const OpenToGroupC: Story = {
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState("all");
     const [statementsData, setStatementsData] = useState(null);
-    
+
     useEffect(() => {
       fetch(resolveAssetPath('/statements.json'))
         .then(response => response.json())

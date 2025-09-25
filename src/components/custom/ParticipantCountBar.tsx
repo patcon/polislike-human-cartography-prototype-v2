@@ -29,7 +29,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
 }) => {
   // Internal state for uncontrolled mode
   const [internalIsUnpaintedGrouped, setInternalIsUnpaintedGrouped] = React.useState(false);
-  
+
   // Determine if we're in controlled mode
   const isControlled = controlledIsUnpaintedGrouped !== undefined;
   const isUnpaintedGrouped = isControlled ? controlledIsUnpaintedGrouped : internalIsUnpaintedGrouped;
@@ -52,7 +52,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
         unpaintedCount++;
       }
     });
-    
+
     if (unpaintedCount > 0) {
       unpaintedGroup = {
         label: unpaintedCount.toString(),
@@ -86,11 +86,11 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     // Calculate total number of badges - no gaps between colored badges now
     const totalBadges = groupData.coloredGroups.length + (groupData.unpaintedGroup ? 1 : 0);
     const gapWidth = 4; // gap-1 = 4px in Tailwind (only between colored group and unpainted group)
-    
+
     // When unpainted is not grouped, it takes minimal space, colored badges divide the rest
     let coloredPointsTotal: number;
     let availableWidthPercent: number;
-    
+
     if (groupData.unpaintedGroup && !isUnpaintedGrouped) {
       // Unpainted badge takes minimal space, colored badges get proportional share of remaining space
       coloredPointsTotal = groupData.coloredGroups.reduce((sum, group) => sum + group.count, 0);
@@ -125,7 +125,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
 
   const handleUnpaintedClick = () => {
     const newValue = !isUnpaintedGrouped;
-    
+
     if (isControlled) {
       onUnpaintedGroupedChange?.(newValue);
     } else {
@@ -140,7 +140,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   if (isProportional && proportionalData) {
     // Proportional layout
     const hasColoredGroups = proportionalData.coloredGroups.length > 0;
-    
+
     return (
       <div className={cn(
         "flex gap-1 items-center w-full",
@@ -152,7 +152,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           const color = PALETTE_COLORS[group.colorIndex!];
           const isFirst = index === 0;
           const isLast = index === proportionalData.coloredGroups.length - 1;
-          
+
           // Determine border radius override classes and margin for continuous appearance
           let borderRadiusOverride = '';
           let marginClass = '';
@@ -171,7 +171,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           } else if (!isFirst) {
             marginClass = '-ml-1'; // Pull non-first badges left to close gaps
           }
-          
+
           if (group.useFlexGrow) {
             // When unpainted is minimal, use flex-grow for colored badges
             return (
@@ -201,7 +201,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
             const isUnpaintedGroupedAndLarge = proportionalData.unpaintedGroup &&
               !proportionalData.unpaintedGroup.useMinimalWidth &&
               proportionalData.unpaintedGroup.widthPercent > 80; // Large unpainted group threshold
-            
+
             if (isUnpaintedGroupedAndLarge) {
               // Use min-width based on actual proportion, but allow shrinking
               return (
@@ -313,7 +313,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           const color = PALETTE_COLORS[group.colorIndex!];
           const isFirst = index === 0;
           const isLast = index === groupData.coloredGroups.length - 1;
-          
+
           // Determine border radius override classes and margin for continuous appearance
           let borderRadiusOverride = '';
           let marginClass = '';
@@ -329,7 +329,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
           if (!isFirst) {
             marginClass = '-ml-1'; // Pull non-first badges left to close gaps
           }
-          
+
           return (
             <Badge
               key={group.colorIndex}

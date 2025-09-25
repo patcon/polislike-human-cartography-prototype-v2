@@ -43,13 +43,13 @@ const samplePointGroupsLarge: (number | null)[] = [
 // Helper function to generate random point groups
 const generateRandomPointGroups = (totalPoints: number, selectedPoints: number): (number | null)[] => {
   const points: (number | null)[] = Array(totalPoints).fill(null);
-  
+
   // Randomly assign selected points to different groups
   const selectedIndices = new Set<number>();
   while (selectedIndices.size < selectedPoints) {
     selectedIndices.add(Math.floor(Math.random() * totalPoints));
   }
-  
+
   selectedIndices.forEach(index => {
     // Randomly assign to groups 0-4 or leave as null (unpainted)
     const groupChoice = Math.random();
@@ -60,7 +60,7 @@ const generateRandomPointGroups = (totalPoints: number, selectedPoints: number):
     else if (groupChoice < 0.9) points[index] = 3;    // 15% red
     else points[index] = 4;                           // 10% purple
   });
-  
+
   return points;
 };
 
@@ -70,7 +70,7 @@ export const Default: Story = {
   },
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
-    
+
     return (
       <div className="w-full">
         <ParticipantCountBar
@@ -133,7 +133,7 @@ export const NotProportional: Story = {
   },
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
-    
+
     return (
       <div className="w-full">
         <ParticipantCountBar
@@ -165,7 +165,7 @@ export const SmallSelectionMediumConvo: Story = {
   },
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
-    
+
     return (
       <div className="w-full">
         <ParticipantCountBar
@@ -184,7 +184,7 @@ export const SmallSelectionLargeConvo: Story = {
   },
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
-    
+
     return (
       <div className="w-full">
         <ParticipantCountBar
@@ -204,11 +204,11 @@ export const RandomMediumConvo: Story = {
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
     const [pointGroups, setPointGroups] = useState(args.pointGroups);
-    
+
     const regenerate = () => {
       setPointGroups(generateRandomPointGroups(250, 40));
     };
-    
+
     return (
       <div className="w-full space-y-4">
         <div className="flex justify-between items-center">
@@ -239,11 +239,11 @@ export const RandomLargeConvo: Story = {
   render: (args) => {
     const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
     const [pointGroups, setPointGroups] = useState(args.pointGroups);
-    
+
     const regenerate = () => {
       setPointGroups(generateRandomPointGroups(3000, 40));
     };
-    
+
     return (
       <div className="w-full space-y-4">
         <div className="flex justify-between items-center">

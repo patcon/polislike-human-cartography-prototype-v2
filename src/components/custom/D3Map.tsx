@@ -61,7 +61,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Load projection data only if testAnimation is enabled
   React.useEffect(() => {
     if (!testAnimation) return;
-    
+
     const loadProjections = async () => {
       try {
         const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
@@ -72,7 +72,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         const localmapData = await localmapResponse.json();
         const pacmapData = await pacmapResponse.json();
         const umapData = await umapResponse.json();
-        
+
         setProjectionData({
           localmap: localmapData,
           pacmap: pacmapData,
@@ -91,7 +91,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   const { points, xScale, yScale } = React.useMemo(() => {
     // Use projection data if testAnimation is enabled and data is available, otherwise fall back to original data
     let currentData = data;
-    
+
     if (testAnimation && projectionData[selectedProjection]) {
       const activeProjections = projectionData[selectedProjection]!;
       // Use projection data directly since it's already in [string, [x, y]] format
@@ -463,7 +463,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   return (
     <div className="relative w-screen h-screen">
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
-      
+
       {/* Debug Controls - only show when testAnimation is enabled */}
       {testAnimation && Object.values(projectionData).some(data => data !== null) && (
         <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border">

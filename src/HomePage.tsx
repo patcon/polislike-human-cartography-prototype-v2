@@ -23,7 +23,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
         {/* Cards Container */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          
+
           {/* Perspective Map Explorer Card - Top on mobile, Left on desktop */}
           <Card
             className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 bg-white flex flex-col"

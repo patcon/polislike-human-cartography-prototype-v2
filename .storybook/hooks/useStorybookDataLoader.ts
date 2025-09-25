@@ -9,15 +9,15 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
   const [dataset, setDataset] = useState<[string, [number, number]][] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         let loadedData: [string, [number, number]][];
-        
+
         if (kedroBaseUrl) {
           console.log('Loading data from Kedro API:', kedroBaseUrl);
           loadedData = await fetchAndProcessKedroData(kedroBaseUrl);
@@ -27,7 +27,7 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
           const response = await fetch('/projections.json');
           loadedData = await response.json();
         }
-        
+
         // 🔍 DEBUG: Print the full projections data for inspection
         const dataSource = kedroBaseUrl ? 'SYNTHETIC (Kedro API)' : 'LOCAL FILE';
         console.log(`📊 FULL PROJECTIONS DATA (${dataSource}):`);
@@ -35,7 +35,7 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
         console.log(`📊 Total data points: ${loadedData.length}`);
         console.log(`📊 Participant ID range: ${Math.min(...loadedData.map(([id]) => parseInt(id)))} - ${Math.max(...loadedData.map(([id]) => parseInt(id)))}`);
         console.log(`📊 Sample data points:`, loadedData.slice(0, 10));
-        
+
         setDataset(loadedData);
       } catch (err) {
         console.error('Error loading data:', err);
@@ -44,9 +44,9 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
         setLoading(false);
       }
     };
-    
+
     loadData();
   }, [kedroBaseUrl]);
-  
+
   return { dataset, loading, error };
 }
