@@ -12,7 +12,7 @@ const FEATURE_SCALE_RADIUS_ON_ZOOM = true;
 
 type D3MapProps = {
   /** Dataset points in the format [[i, [x, y]], ...] */
-  data: [number, [number, number]][];
+  data: [string, [number, number]][];
   mode?: "move" | "paint";
   /** Color indices parallel to data: null = default color, number = palette index */
   pointColors?: (number | null)[];
@@ -20,7 +20,7 @@ type D3MapProps = {
   palette?: string[];
   onSelectionChange?: (ids: (number | string)[]) => void;
   /** Called when exactly one point is clicked/tapped. Return false to allow event propagation. */
-  onQuickSelect?: (id: number) => boolean | void;
+  onQuickSelect?: (id: string) => boolean | void;
   flipX?: boolean;
   flipY?: boolean;
   /** Enable animation testing between projection sets */
@@ -94,8 +94,8 @@ export const D3Map: React.FC<D3MapProps> = ({
     
     if (testAnimation && projectionData[selectedProjection]) {
       const activeProjections = projectionData[selectedProjection]!;
-      // Convert projection data format [string, [x, y]] to [number, [x, y]]
-      currentData = activeProjections.map(([id, coords]) => [parseInt(id), coords] as [number, [number, number]]);
+      // Use projection data directly since it's already in [string, [x, y]] format
+      currentData = activeProjections;
     }
 
     const xExtent = d3.extent(currentData, ([, [x]]) => x)! as [number, number];

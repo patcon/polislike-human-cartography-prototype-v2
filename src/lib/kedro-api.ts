@@ -119,7 +119,7 @@ function extractParticipantId(hovertext: string): number {
  * Process Kedro node data to match projections.json format
  * Returns data in format: [participantId, [x, y]][]
  */
-export function processKedroNodeData(nodeData: KedroNodeDataResponse): [number, [number, number]][] {
+export function processKedroNodeData(nodeData: KedroNodeDataResponse): [string, [number, number]][] {
   // Merge all x, y, and hovertext arrays into one long array
   let allX: number[] = [];
   let allY: number[] = [];
@@ -147,11 +147,24 @@ export function processKedroNodeData(nodeData: KedroNodeDataResponse): [number, 
     allHovertext = allHovertext.concat(hovertext);
   });
 
-  // Zip into [[participantId, [x,y]], [participantId, [x,y]], …] using actual participant IDs
-  const merged: [number, [number, number]][] = allX.map((xVal, i) => {
+  // Extract actual participant IDs from hovertext and create the merged dataset
+  const merged: [string, [number, number]][] = allX.map((xVal, i) => {
+    // Extract the actual participant ID from hovertext
     const participantId = extractParticipantId(allHovertext[i]);
-    return [participantId, [xVal, allY[i]]];
+    return [participantId.toString(), [xVal, allY[i]]];
   });
+
+  // Debug output to understand the data structure
+  console.log('🔍 Kedro Data Processing Debug:');
+  console.log(`  - Total traces processed: ${nodeData.preview.data.length}`);
+  console.log(`  - Total points: ${merged.length}`);
+  console.log(`  - Sample hovertext values:`, allHovertext.slice(0, 5));
+  console.log(`  - Extracted participant IDs:`, allHovertext.slice(0, 5).map(h => extractParticipantId(h)));
+  console.log(`  - Using extracted participant IDs:`, merged.slice(0, 5).map(([id]) => id));
+  console.log(`  - Sample coordinates:`, merged.slice(0, 5).map(([, coords]) => coords));
+  console.log(`  - Participant ID range: ${Math.min(...merged.map(([id]) => parseInt(id)))} - ${Math.max(...merged.map(([id]) => parseInt(id)))}`);
+  
+  console.log('✅ Using actual participant IDs extracted from hovertext for proper vote alignment.');
 
   return merged;
 }
@@ -159,7 +172,7 @@ export function processKedroNodeData(nodeData: KedroNodeDataResponse): [number, 
 /**
  * Complete workflow to fetch and process Kedro data
  */
-export async function fetchAndProcessKedroData(kedroBaseUrl: string): Promise<[number, [number, number]][]> {
+export async function fetchAndProcessKedroData(kedroBaseUrl: string): Promise<[string, [number, number]][]> {
   try {
     console.log('Fetching Kedro pipeline data...');
     const apiResponse = await fetchKedroApiData(kedroBaseUrl);

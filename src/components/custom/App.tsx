@@ -18,7 +18,7 @@ import type { FinalizedCommentStats } from "@/lib/stats";
 import { fetchAndProcessKedroData } from "@/lib/kedro-api";
 
 // Helper function for ID matching - can be optimized later for performance
-function findDatasetIndex(dataset: [number, [number, number]][], targetId: number | string): number {
+function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
   // Convert both to strings for comparison to handle mixed types
   // TODO: Check if this causes a performance hit.
   const targetIdStr = String(targetId);
@@ -31,7 +31,7 @@ type AppProps = {
 };
 
 export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url }) => {
-  const [dataset, setDataset] = React.useState<[number, [number, number]][]>([]);
+  const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -142,7 +142,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url 
 
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
-            const participantVoteData = participantData.find(p => p.participantId === participantId.toString());
+            const participantVoteData = participantData.find(p => p.participantId === participantId);
 
             if (!participantVoteData || participantVoteData.vote === null) {
               // Participant has no vote - should be black (unpainted)
@@ -211,7 +211,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url 
 
     try {
       // Get participant IDs from dataset
-      const participants = dataset.map(([participantId]) => participantId.toString());
+      const participants = dataset.map(([participantId]) => participantId);
 
       const result = await calculateRepresentativeStatements(
         labelArray,
@@ -261,7 +261,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url 
   }
 
   // handle quick select (single point click) - opens drawer to specific tab
-  function handleQuickSelect(id: number): boolean {
+  function handleQuickSelect(id: string): boolean {
     console.log('🔍 QuickSelect:', id, '(', typeof id, ')');
 
     // find the index of this point in the dataset
