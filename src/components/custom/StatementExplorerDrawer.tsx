@@ -201,15 +201,15 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   <TabsList
                     className="grid w-full gap-2 h-auto p-2"
                     style={{
-                      gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0), 2)}, 1fr)`,
+                      gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0) + 1, 2)}, 1fr)`,
                       gridTemplateRows: 'auto auto'
                     }}
                   >
                     {/* First row: Letter groups and Rest tab */}
                     {(() => {
                       const totalFirstRowTabs = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
-                      const totalColumns = Math.max(totalFirstRowTabs, 2);
-                      const shouldSpanFullWidth = totalFirstRowTabs === 1;
+                      const totalColumns = Math.max(totalFirstRowTabs + 1, 2); // +1 for the empty column
+                      const shouldSpanConsensusWidth = totalFirstRowTabs === 1;
                       
                       return (
                         <>
@@ -220,7 +220,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               className="relative"
                               style={{
                                 gridRow: 1,
-                                gridColumn: shouldSpanFullWidth ? `1 / ${totalColumns + 1}` : index + 1
+                                gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : index + 2
                               }}
                             >
                               <span translate="no">{letterForIndex(colorIndex)}</span>
@@ -236,7 +236,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               className="relative"
                               style={{
                                 gridRow: 1,
-                                gridColumn: shouldSpanFullWidth ? `1 / ${totalColumns + 1}` : sortedColors.length + 1
+                                gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : sortedColors.length + 2
                               }}
                             >
                               Rest
@@ -261,7 +261,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       className="relative"
                       style={{
                         gridRow: 2,
-                        gridColumn: `2 / ${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0), 2) + 1}`
+                        gridColumn: `2 / ${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0) + 1, 2) + 1}`
                       }}
                     >
                       Consensus
