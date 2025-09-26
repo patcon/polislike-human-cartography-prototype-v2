@@ -85,7 +85,10 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Initialize selectedPipeline when effectivePipelines becomes available
   React.useEffect(() => {
     if (effectivePipelines.length > 0 && !selectedPipeline) {
-      setSelectedPipeline(effectivePipelines[0].id);
+      // Prioritize 'mean_localmap_bestkmeans' if available, otherwise use first pipeline
+      const preferredPipeline = effectivePipelines.find(p => p.id === 'mean_localmap_bestkmeans');
+      const defaultPipeline = preferredPipeline || effectivePipelines[0];
+      setSelectedPipeline(defaultPipeline.id);
     }
   }, [effectivePipelines, selectedPipeline]);
 
@@ -111,8 +114,11 @@ export const D3Map: React.FC<D3MapProps> = ({
           }
 
           setPipelineData(pipelineDataMap);
-          if (!selectedPipeline && effectivePipelines[0]) {
-            setSelectedPipeline(effectivePipelines[0].id);
+          if (!selectedPipeline && effectivePipelines.length > 0) {
+            // Prioritize 'mean_localmap_bestkmeans' if available, otherwise use first pipeline
+            const preferredPipeline = effectivePipelines.find(p => p.id === 'mean_localmap_bestkmeans');
+            const defaultPipeline = preferredPipeline || effectivePipelines[0];
+            setSelectedPipeline(defaultPipeline.id);
           }
         } else {
           // Load local projection files (original behavior)
