@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Repeat2, Repeat1, Repeat } from "lucide-react";
+import { Repeat1, Repeat } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -84,7 +84,6 @@ export const D3Map: React.FC<D3MapProps> = ({
 
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
-  const autoCycleIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Initialize selectedPipeline when effectivePipelines becomes available
   React.useEffect(() => {
