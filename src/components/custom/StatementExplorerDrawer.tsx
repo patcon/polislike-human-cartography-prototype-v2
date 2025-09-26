@@ -206,32 +206,48 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                     }}
                   >
                     {/* First row: Letter groups and Rest tab */}
-                    {sortedColors.map((colorIndex, index) => (
-                      <TabsTrigger
-                        key={colorIndex}
-                        value={`group-${colorIndex}`}
-                        className="relative"
-                        style={{ gridRow: 1, gridColumn: index + 1 }}
-                      >
-                        <span translate="no">{letterForIndex(colorIndex)}</span>
-                        <div
-                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
-                          style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
-                        />
-                      </TabsTrigger>
-                    ))}
-                    {hasUnpaintedGroup && (
-                      <TabsTrigger
-                        value="unpainted"
-                        className="relative"
-                        style={{ gridRow: 1, gridColumn: sortedColors.length + 1 }}
-                      >
-                        Rest
-                        <div
-                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
-                        />
-                      </TabsTrigger>
-                    )}
+                    {(() => {
+                      const totalFirstRowTabs = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
+                      const totalColumns = Math.max(totalFirstRowTabs, 2);
+                      const shouldSpanFullWidth = totalFirstRowTabs === 1;
+                      
+                      return (
+                        <>
+                          {sortedColors.map((colorIndex, index) => (
+                            <TabsTrigger
+                              key={colorIndex}
+                              value={`group-${colorIndex}`}
+                              className="relative"
+                              style={{
+                                gridRow: 1,
+                                gridColumn: shouldSpanFullWidth ? `1 / ${totalColumns + 1}` : index + 1
+                              }}
+                            >
+                              <span translate="no">{letterForIndex(colorIndex)}</span>
+                              <div
+                                className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
+                                style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
+                              />
+                            </TabsTrigger>
+                          ))}
+                          {hasUnpaintedGroup && (
+                            <TabsTrigger
+                              value="unpainted"
+                              className="relative"
+                              style={{
+                                gridRow: 1,
+                                gridColumn: shouldSpanFullWidth ? `1 / ${totalColumns + 1}` : sortedColors.length + 1
+                              }}
+                            >
+                              Rest
+                              <div
+                                className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
+                              />
+                            </TabsTrigger>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* Second row: All tab and Consensus tab */}
                     <TabsTrigger
