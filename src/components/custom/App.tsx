@@ -5,7 +5,7 @@ import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted, UNPAINTED_INDEX } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getParticipantDataForStatement, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
@@ -40,8 +40,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const [, setSelectedIds] = React.useState<number[]>([]);
   const [action, setAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
 
-  // current palette index chosen in the overlay
-  const [colorIndex, setColorIndex] = React.useState(0);
+  // current palette index chosen in the overlay - default to 1 (orange)
+  const [colorIndex, setColorIndex] = React.useState(1);
 
   const [toggles, setToggles] = React.useState<string[]>([]);
 
@@ -129,6 +129,40 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
     init();
   }, [kedroBaseUrl, pipelineId]);
+
+  // Keyboard shortcuts for color selection
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when not typing in an input field
+      if (event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement ||
+          event.target instanceof HTMLSelectElement) {
+        return;
+      }
+
+      // Handle number keys 1-9 and 0 for color selection
+      if (event.key >= '1' && event.key <= '9') {
+        const index = parseInt(event.key, 10);
+        if (index <= PALETTE_COLORS.length) {
+          setColorIndex(index);
+          event.preventDefault();
+        }
+      } else if (event.key === '0') {
+        // 0 key selects blue (index 0)
+        setColorIndex(0);
+        event.preventDefault();
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Delete key selects eraser (UNPAINTED_INDEX)
+        setColorIndex(UNPAINTED_INDEX);
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {

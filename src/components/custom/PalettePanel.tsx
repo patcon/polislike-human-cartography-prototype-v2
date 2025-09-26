@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card } from "@/components/ui/card";
-import { PALETTE_COLORS, UNPAINTED_INDEX } from "@/constants";
+import { PALETTE_COLORS, PALETTE_COLOR_NAMES, UNPAINTED_INDEX } from "@/constants";
 import { Eraser } from "lucide-react";
 
 type PalettePanelProps = {
@@ -27,14 +27,20 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
     return (
       <Card ref={ref} className={`p-1 inline-block ${className ?? ""}`} {...props}>
         <div className="grid grid-cols-2 gap-1">
-          {PALETTE_COLORS.map((color, index) => {
-            const isSelected = index === activeIndex;
+          {/* Create visual order: 1,2,3,4,5,6,7,8,9,0 (but keep original indices) */}
+          {PALETTE_COLORS.slice(1).concat(PALETTE_COLORS.slice(0, 1)).map((color, visualIndex) => {
+            // Map visual index back to actual index: visual 0-8 = actual 1-9, visual 9 = actual 0
+            const actualIndex = visualIndex < PALETTE_COLORS.length - 1 ? visualIndex + 1 : 0;
+            const isSelected = actualIndex === activeIndex;
+            const keyNumber = actualIndex === 0 ? '0' : actualIndex.toString();
+            const colorName = PALETTE_COLOR_NAMES[color] || color;
+            
             return (
               <button
                 key={color}
-                onClick={() => onSelectIndex?.(index)}
+                onClick={() => onSelectIndex?.(actualIndex)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-white"
-                title={color}
+                title={`${colorName} (${keyNumber})`}
               >
                 <div
                   className={`w-8 h-8 rounded-lg flex items-center justify-center ${
@@ -50,7 +56,7 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
           <button
             onClick={handleEraserClick}
             className="col-span-2 h-8 flex items-center justify-center rounded-lg bg-white group"
-            title="Eraser - Reset to unpainted (tap again when selected for options)"
+            title="Eraser - Reset to unpainted (Delete)"
           >
             <div
               className={`w-full h-8 rounded-lg flex items-center justify-between px-2 ${

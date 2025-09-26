@@ -1,15 +1,24 @@
-export const PALETTE_COLORS = [
-    "#1f77b4", // blue
-    "#ff7f0e", // orange
-    "#2ca02c", // green
-    "#d62728", // red
-    "#9467bd", // purple
-    "#8c564b", // brown
-    "#e377c2", // pink
-    "#7f7f7f", // gray
-    "#bcbd22", // lime
-    "#17becf", // teal
+// Color definitions with human-readable names
+export const PALETTE_COLOR_DEFINITIONS = [
+    { name: "Blue", hex: "#1f77b4" },
+    { name: "Orange", hex: "#ff7f0e" },
+    { name: "Green", hex: "#2ca02c" },
+    { name: "Red", hex: "#d62728" },
+    { name: "Purple", hex: "#9467bd" },
+    { name: "Brown", hex: "#8c564b" },
+    { name: "Pink", hex: "#e377c2" },
+    { name: "Gray", hex: "#7f7f7f" },
+    { name: "Lime", hex: "#bcbd22" },
+    { name: "Teal", hex: "#17becf" },
 ];
+
+// Generate the palette colors array from definitions
+export const PALETTE_COLORS = PALETTE_COLOR_DEFINITIONS.map(color => color.hex);
+
+// Generate color name mapping for easy lookup
+export const PALETTE_COLOR_NAMES: Record<string, string> = Object.fromEntries(
+    PALETTE_COLOR_DEFINITIONS.map(color => [color.hex, color.name])
+);
 
 // Color for unpainted points (matches the default black color in D3Map)
 export const UNPAINTED_COLOR = "#000000";
