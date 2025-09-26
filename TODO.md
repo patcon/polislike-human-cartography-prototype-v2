@@ -1,47 +1,56 @@
 # To Dos
+
 - v2 map prototype
-    - [x] add representative statement functionality
-    - [ ] add tooltips for MapOverlay buttons (buggy?)
-    - [x] Create button for statement explorer drawer.
-    - [x] Add statement explorer drawer.
-        - [x] Add mock group tabs based on selections.
-        - [ ] Add pointer tool to action toolbar
-        - [x] Get quickselect tap working on mobile.
-            - [x] Get quickselect click working on desktop.
-        - [x] Implement feature of pointer jumping to group tab of StatementExplorerDrawer.
-        - [x] Wrap Tabs for when too many tabs on mobile
-        - [ ] Make Tabs scrollable horizontally for when too many tabs
-        - [ ] Maybe sort tabs in order of appearance on map (left-to-right)
-    - [x] Wire up flip buttons.
-    - [x] Fix storybook fullscreen iframe.
-    - [x] Annotate moderated statements in some way in StatementExplorerDrawer.
-        - [ ] Try to determine moderation type to properly format statements.
-    - [x] Add stories for StatementsTable.
-    - [x] Disable ToggleToolBar buttons that aren't implemented.
-    - [x] Add dummy statements to empty StatementTable.
-    - [x] Added About dialog so will need less description.
-    - [x] Get multitouch zoom working in paint mode on mobile.
-    - [ ] Implement votes layer
-        - [x] Integrate sqlite or duckdb
-        - [x] add VotesLayerConfig for statement ID
-        - [x] Implement vote setting by click from StatementExplorerDrawer.
-        - [ ] Create legend to show what vote colors mean. Maybe re-use group-count badge real-estate? 
-    - [ ] Create conversation chooser combobox
-    - [ ] Add pagination to statement tables.
-    - [ ] Create a new viz UI for comparing statement stats between groups on limited mobile width.
-    - [ ] Add group count badges to bottom.
-        - [ ] Add toggle to include black
-    - [x] Add special black color to the color palette.
-    - [ ] Support easier keyboard navigation of palette colors with arrows, not tab.
-    - [ ] Add undo/redo buttons.
-    - [ ] Use hosted duckdb worker files, not version-controlling our own? Large size?
-    - lowest priority backlog
-        - [ ] allow rotation with zoom in d3map
-        - [ ] allow zooming X and Y separately (would need a button to lock rotation)
-    - [ ] slider for opacity
-    - [ ] slider for size
-        - [ ] add toggle button for zoom scale lock?
-    - clustering
-        - [ ] Add no-op magic paintbrush action.
-        - [ ] Bring in HDBSCAN clustering data somehow.
-            - [ ] Implement magic paintbrush tool with clustering data.
+  - [x] add representative statement functionality
+  - [ ] add tooltips for MapOverlay buttons (buggy?)
+  - [x] Create button for statement explorer drawer.
+  - [x] Add statement explorer drawer.
+    - [x] Add mock group tabs based on selections.
+    - [ ] Add pointer tool to action toolbar
+    - [x] Get quickselect tap working on mobile.
+      - [x] Get quickselect click working on desktop.
+    - [x] Implement feature of pointer jumping to group tab of StatementExplorerDrawer.
+    - [x] Wrap Tabs for when too many tabs on mobile
+    - [ ] Make Tabs scrollable horizontally for when too many tabs
+    - [ ] Maybe sort tabs in order of appearance on map (left-to-right)
+  - [x] Wire up flip buttons.
+  - [x] Fix storybook fullscreen iframe.
+  - [x] Annotate moderated statements in some way in StatementExplorerDrawer.
+    - [ ] Try to determine moderation type to properly format statements.
+  - [x] Add stories for StatementsTable.
+  - [x] Disable ToggleToolBar buttons that aren't implemented.
+  - [x] Add dummy statements to empty StatementTable.
+  - [x] Added About dialog so will need less description.
+  - [x] Get multitouch zoom working in paint mode on mobile.
+  - [ ] Implement votes layer
+    - [x] Integrate sqlite or duckdb
+    - [x] add VotesLayerConfig for statement ID
+    - [x] Implement vote setting by click from StatementExplorerDrawer.
+    - [ ] Create legend to show what vote colors mean. Maybe re-use group-count badge real-estate?
+  - [ ] Create conversation chooser combobox
+  - [ ] Add pagination to statement tables.
+  - [ ] Create a new viz UI for comparing statement stats between groups on limited mobile width.
+  - [x] Add group count badges to bottom.
+    - [x] Add toggle to include black
+    - [ ] bugfix: don't overflow black with all colors
+  - [x] Add special black color to the color palette.
+  - [ ] Support easier keyboard navigation of palette colors with arrows, not tab.
+  - [ ] Add undo/redo buttons.
+  - [ ] Use hosted duckdb worker files, not version-controlling our own? Large size?
+  - lowest priority backlog
+    - [ ] allow rotation with zoom in d3map
+    - [ ] allow zooming X and Y separately (would need a button to lock rotation)
+  - [ ] slider for opacity
+  - [ ] slider for size
+    - [ ] add toggle button for zoom scale lock?
+  - clustering
+    - [ ] Add no-op magic paintbrush action.
+    - [ ] Bring in HDBSCAN clustering data somehow.
+      - [ ] Implement magic paintbrush tool with clustering data.
+- [x] add consensus tab
+- [x] add styling to consensus tab
+- [x] add a "clear all" option via eraser re-select
+- [x] allow exploring projections from kedro API
+  - [x] support cycling through last two projections
+  - [x] enable auto-cycling
+- [ ] show groups (or cycle group layer) when painting, and allow painting in other layer modes
