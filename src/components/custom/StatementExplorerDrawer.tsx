@@ -15,7 +15,6 @@ import {
 import { StatementTable } from "./StatementTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatementExplorerButton } from "./StatementExplorerButton";
-import { Badge } from "@/components/ui/badge";
 import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
 import type { FinalizedCommentStats } from "@/lib/stats";
@@ -233,7 +232,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                         />
                       </TabsTrigger>
                     )}
-                    
+
                     {/* Second row: All tab (1/4) and Consensus tab (3/4) */}
                     <TabsTrigger
                       value="all"
@@ -254,7 +253,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                     >
                       Consensus
                       <div className="absolute bottom-0 left-2 right-2 h-1 rounded-full flex overflow-hidden">
-                        {sortedColors.map((colorIndex, index) => (
+                        {sortedColors.map((colorIndex) => (
                           <div
                             key={colorIndex}
                             className="flex-1"
