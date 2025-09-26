@@ -27,11 +27,11 @@ function findDatasetIndex(dataset: [string, [number, number]][], targetId: numbe
 
 type AppProps = {
   testAnimation?: boolean;
-  kedro_base_url?: string;
-  pipeline_id?: string;
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url, pipeline_id }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, pipelineId }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -75,12 +75,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url,
   React.useEffect(() => {
     const init = async () => {
       try {
-        if (kedro_base_url) {
+        if (kedroBaseUrl) {
           // Kedro mode: fetch data from Kedro API
-          console.log('Loading data from Kedro API:', kedro_base_url);
+          console.log('Loading data from Kedro API:', kedroBaseUrl);
 
           const [kedroData, statementsResponse] = await Promise.all([
-            fetchAndProcessKedroData(kedro_base_url, pipeline_id),
+            fetchAndProcessKedroData(kedroBaseUrl, pipelineId),
             fetch(resolveAssetPath('/statements.json'))
           ]);
 
@@ -120,7 +120,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url,
     };
 
     init();
-  }, [kedro_base_url, pipeline_id]);
+  }, [kedroBaseUrl, pipelineId]);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
@@ -344,8 +344,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedro_base_url,
           flipX={toggles.includes("flip-horizontal")}
           flipY={toggles.includes("flip-vertical")}
           testAnimation={testAnimation}
-          kedroBaseUrl={kedro_base_url}
-          availablePipelines={kedro_base_url ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
+          kedroBaseUrl={kedroBaseUrl}
+          availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
         />
       </div>
 

@@ -4,10 +4,10 @@ import { D3Map } from "./D3Map";
 import { useStorybookDataLoader } from "../../../.storybook/hooks/useStorybookDataLoader";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 
-// Extend the D3Map props to include kedro_base_url and pipeline_id for stories
+// Extend the D3Map props to include kedroBaseUrl and pipelineId for stories
 type D3MapStoryArgs = React.ComponentProps<typeof D3Map> & {
-  kedro_base_url?: string;
-  pipeline_id?: string;
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
 const meta: Meta<D3MapStoryArgs> = {
@@ -22,11 +22,11 @@ const meta: Meta<D3MapStoryArgs> = {
       options: ["move", "paint"],
       description: "Map interaction mode",
     },
-    kedro_base_url: {
+    kedroBaseUrl: {
       control: "text",
       description: "Base URL for Kedro API endpoints (when provided, loads data from Kedro instead of local JSON)",
     },
-    pipeline_id: {
+    pipelineId: {
       control: "text",
       description: "Pipeline ID to load data from (e.g., mean_localmap_bestkmeans, mean_pca_bestkmeans)",
     },
@@ -43,9 +43,9 @@ type Story = StoryObj<D3MapStoryArgs>;
 /** Pan/zoom only with live mode control */
 export const MoveMode: Story = {
   render: (args) => {
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
     React.useEffect(() => {
@@ -66,9 +66,9 @@ MoveMode.storyName = "Move Mode (broken)"
 /** Freeform lasso select with live mode control */
 export const PaintMode: Story = {
   render: (args) => {
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
     React.useEffect(() => {
@@ -89,9 +89,9 @@ PaintMode.storyName = "Paint Mode (broken)"
 /** Lasso select with selection state and live mode control */
 export const PaintModeWithSelection: Story = {
   render: (args) => {
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
 
     // Show pipeline options in console for debugging
@@ -131,9 +131,9 @@ export const PaintModeWithSelection: Story = {
 
 export const QuickSelectDemo: Story = {
   render: (args) => {
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
     const [quickId, setQuickId] = React.useState<string | null>(null);
 
@@ -190,10 +190,10 @@ export const QuickSelectDemo: Story = {
 /** Kedro endpoint mode - loads data from Kedro API */
 export const KedroMode: Story = {
   render: (args) => {
-    // Extract kedro_base_url and pipeline_id from args and remove them before passing to D3Map
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args as any;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args as any;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
     React.useEffect(() => {
@@ -211,14 +211,14 @@ export const KedroMode: Story = {
         {...d3MapArgs}
         data={dataset}
         testAnimation={args.testAnimation || false}
-        kedroBaseUrl={kedro_base_url}
+        kedroBaseUrl={kedroBaseUrl}
         availablePipelines={pipelines}
       />
     );
   },
   args: {
-    kedro_base_url: 'https://patcon.github.io/kedro-polislike-pipelines',
-    pipeline_id: 'mean_localmap_bestkmeans',
+    kedroBaseUrl: 'https://patcon.github.io/kedro-polislike-pipelines',
+    pipelineId: 'mean_localmap_bestkmeans',
     mode: 'move' as const,
     testAnimation: false,
   },
@@ -228,10 +228,10 @@ KedroMode.storyName = "Kedro Mode";
 /** Local Kedro endpoint mode - for development */
 export const LocalKedroMode: Story = {
   render: (args) => {
-    // Extract kedro_base_url and pipeline_id from args and remove them before passing to D3Map
-    const { kedro_base_url, pipeline_id, ...d3MapArgs } = args as any;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedro_base_url);
-    const { dataset, loading, error } = useStorybookDataLoader(kedro_base_url, pipeline_id);
+    // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args as any;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
     React.useEffect(() => {
@@ -249,14 +249,14 @@ export const LocalKedroMode: Story = {
         {...d3MapArgs}
         data={dataset}
         testAnimation={args.testAnimation || false}
-        kedroBaseUrl={kedro_base_url}
+        kedroBaseUrl={kedroBaseUrl}
         availablePipelines={pipelines}
       />
     );
   },
   args: {
-    kedro_base_url: 'http://localhost:4141',
-    pipeline_id: 'mean_localmap_bestkmeans',
+    kedroBaseUrl: 'http://localhost:4141',
+    pipelineId: 'mean_localmap_bestkmeans',
     mode: 'move' as const,
     testAnimation: false,
   },
