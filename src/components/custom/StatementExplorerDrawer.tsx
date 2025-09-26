@@ -197,77 +197,67 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
               {/* Sticky tabs container */}
               <div className="sticky top-0 z-10 bg-white shadow-md">
                 <div className="px-4 pb-2">
-                  {/* Single TabsList with CSS Grid layout for accessibility */}
-                  <TabsList className="grid w-full gap-2 h-auto p-2" style={{
-                    gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0), 4)}, 1fr)`,
-                    gridTemplateRows: 'auto auto'
-                  }}>
+                  {/* Two separate TabsList components for proper layout */}
+                  <div className="space-y-2">
                     {/* First row: Letter groups and Rest tab */}
-                    {sortedColors.map((colorIndex, index) => (
-                      <TabsTrigger
-                        key={colorIndex}
-                        value={`group-${colorIndex}`}
-                        className="relative"
-                        style={{ gridColumn: index + 1, gridRow: 1 }}
-                      >
-                        <span translate="no">{letterForIndex(colorIndex)}</span>
-                        <div
-                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
-                          style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
-                        />
-                      </TabsTrigger>
-                    ))}
-                    {hasUnpaintedGroup && (
-                      <TabsTrigger
-                        value="unpainted"
-                        className="relative"
-                        style={{
-                          gridColumn: sortedColors.length + 1,
-                          gridRow: 1
-                        }}
-                      >
-                        Rest
-                        <div
-                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
-                        />
-                      </TabsTrigger>
-                    )}
-
-                    {/* Second row: All tab (1/4) and Consensus tab (3/4) */}
-                    <TabsTrigger
-                      value="all"
-                      style={{
-                        gridColumn: '1',
-                        gridRow: 2
-                      }}
-                    >
-                      All
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="consensus"
-                      className="relative"
-                      style={{
-                        gridColumn: '2 / -1',
-                        gridRow: 2
-                      }}
-                    >
-                      Consensus
-                      <div className="absolute bottom-0 left-2 right-2 h-1 rounded-full flex overflow-hidden">
-                        {sortedColors.map((colorIndex) => (
+                    <TabsList className="grid w-full gap-2 h-auto p-2" style={{
+                      gridTemplateColumns: `repeat(${sortedColors.length + (hasUnpaintedGroup ? 1 : 0)}, 1fr)`
+                    }}>
+                      {sortedColors.map((colorIndex) => (
+                        <TabsTrigger
+                          key={colorIndex}
+                          value={`group-${colorIndex}`}
+                          className="relative"
+                        >
+                          <span translate="no">{letterForIndex(colorIndex)}</span>
                           <div
-                            key={colorIndex}
-                            className="flex-1"
+                            className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
                             style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
                           />
-                        ))}
-                        {hasUnpaintedGroup && (
+                        </TabsTrigger>
+                      ))}
+                      {hasUnpaintedGroup && (
+                        <TabsTrigger
+                          value="unpainted"
+                          className="relative"
+                        >
+                          Rest
                           <div
-                            className="flex-1 bg-black"
+                            className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
                           />
-                        )}
-                      </div>
-                    </TabsTrigger>
-                  </TabsList>
+                        </TabsTrigger>
+                      )}
+                    </TabsList>
+
+                    {/* Second row: All tab and Consensus tab */}
+                    <TabsList className="grid w-full gap-2 h-auto p-2" style={{
+                      gridTemplateColumns: '1fr 3fr'
+                    }}>
+                      <TabsTrigger value="all">
+                        All
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="consensus"
+                        className="relative"
+                      >
+                        Consensus
+                        <div className="absolute bottom-0 left-2 right-2 h-1 rounded-full flex overflow-hidden">
+                          {sortedColors.map((colorIndex) => (
+                            <div
+                              key={colorIndex}
+                              className="flex-1"
+                              style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
+                            />
+                          ))}
+                          {hasUnpaintedGroup && (
+                            <div
+                              className="flex-1 bg-black"
+                            />
+                          )}
+                        </div>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
                 </div>
               </div>
 
