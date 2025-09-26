@@ -137,7 +137,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
 
     loadProjections();
-  }, [testAnimation, kedroBaseUrl, availablePipelines, selectedPipeline]);
+  }, [testAnimation, kedroBaseUrl, effectivePipelines]);
 
   const BASE_RADIUS = 1 * (window.devicePixelRatio || 1);
 
