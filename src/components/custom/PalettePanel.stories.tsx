@@ -18,10 +18,17 @@ export const Default: Story = {
   args: {
     activeIndex: 0,
     onSelectIndex: () => {},
+    onEraserReselect: () => {},
   },
   render: () => {
     const [activeIndex, setActiveIndex] = useState(0); // default to first color (blue)
-    return <PalettePanel activeIndex={activeIndex} onSelectIndex={setActiveIndex} />;
+    return (
+      <PalettePanel
+        activeIndex={activeIndex}
+        onSelectIndex={setActiveIndex}
+        onEraserReselect={() => alert("Eraser tapped while already selected!")}
+      />
+    );
   },
 };
 
@@ -29,10 +36,17 @@ export const OrangeSelected: Story = {
   args: {
     activeIndex: PALETTE_COLORS.indexOf("#ff7f0e"),
     onSelectIndex: () => {},
+    onEraserReselect: () => {},
   },
   render: () => {
     const orangeIndex = PALETTE_COLORS.indexOf("#ff7f0e");
     const [activeIndex, setActiveIndex] = useState(orangeIndex);
-    return <PalettePanel activeIndex={activeIndex} onSelectIndex={setActiveIndex} />;
+    return (
+      <PalettePanel
+        activeIndex={activeIndex}
+        onSelectIndex={setActiveIndex}
+        onEraserReselect={() => alert("Eraser tapped while already selected!")}
+      />
+    );
   },
 };

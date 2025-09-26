@@ -8,11 +8,21 @@ import { Eraser } from "lucide-react";
 type PalettePanelProps = {
   activeIndex: number; // UNPAINTED_INDEX means eraser is selected
   onSelectIndex?: (index: number) => void;
+  onEraserReselect?: () => void;
 } & React.ComponentPropsWithoutRef<typeof Card>; // allow extra props
 
 export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
-  ({ activeIndex, onSelectIndex, className, ...props }, ref) => {
+  ({ activeIndex, onSelectIndex, onEraserReselect, className, ...props }, ref) => {
     const isEraserSelected = activeIndex === UNPAINTED_INDEX;
+
+    const handleEraserClick = () => {
+      // If eraser is already selected, trigger the callback
+      if (isEraserSelected) {
+        onEraserReselect?.();
+      } else {
+        onSelectIndex?.(UNPAINTED_INDEX);
+      }
+    };
 
     return (
       <Card ref={ref} className={`p-1 inline-block ${className ?? ""}`} {...props}>
@@ -38,9 +48,9 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
           })}
           {/* Eraser button spanning two columns */}
           <button
-            onClick={() => onSelectIndex?.(UNPAINTED_INDEX)}
-            className="col-span-2 h-8 flex items-center justify-center rounded-lg bg-white"
-            title="Eraser - Reset to unpainted"
+            onClick={handleEraserClick}
+            className="col-span-2 h-8 flex items-center justify-center rounded-lg bg-white group"
+            title="Eraser - Reset to unpainted (tap again when selected for options)"
           >
             <div
               className={`w-full h-8 rounded-lg flex items-center justify-between px-2 ${
@@ -52,7 +62,12 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
 
               {/* Large eraser icon on the right */}
               <div className="flex items-center justify-center pr-0">
-                <Eraser size={18} className="text-unpainted" />
+                <Eraser
+                  size={18}
+                  className={`text-unpainted ${
+                    isEraserSelected ? "group-hover:text-red-500 transition-colors" : ""
+                  }`}
+                />
               </div>
             </div>
           </button>
