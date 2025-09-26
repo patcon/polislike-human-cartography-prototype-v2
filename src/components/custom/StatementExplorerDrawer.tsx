@@ -197,31 +197,38 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               {/* Sticky tabs container */}
               <div className="sticky top-0 z-10 bg-white shadow-md">
-                <TabsList className="flex flex-wrap w-full gap-2 bg-white h-auto px-4 pb-2">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  {sortedColors.map((colorIndex) => (
-                    <TabsTrigger key={colorIndex} value={`group-${colorIndex}`}>
-                      <Badge
-                        className="h-5 w-8 rounded-xlg"
-                        style={{
-                          backgroundColor: PALETTE_COLORS[colorIndex],
-                          color: "white"
-                        }}
-                      >
-                        <span translate="no">{letterForIndex(colorIndex)}</span>
-                      </Badge>
-                    </TabsTrigger>
-                  ))}
-                  {hasUnpaintedGroup && (
-                    <TabsTrigger value="unpainted">
-                      <Badge
-                        className="h-5 rounded-xlg bg-black text-white"
-                      >
-                        Rest
-                      </Badge>
-                    </TabsTrigger>
-                  )}
-                </TabsList>
+                <div className="px-4 pb-2 space-y-2">
+                  {/* First row: Letter groups and Rest tab */}
+                  <TabsList className="flex flex-wrap w-full gap-2 bg-white h-auto">
+                    {sortedColors.map((colorIndex) => (
+                      <TabsTrigger key={colorIndex} value={`group-${colorIndex}`}>
+                        <Badge
+                          className="h-5 w-8 rounded-xlg"
+                          style={{
+                            backgroundColor: PALETTE_COLORS[colorIndex],
+                            color: "white"
+                          }}
+                        >
+                          <span translate="no">{letterForIndex(colorIndex)}</span>
+                        </Badge>
+                      </TabsTrigger>
+                    ))}
+                    {hasUnpaintedGroup && (
+                      <TabsTrigger value="unpainted">
+                        <Badge
+                          className="h-5 rounded-xlg bg-black text-white"
+                        >
+                          Rest
+                        </Badge>
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+                  
+                  {/* Second row: All tab (and future Consensus tab) */}
+                  <TabsList className="flex w-full gap-2 bg-white h-auto">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                  </TabsList>
+                </div>
               </div>
 
               {/* All tab */}
