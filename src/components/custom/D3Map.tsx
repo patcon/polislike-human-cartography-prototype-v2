@@ -81,7 +81,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
   const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
   const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
-  
+
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
   const autoCycleIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -319,7 +319,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       const timeoutId = setTimeout(() => {
         handleTogglePipeline();
       }, 0);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [isAutoCycling, previousPipeline, isAnimating, handleTogglePipeline]);
