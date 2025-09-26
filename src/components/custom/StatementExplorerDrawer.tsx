@@ -197,37 +197,77 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               {/* Sticky tabs container */}
               <div className="sticky top-0 z-10 bg-white shadow-md">
-                <div className="px-4 pb-2 space-y-2">
-                  {/* First row: Letter groups and Rest tab */}
-                  <TabsList className="flex flex-wrap w-full gap-2 h-auto">
-                    {sortedColors.map((colorIndex) => (
-                      <TabsTrigger key={colorIndex} value={`group-${colorIndex}`}>
-                        <Badge
-                          className="h-5 w-8 rounded-xlg"
-                          style={{
-                            backgroundColor: PALETTE_COLORS[colorIndex],
-                            color: "white"
-                          }}
-                        >
-                          <span translate="no">{letterForIndex(colorIndex)}</span>
-                        </Badge>
+                <div className="px-4 pb-2">
+                  {/* Single TabsList with CSS Grid layout for accessibility */}
+                  <TabsList className="grid w-full gap-2 h-auto p-2" style={{
+                    gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0), 4)}, 1fr)`,
+                    gridTemplateRows: 'auto auto'
+                  }}>
+                    {/* First row: Letter groups and Rest tab */}
+                    {sortedColors.map((colorIndex, index) => (
+                      <TabsTrigger
+                        key={colorIndex}
+                        value={`group-${colorIndex}`}
+                        className="relative"
+                        style={{ gridColumn: index + 1, gridRow: 1 }}
+                      >
+                        <span translate="no">{letterForIndex(colorIndex)}</span>
+                        <div
+                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
+                          style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
+                        />
                       </TabsTrigger>
                     ))}
                     {hasUnpaintedGroup && (
-                      <TabsTrigger value="unpainted">
-                        <Badge
-                          className="h-5 rounded-xlg bg-black text-white"
-                        >
-                          Rest
-                        </Badge>
+                      <TabsTrigger
+                        value="unpainted"
+                        className="relative"
+                        style={{
+                          gridColumn: sortedColors.length + 1,
+                          gridRow: 1
+                        }}
+                      >
+                        Rest
+                        <div
+                          className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
+                        />
                       </TabsTrigger>
                     )}
-                  </TabsList>
-
-                  {/* Second row: All tab and Consensus tab */}
-                  <TabsList className="flex w-full gap-2 h-auto">
-                    <TabsTrigger value="all" className="w-1/4 flex-none">All</TabsTrigger>
-                    <TabsTrigger value="consensus" className="w-3/4 flex-none">Consensus</TabsTrigger>
+                    
+                    {/* Second row: All tab (1/4) and Consensus tab (3/4) */}
+                    <TabsTrigger
+                      value="all"
+                      style={{
+                        gridColumn: '1',
+                        gridRow: 2
+                      }}
+                    >
+                      All
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="consensus"
+                      className="relative"
+                      style={{
+                        gridColumn: '2 / -1',
+                        gridRow: 2
+                      }}
+                    >
+                      Consensus
+                      <div className="absolute bottom-0 left-2 right-2 h-1 rounded-full flex overflow-hidden">
+                        {sortedColors.map((colorIndex, index) => (
+                          <div
+                            key={colorIndex}
+                            className="flex-1"
+                            style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
+                          />
+                        ))}
+                        {hasUnpaintedGroup && (
+                          <div
+                            className="flex-1 bg-black"
+                          />
+                        )}
+                      </div>
+                    </TabsTrigger>
                   </TabsList>
                 </div>
               </div>
