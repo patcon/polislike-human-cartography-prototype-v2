@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/drawer";
 import { StatementTable } from "./StatementTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GroupTabsTrigger, type GroupTabsStyle } from "./GroupTabsTrigger";
 import { StatementExplorerButton } from "./StatementExplorerButton";
 import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
@@ -59,6 +60,8 @@ type StatementExplorerDrawerProps = {
   onTabValueChange?: (v: string) => void;
   defaultTab?: string;
 
+  groupTabStyle?: GroupTabsStyle;
+
   onStatementClick?: (statementId: number) => void;
 };
 
@@ -78,6 +81,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   tabValue,
   onTabValueChange,
   defaultTab = "all",
+
+  groupTabStyle = "enclosure",
 
   onStatementClick,
 }) => {
@@ -199,7 +204,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                 <div className="px-4 pb-2">
                   {/* Single TabsList with two-row layout for accessibility */}
                   <TabsList
-                    className="grid w-full gap-2 h-auto p-2"
+                    className="grid w-full h-auto p-1"
                     style={{
                       gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0) + 1, 2)}, 1fr)`,
                       gridTemplateRows: 'auto auto'
@@ -214,36 +219,32 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       return (
                         <>
                           {sortedColors.map((colorIndex, index) => (
-                            <TabsTrigger
+                            <GroupTabsTrigger
                               key={colorIndex}
                               value={`group-${colorIndex}`}
-                              className="relative"
+                              tabStyle={groupTabStyle}
+                              color={PALETTE_COLORS[colorIndex]}
                               style={{
                                 gridRow: 1,
                                 gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : index + 2
                               }}
                             >
                               <span translate="no">{letterForIndex(colorIndex)}</span>
-                              <div
-                                className="absolute bottom-0 left-2 right-2 h-1 rounded-full"
-                                style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
-                              />
-                            </TabsTrigger>
+                            </GroupTabsTrigger>
                           ))}
                           {hasUnpaintedGroup && (
-                            <TabsTrigger
+                            <GroupTabsTrigger
                               value="unpainted"
-                              className="relative"
+                              tabStyle={groupTabStyle}
+                              color="black"
                               style={{
                                 gridRow: 1,
                                 gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : sortedColors.length + 2
                               }}
                             >
-                              Rest
-                              <div
-                                className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-black"
-                              />
-                            </TabsTrigger>
+                              <span className="sm:hidden">X</span>
+                              <span className="hidden sm:inline">Rest</span>
+                            </GroupTabsTrigger>
                           )}
                         </>
                       );
