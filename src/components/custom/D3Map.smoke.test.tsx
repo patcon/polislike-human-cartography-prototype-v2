@@ -56,10 +56,10 @@ vi.mock('d3', () => {
 });
 
 describe('D3Map Smoke Tests', () => {
-  const mockData: [number, [number, number]][] = [
-    [1, [10, 20]],
-    [2, [30, 40]],
-    [3, [50, 60]],
+  const mockData: [string, [number, number]][] = [
+    ["1", [10, 20]],
+    ["2", [30, 40]],
+    ["3", [50, 60]],
   ];
 
   const mockOnSelectionChange = vi.fn();
