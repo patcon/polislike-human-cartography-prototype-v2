@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Repeat2 } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -77,6 +79,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   const { pipelines: fetchedPipelines } = usePipelineOptions(shouldFetchPipelines ? kedroBaseUrl : undefined);
   const effectivePipelines = availablePipelines?.length ? availablePipelines : fetchedPipelines;
   const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
+  const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
   const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
 
   // Initialize selectedPipeline when effectivePipelines becomes available
@@ -286,8 +289,18 @@ export const D3Map: React.FC<D3MapProps> = ({
   const handlePipelineChange = React.useCallback((newPipeline: string) => {
     if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
     setIsAnimating(true);
+    setPreviousPipeline(selectedPipeline);
     setSelectedPipeline(newPipeline);
   }, [testAnimation, pipelineData, isAnimating, selectedPipeline]);
+
+  // Handle toggle between current and previous pipeline
+  const handleTogglePipeline = React.useCallback(() => {
+    if (!testAnimation || !previousPipeline || !pipelineData[previousPipeline] || isAnimating) return;
+    setIsAnimating(true);
+    const temp = selectedPipeline;
+    setSelectedPipeline(previousPipeline);
+    setPreviousPipeline(temp);
+  }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline]);
 
   // --- Zoom behavior (pan/zoom only) ---
   React.useEffect(() => {
@@ -543,29 +556,40 @@ export const D3Map: React.FC<D3MapProps> = ({
               <h3 className="text-sm font-medium mb-2">
                 Pipeline {isAnimating && "(Animating...)"}
               </h3>
-              <Select
-                value={selectedPipeline}
-                onValueChange={handlePipelineChange}
-                disabled={isAnimating}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select pipeline..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {effectivePipelines.map((pipeline) => (
-                    <SelectItem
-                      key={pipeline.id}
-                      value={pipeline.id}
-                      disabled={!pipelineData[pipeline.id]}
-                    >
-                      <span className={!pipelineData[pipeline.id] ? 'text-gray-400' : ''}>
-                        {pipeline.name}
-                        {!pipelineData[pipeline.id] && " (Loading...)"}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedPipeline}
+                  onValueChange={handlePipelineChange}
+                  disabled={isAnimating}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Select pipeline..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {effectivePipelines.map((pipeline) => (
+                      <SelectItem
+                        key={pipeline.id}
+                        value={pipeline.id}
+                        disabled={!pipelineData[pipeline.id]}
+                      >
+                        <span className={!pipelineData[pipeline.id] ? 'text-gray-400' : ''}>
+                          {pipeline.name}
+                          {!pipelineData[pipeline.id] && " (Loading...)"}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTogglePipeline}
+                  disabled={isAnimating || !previousPipeline || !pipelineData[previousPipeline]}
+                  title={previousPipeline ? `Toggle to ${effectivePipelines.find(p => p.id === previousPipeline)?.name || previousPipeline}` : 'No previous pipeline'}
+                >
+                  <Repeat2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ) : (
             // Original projection switching controls
