@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Repeat2 } from "lucide-react";
+import { Repeat2, Repeat1, Repeat } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -81,6 +81,10 @@ export const D3Map: React.FC<D3MapProps> = ({
   const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
   const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
   const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
+  
+  // Auto-cycling state
+  const [isAutoCycling, setIsAutoCycling] = React.useState(false);
+  const autoCycleIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Initialize selectedPipeline when effectivePipelines becomes available
   React.useEffect(() => {
@@ -307,6 +311,31 @@ export const D3Map: React.FC<D3MapProps> = ({
     setSelectedPipeline(previousPipeline);
     setPreviousPipeline(temp);
   }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline]);
+
+  // Auto-cycling logic - trigger next cycle when animation completes
+  React.useEffect(() => {
+    if (isAutoCycling && previousPipeline && !isAnimating) {
+      // Start the next cycle immediately when animation completes
+      const timeoutId = setTimeout(() => {
+        handleTogglePipeline();
+      }, 0);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAutoCycling, previousPipeline, isAnimating, handleTogglePipeline]);
+
+  // Handle auto-cycle toggle
+  const handleAutoCycleToggle = React.useCallback(() => {
+    if (isAutoCycling) {
+      // Stop auto-cycling - let current cycle complete
+      setIsAutoCycling(false);
+    } else {
+      // Start auto-cycling if we have a previous pipeline
+      if (previousPipeline && pipelineData[previousPipeline]) {
+        setIsAutoCycling(true);
+      }
+    }
+  }, [isAutoCycling, previousPipeline, pipelineData]);
 
   // --- Zoom behavior (pan/zoom only) ---
   React.useEffect(() => {
@@ -593,7 +622,17 @@ export const D3Map: React.FC<D3MapProps> = ({
                   disabled={isAnimating || !previousPipeline || !pipelineData[previousPipeline]}
                   title={previousPipeline ? `Toggle to ${effectivePipelines.find(p => p.id === previousPipeline)?.name || previousPipeline}` : 'No previous pipeline'}
                 >
-                  <Repeat2 className="h-4 w-4" />
+                  <Repeat1 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={isAutoCycling ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleAutoCycleToggle}
+                  disabled={!previousPipeline || !pipelineData[previousPipeline]}
+                  title={isAutoCycling ? 'Stop auto-cycling' : 'Start auto-cycling between last two pipelines'}
+                  className={isAutoCycling ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                >
+                  <Repeat className="h-4 w-4" />
                 </Button>
               </div>
             </div>
