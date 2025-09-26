@@ -199,7 +199,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
               <div className="sticky top-0 z-10 bg-white shadow-md">
                 <div className="px-4 pb-2 space-y-2">
                   {/* First row: Letter groups and Rest tab */}
-                  <TabsList className="flex flex-wrap w-full gap-2 bg-white h-auto">
+                  <TabsList className="flex flex-wrap w-full gap-2 h-auto">
                     {sortedColors.map((colorIndex) => (
                       <TabsTrigger key={colorIndex} value={`group-${colorIndex}`}>
                         <Badge
@@ -225,7 +225,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   </TabsList>
 
                   {/* Second row: All tab and Consensus tab */}
-                  <TabsList className="flex w-full gap-2 bg-white h-auto">
+                  <TabsList className="flex w-full gap-2 h-auto">
                     <TabsTrigger value="all" className="w-1/4 flex-none">All</TabsTrigger>
                     <TabsTrigger value="consensus" className="w-3/4 flex-none">Consensus</TabsTrigger>
                   </TabsList>
