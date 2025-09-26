@@ -208,7 +208,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           color: "white"
                         }}
                       >
-                        {letterForIndex(colorIndex)}
+                        <span translate="no">{letterForIndex(colorIndex)}</span>
                       </Badge>
                     </TabsTrigger>
                   ))}
@@ -259,7 +259,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       <div className="space-y-4">
                         <div className="px-4 py-2 bg-gray-50 rounded-lg">
                           <h3 className="font-medium text-sm text-gray-700 mb-1">
-                            Representative Statements for Group {letterForIndex(colorIndex)}
+                            Representative Statements for Group <span translate="no">{letterForIndex(colorIndex)}</span>
                           </h3>
                           <p className="text-xs text-gray-500">
                             These statements are most representative of this group's opinion patterns.
