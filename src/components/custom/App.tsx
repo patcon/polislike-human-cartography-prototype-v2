@@ -86,6 +86,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
           const statementsData = await statementsResponse.json();
 
+          // Kedro data is already sorted in fetchAndProcessKedroData
           setDataset(kedroData);
           setStatements(statementsData);
 
@@ -105,7 +106,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           const projectionsData = await projectionsResponse.json();
           const statementsData = await statementsResponse.json();
 
-          setDataset(projectionsData);
+          // Sort local projection data by participant ID to ensure consistent ordering
+          const sortedProjectionsData = [...projectionsData].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+
+          setDataset(sortedProjectionsData);
           setStatements(statementsData);
 
           await initializeDuckDB();

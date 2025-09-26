@@ -113,3 +113,34 @@ a local Kedro instance with the API plugin enabled at http://localhost:4141.
     },
   },
 };
+
+export const KedroModeWithAnimation: Story = {
+  render: (args) => {
+    return (
+      <App
+        kedroBaseUrl={args.kedroBaseUrl}
+        pipelineId={args.pipelineId}
+        testAnimation={args.testAnimation}
+      />
+    );
+  },
+  args: {
+    kedroBaseUrl: 'https://patcon.github.io/kedro-polislike-pipelines',
+    pipelineId: 'mean_localmap_bestkmeans',
+    testAnimation: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Same as KedroMode but with animation testing enabled. This allows switching between
+different pipeline types with smooth transitions while preserving painted groups.
+
+The animation system will load all available pipelines and provide a dropdown selector
+to switch between them. Points will smoothly animate from one projection to another
+while maintaining their group assignments.
+        `,
+      },
+    },
+  },
+};

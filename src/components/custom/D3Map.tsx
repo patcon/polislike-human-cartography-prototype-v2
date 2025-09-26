@@ -125,10 +125,14 @@ export const D3Map: React.FC<D3MapProps> = ({
             umapResponse.json()
           ]);
 
+          // Sort all projection data by participant ID to ensure consistent ordering
+          const sortByParticipantId = (data: [string, [number, number]][]) =>
+            data.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+
           setProjectionData({
-            localmap: localmapData,
-            pacmap: pacmapData,
-            umap: umapData,
+            localmap: sortByParticipantId([...localmapData]),
+            pacmap: sortByParticipantId([...pacmapData]),
+            umap: sortByParticipantId([...umapData]),
           });
         }
       } catch (error) {

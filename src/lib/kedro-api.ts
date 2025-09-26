@@ -166,6 +166,9 @@ export function processKedroNodeData(nodeData: KedroNodeDataResponse): [string, 
 
   console.log('✅ Using actual participant IDs extracted from hovertext for proper vote alignment.');
 
+  // Sort by participant ID to ensure consistent ordering across pipelines
+  merged.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+
   return merged;
 }
 
