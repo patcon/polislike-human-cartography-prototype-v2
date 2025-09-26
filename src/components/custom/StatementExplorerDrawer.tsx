@@ -215,7 +215,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       const totalFirstRowTabs = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
                       const totalColumns = Math.max(totalFirstRowTabs + 1, 2); // +1 for the empty column
                       const shouldSpanConsensusWidth = totalFirstRowTabs === 1;
-                      
+
                       return (
                         <>
                           {sortedColors.map((colorIndex, index) => (
