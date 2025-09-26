@@ -224,9 +224,10 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                     )}
                   </TabsList>
 
-                  {/* Second row: All tab (and future Consensus tab) */}
+                  {/* Second row: All tab and Consensus tab */}
                   <TabsList className="flex w-full gap-2 bg-white h-auto">
-                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="all" className="w-1/4 flex-none">All</TabsTrigger>
+                    <TabsTrigger value="consensus" className="w-3/4 flex-none">Consensus</TabsTrigger>
                   </TabsList>
                 </div>
               </div>
@@ -234,6 +235,18 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
               {/* All tab */}
               <TabsContent value="all" className="select-text">
                 <StatementTable statements={statements} onStatementClick={onStatementClick} />
+              </TabsContent>
+
+              {/* Consensus tab */}
+              <TabsContent value="consensus" className="select-text">
+                <div className="px-4 py-8 text-center">
+                  <div className="text-gray-500 text-sm">
+                    <p className="mb-2">Consensus statements coming soon.</p>
+                    <p className="text-xs">
+                      This will show statements with high consensus across all groups.
+                    </p>
+                  </div>
+                </div>
               </TabsContent>
 
               {/* Representative statements for each group */}
