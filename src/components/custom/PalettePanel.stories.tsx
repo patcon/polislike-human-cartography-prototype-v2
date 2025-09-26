@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { PalettePanel } from "./PalettePanel";
+import { ClearColorsDialog } from "./ClearColorsDialog";
 import { PALETTE_COLORS } from "@/constants";
 
 const meta = {
@@ -22,12 +23,24 @@ export const Default: Story = {
   },
   render: () => {
     const [activeIndex, setActiveIndex] = useState(0); // default to first color (blue)
+    const [dialogOpen, setDialogOpen] = useState(false);
+    
     return (
-      <PalettePanel
-        activeIndex={activeIndex}
-        onSelectIndex={setActiveIndex}
-        onEraserReselect={() => alert("Eraser tapped while already selected!")}
-      />
+      <>
+        <PalettePanel
+          activeIndex={activeIndex}
+          onSelectIndex={setActiveIndex}
+          onEraserReselect={() => setDialogOpen(true)}
+        />
+        <ClearColorsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={() => {
+            alert("All colors erased!");
+            console.log("Erase colors confirmed");
+          }}
+        />
+      </>
     );
   },
 };
@@ -41,12 +54,24 @@ export const OrangeSelected: Story = {
   render: () => {
     const orangeIndex = PALETTE_COLORS.indexOf("#ff7f0e");
     const [activeIndex, setActiveIndex] = useState(orangeIndex);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    
     return (
-      <PalettePanel
-        activeIndex={activeIndex}
-        onSelectIndex={setActiveIndex}
-        onEraserReselect={() => alert("Eraser tapped while already selected!")}
-      />
+      <>
+        <PalettePanel
+          activeIndex={activeIndex}
+          onSelectIndex={setActiveIndex}
+          onEraserReselect={() => setDialogOpen(true)}
+        />
+        <ClearColorsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={() => {
+            alert("All colors erased!");
+            console.log("Erase colors confirmed");
+          }}
+        />
+      </>
     );
   },
 };

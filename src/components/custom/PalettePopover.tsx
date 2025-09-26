@@ -8,17 +8,18 @@ import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_INDEX } from "@/constants";
 type PalettePopoverProps = {
   activeIndex: number;
   onSelectIndex: (index: number) => void;
+  onEraserReselect?: () => void;
   disabled?: boolean; // 👈 add this
 };
 
-export function PalettePopover({ activeIndex, onSelectIndex, disabled = false }: PalettePopoverProps) {
+export function PalettePopover({ activeIndex, onSelectIndex, onEraserReselect, disabled = false }: PalettePopoverProps) {
   // Use UNPAINTED_COLOR when eraser is selected (activeIndex === UNPAINTED_INDEX)
   const displayColor = activeIndex === UNPAINTED_INDEX ? UNPAINTED_COLOR : PALETTE_COLORS[activeIndex];
 
   return (
     <Popover>
       <PopoverContent align="end" className="w-auto p-1 mb-2" asChild>
-        <PalettePanel activeIndex={activeIndex} onSelectIndex={onSelectIndex} />
+        <PalettePanel activeIndex={activeIndex} onSelectIndex={onSelectIndex} onEraserReselect={onEraserReselect} />
       </PopoverContent>
 
       <PopoverTrigger asChild disabled={disabled}>
