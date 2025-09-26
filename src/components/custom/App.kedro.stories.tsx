@@ -17,6 +17,10 @@ const meta: Meta<typeof App> = {
       control: 'text',
       description: 'Base URL for Kedro API endpoints',
     },
+    pipeline_id: {
+      control: 'text',
+      description: 'Pipeline ID to load data from (e.g., mean_localmap_bestkmeans, mean_pca_bestkmeans)',
+    },
     testAnimation: {
       control: 'boolean',
       description: 'Enable animation testing between projection sets',
@@ -28,8 +32,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const KedroMode: Story = {
+  render: (args) => {
+    return (
+      <App
+        kedro_base_url={args.kedro_base_url}
+        pipeline_id={args.pipeline_id}
+        testAnimation={args.testAnimation}
+      />
+    );
+  },
   args: {
     kedro_base_url: 'https://patcon.github.io/kedro-polislike-pipelines',
+    pipeline_id: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
   parameters: {
@@ -39,8 +53,8 @@ export const KedroMode: Story = {
 This story demonstrates the App component in Kedro mode. When the \`kedro_base_url\` prop is provided, 
 the component will:
 
-1. Fetch pipeline data from \`{kedro_base_url}/api/pipelines/mean_localmap_bestkmeans\`
-2. Find the node with name \`mean_localmap_bestkmeans__scatter_plot\`
+1. Fetch pipeline data from \`{kedro_base_url}/api/pipelines/{pipeline_id}\`
+2. Find the node with name \`{pipeline_id}__scatter_plot\`
 3. Fetch the node data from \`{kedro_base_url}/api/nodes/{node_id}\`
 4. Process the Plotly binary data to extract x,y coordinates
 5. Transform the data to match the expected format: \`[participantId, [x, y]][]\`
@@ -74,8 +88,18 @@ and merges all traces into a single dataset suitable for visualization.
 // };
 
 export const LocalKedroMode: Story = {
+  render: (args) => {
+    return (
+      <App
+        kedro_base_url={args.kedro_base_url}
+        pipeline_id={args.pipeline_id}
+        testAnimation={args.testAnimation}
+      />
+    );
+  },
   args: {
     kedro_base_url: 'http://localhost:4141',
+    pipeline_id: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
   parameters: {

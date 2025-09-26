@@ -69,8 +69,8 @@ function decodePlotlyTypedArray({ bdata, dtype }: PlotlyTypedArray): number[] {
 /**
  * Fetch pipeline data from Kedro API
  */
-export async function fetchKedroApiData(kedroBaseUrl: string): Promise<KedroApiResponse> {
-  const pipelineUrl = `${kedroBaseUrl}/api/pipelines/mean_localmap_bestkmeans`;
+export async function fetchKedroApiData(kedroBaseUrl: string, pipelineId: string = 'mean_localmap_bestkmeans'): Promise<KedroApiResponse> {
+  const pipelineUrl = `${kedroBaseUrl}/api/pipelines/${pipelineId}`;
 
   const response = await fetch(pipelineUrl);
   if (!response.ok) {
@@ -83,9 +83,9 @@ export async function fetchKedroApiData(kedroBaseUrl: string): Promise<KedroApiR
 /**
  * Find the scatter plot node in the pipeline data
  */
-export function findScatterPlotNode(apiResponse: KedroApiResponse): KedroNode | null {
-  return apiResponse.nodes.find(node => 
-    node.name === 'mean_localmap_bestkmeans__scatter_plot'
+export function findScatterPlotNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
+  return apiResponse.nodes.find(node =>
+    node.name === `${pipelineId}__scatter_plot`
   ) || null;
 }
 
@@ -172,16 +172,16 @@ export function processKedroNodeData(nodeData: KedroNodeDataResponse): [string, 
 /**
  * Complete workflow to fetch and process Kedro data
  */
-export async function fetchAndProcessKedroData(kedroBaseUrl: string): Promise<[string, [number, number]][]> {
+export async function fetchAndProcessKedroData(kedroBaseUrl: string, pipelineId: string = 'mean_localmap_bestkmeans'): Promise<[string, [number, number]][]> {
   try {
     console.log('Fetching Kedro pipeline data...');
-    const apiResponse = await fetchKedroApiData(kedroBaseUrl);
+    const apiResponse = await fetchKedroApiData(kedroBaseUrl, pipelineId);
 
     console.log('Finding scatter plot node...');
-    const scatterPlotNode = findScatterPlotNode(apiResponse);
+    const scatterPlotNode = findScatterPlotNode(apiResponse, pipelineId);
 
     if (!scatterPlotNode) {
-      throw new Error('Could not find scatter plot node with name "mean_localmap_bestkmeans__scatter_plot"');
+      throw new Error(`Could not find scatter plot node with name "${pipelineId}__scatter_plot"`);
     }
 
     console.log(`Found scatter plot node with ID: ${scatterPlotNode.id}`);

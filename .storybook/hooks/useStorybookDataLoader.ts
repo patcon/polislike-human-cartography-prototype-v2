@@ -5,7 +5,7 @@ import { fetchAndProcessKedroData } from '../../src/lib/kedro-api';
  * Custom hook for loading projection data in D3Map Storybook stories
  * Supports both local JSON files and Kedro API endpoints
  */
-export function useStorybookDataLoader(kedroBaseUrl?: string) {
+export function useStorybookDataLoader(kedroBaseUrl?: string, pipelineId?: string) {
   const [dataset, setDataset] = useState<[string, [number, number]][] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +19,8 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
         let loadedData: [string, [number, number]][];
 
         if (kedroBaseUrl) {
-          console.log('Loading data from Kedro API:', kedroBaseUrl);
-          loadedData = await fetchAndProcessKedroData(kedroBaseUrl);
+          console.log('Loading data from Kedro API:', kedroBaseUrl, 'Pipeline:', pipelineId);
+          loadedData = await fetchAndProcessKedroData(kedroBaseUrl, pipelineId);
         } else {
           // Fallback to local JSON if no Kedro URL provided
           console.log('Loading data from local projections.json file');
@@ -46,7 +46,7 @@ export function useStorybookDataLoader(kedroBaseUrl?: string) {
     };
 
     loadData();
-  }, [kedroBaseUrl]);
+  }, [kedroBaseUrl, pipelineId]);
 
   return { dataset, loading, error };
 }

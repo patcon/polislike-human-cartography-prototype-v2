@@ -3,6 +3,14 @@
 import * as React from "react";
 import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR } from "@/constants";
+import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -25,6 +33,10 @@ type D3MapProps = {
   flipY?: boolean;
   /** Enable animation testing between projection sets */
   testAnimation?: boolean;
+  /** Kedro base URL for fetching pipeline data */
+  kedroBaseUrl?: string;
+  /** Available pipelines for switching */
+  availablePipelines?: Array<{id: string, name: string}>;
 };
 
 export const D3Map: React.FC<D3MapProps> = ({
@@ -37,6 +49,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   flipX,
   flipY,
   testAnimation = false,
+  kedroBaseUrl,
+  availablePipelines = [],
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -57,6 +71,20 @@ export const D3Map: React.FC<D3MapProps> = ({
     umap: null
   });
   const [isAnimating, setIsAnimating] = React.useState(false);
+  
+  // Pipeline switching state - use internal pipeline fetching if availablePipelines not provided
+  const shouldFetchPipelines = kedroBaseUrl && testAnimation && !availablePipelines?.length;
+  const { pipelines: fetchedPipelines } = usePipelineOptions(shouldFetchPipelines ? kedroBaseUrl : undefined);
+  const effectivePipelines = availablePipelines?.length ? availablePipelines : fetchedPipelines;
+  const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
+  const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
+
+  // Initialize selectedPipeline when effectivePipelines becomes available
+  React.useEffect(() => {
+    if (effectivePipelines.length > 0 && !selectedPipeline) {
+      setSelectedPipeline(effectivePipelines[0].id);
+    }
+  }, [effectivePipelines, selectedPipeline]);
 
   // Load projection data only if testAnimation is enabled
   React.useEffect(() => {
@@ -64,26 +92,52 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     const loadProjections = async () => {
       try {
-        const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
-          fetch('/projections.json'),
-          fetch('/projections.mean-pacmap.json'),
-          fetch('/projections.mean-umap.json')
-        ]);
-        const localmapData = await localmapResponse.json();
-        const pacmapData = await pacmapResponse.json();
-        const umapData = await umapResponse.json();
+        if (kedroBaseUrl && effectivePipelines.length > 0) {
+          // Load pipeline data from Kedro API
+          const { fetchAndProcessKedroData } = await import('../../lib/kedro-api');
+          const pipelineDataMap: Record<string, ProjectionData | null> = {};
+          
+          for (const pipeline of effectivePipelines) {
+            try {
+              const data = await fetchAndProcessKedroData(kedroBaseUrl, pipeline.id);
+              pipelineDataMap[pipeline.id] = data;
+            } catch (error) {
+              console.error(`Failed to load pipeline ${pipeline.id}:`, error);
+              pipelineDataMap[pipeline.id] = null;
+            }
+          }
+          
+          setPipelineData(pipelineDataMap);
+          if (!selectedPipeline && effectivePipelines[0]) {
+            setSelectedPipeline(effectivePipelines[0].id);
+          }
+        } else {
+          // Load local projection files (original behavior)
+          const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
+            fetch('/projections.json'),
+            fetch('/projections.mean-pacmap.json'),
+            fetch('/projections.mean-umap.json')
+          ]);
 
-        setProjectionData({
-          localmap: localmapData,
-          pacmap: pacmapData,
-          umap: umapData
-        });
+          const [localmapData, pacmapData, umapData] = await Promise.all([
+            localmapResponse.json(),
+            pacmapResponse.json(),
+            umapResponse.json()
+          ]);
+
+          setProjectionData({
+            localmap: localmapData,
+            pacmap: pacmapData,
+            umap: umapData,
+          });
+        }
       } catch (error) {
         console.error('Failed to load projection data:', error);
       }
     };
+
     loadProjections();
-  }, [testAnimation]);
+  }, [testAnimation, kedroBaseUrl, availablePipelines, selectedPipeline]);
 
   const BASE_RADIUS = 1 * (window.devicePixelRatio || 1);
 
@@ -92,10 +146,15 @@ export const D3Map: React.FC<D3MapProps> = ({
     // Use projection data if testAnimation is enabled and data is available, otherwise fall back to original data
     let currentData = data;
 
-    if (testAnimation && projectionData[selectedProjection]) {
-      const activeProjections = projectionData[selectedProjection]!;
-      // Use projection data directly since it's already in [string, [x, y]] format
-      currentData = activeProjections;
+    if (testAnimation) {
+      if (kedroBaseUrl && selectedPipeline && pipelineData[selectedPipeline]) {
+        // Use pipeline data from Kedro API
+        currentData = pipelineData[selectedPipeline]!;
+      } else if (projectionData[selectedProjection]) {
+        // Use local projection data
+        const activeProjections = projectionData[selectedProjection]!;
+        currentData = activeProjections;
+      }
     }
 
     const xExtent = d3.extent(currentData, ([, [x]]) => x)! as [number, number];
@@ -135,7 +194,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     const yScale = d3.scaleLinear().domain(yExtent).range(yRange);
 
     return { points, xScale, yScale };
-  }, [data, flipX, flipY, testAnimation, projectionData, selectedProjection]);
+  }, [data, flipX, flipY, testAnimation, projectionData, selectedProjection, pipelineData, selectedPipeline, kedroBaseUrl]);
 
   const quadtree = React.useMemo(
     () => d3.quadtree(points, d => d.x, d => d.y),
@@ -218,6 +277,13 @@ export const D3Map: React.FC<D3MapProps> = ({
     setIsAnimating(true);
     setSelectedProjection(newProjection);
   }, [testAnimation, projectionData, isAnimating, selectedProjection]);
+
+  // Handle pipeline change with animation
+  const handlePipelineChange = React.useCallback((newPipeline: string) => {
+    if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
+    setIsAnimating(true);
+    setSelectedPipeline(newPipeline);
+  }, [testAnimation, pipelineData, isAnimating, selectedPipeline]);
 
   // --- Zoom behavior (pan/zoom only) ---
   React.useEffect(() => {
@@ -465,37 +531,72 @@ export const D3Map: React.FC<D3MapProps> = ({
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
       {/* Debug Controls - only show when testAnimation is enabled */}
-      {testAnimation && Object.values(projectionData).some(data => data !== null) && (
+      {testAnimation && (
         <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border">
-          <div className="mb-2">
-            <h3 className="text-sm font-medium mb-2">
-              Projection Type {isAnimating && "(Animating...)"}
-            </h3>
-            <div className="space-y-2">
-              {(["localmap", "pacmap", "umap"] as ProjectionType[]).map((projType) => (
-                <label key={projType} className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="projection-type"
-                    value={projType}
-                    checked={selectedProjection === projType}
-                    onChange={() => handleProjectionChange(projType)}
-                    disabled={isAnimating || !projectionData[projType]}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm capitalize">
-                    {projType === "localmap" ? "LocalMAP" :
-                     projType === "pacmap" ? "PaCMAP" : "UMAP"}
-                    {!projectionData[projType] && " (Loading...)"}
-                  </span>
-                </label>
-              ))}
+          {kedroBaseUrl && effectivePipelines.length > 0 ? (
+            // Pipeline switching controls
+            <div className="mb-2">
+              <h3 className="text-sm font-medium mb-2">
+                Pipeline {isAnimating && "(Animating...)"}
+              </h3>
+              <Select
+                value={selectedPipeline}
+                onValueChange={handlePipelineChange}
+                disabled={isAnimating}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select pipeline..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {effectivePipelines.map((pipeline) => (
+                    <SelectItem
+                      key={pipeline.id}
+                      value={pipeline.id}
+                      disabled={!pipelineData[pipeline.id]}
+                    >
+                      <span className={!pipelineData[pipeline.id] ? 'text-gray-400' : ''}>
+                        {pipeline.name}
+                        {!pipelineData[pipeline.id] && " (Loading...)"}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-          <div className="text-xs text-gray-500 mt-2">
-            Current: {selectedProjection === "localmap" ? "LocalMAP" :
-                     selectedProjection === "pacmap" ? "PaCMAP" : "UMAP"}
-          </div>
+          ) : (
+            // Original projection switching controls
+            Object.values(projectionData).some(data => data !== null) && (
+              <div className="mb-2">
+                <h3 className="text-sm font-medium mb-2">
+                  Projection Type {isAnimating && "(Animating...)"}
+                </h3>
+                <div className="space-y-2">
+                  {(["localmap", "pacmap", "umap"] as ProjectionType[]).map((projType) => (
+                    <label key={projType} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="projection-type"
+                        value={projType}
+                        checked={selectedProjection === projType}
+                        onChange={() => handleProjectionChange(projType)}
+                        disabled={isAnimating || !projectionData[projType]}
+                        className="w-4 h-4"
+                      />
+                      <span className={`text-sm ${!projectionData[projType] ? 'text-gray-400' : ''}`}>
+                        {projType === "localmap" ? "LocalMAP" :
+                         projType === "pacmap" ? "PaCMAP" : "UMAP"}
+                        {!projectionData[projType] && " (Loading...)"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  Current: {selectedProjection === "localmap" ? "LocalMAP" :
+                           selectedProjection === "pacmap" ? "PaCMAP" : "UMAP"}
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
