@@ -34,7 +34,7 @@ export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
             const isSelected = actualIndex === activeIndex;
             const keyNumber = actualIndex === 0 ? '0' : actualIndex.toString();
             const colorName = PALETTE_COLOR_NAMES[color] || color;
-            
+
             return (
               <button
                 key={color}
