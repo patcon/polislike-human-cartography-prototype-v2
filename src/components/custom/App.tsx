@@ -15,7 +15,7 @@ import {
   createStatementTextMap,
   getLabelArrayWithOptionalUngrouped,
 } from "../../lib/representative-statements";
-import type { FinalizedCommentStats } from "@/lib/stats";
+import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { fetchAndProcessKedroData } from "@/lib/kedro-api";
 
 // Helper function for ID matching - can be optimized later for performance
@@ -66,6 +66,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Representative statements state
   const [representativeStatements, setRepresentativeStatements] = React.useState<Record<string, FinalizedCommentStats[]>>({});
+  const [consensusStatements, setConsensusStatements] = React.useState<{ agree: ConsensusStatement[]; disagree: ConsensusStatement[] } | null>(null);
   const [isCalculatingRepStatements, setIsCalculatingRepStatements] = React.useState(false);
   const [repStatementsError, setRepStatementsError] = React.useState<string | null>(null);
 
@@ -240,6 +241,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       console.log('Cannot analyze: need at least 2 groups, found:', uniqueGroups.size);
       // Clear representative statements when below threshold to prevent stale data
       setRepresentativeStatements({});
+      setConsensusStatements(null);
       setRepStatementsError(null);
 
       // Reset drawer to "all" tab when below threshold to prevent showing stale group tabs
@@ -268,6 +270,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       );
 
       setRepresentativeStatements(result.repComments);
+      setConsensusStatements(result.consensusStatements);
       console.log('Representative statements calculated:', result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to calculate representative statements';
@@ -315,6 +318,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       // Clear representative statements since all groups are now empty
       setRepresentativeStatements({});
+      setConsensusStatements(null);
       setRepStatementsError(null);
 
       // Reset drawer to "all" tab since group tabs are no longer valid
@@ -438,6 +442,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onClearAllColors={handleOpenClearDialog}
           // Representative statements props
           representativeStatements={representativeStatements}
+          consensusStatements={consensusStatements}
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
           isUnpaintedGrouped={isUnpaintedGrouped}

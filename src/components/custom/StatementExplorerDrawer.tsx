@@ -18,7 +18,7 @@ import { GroupTabsTrigger, type GroupTabsStyle } from "./GroupTabsTrigger";
 import { StatementExplorerButton } from "./StatementExplorerButton";
 import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
-import type { FinalizedCommentStats } from "@/lib/stats";
+import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 
 export type Statement = {
   statement_id: number;
@@ -47,6 +47,7 @@ type StatementExplorerDrawerProps = {
   statements: Statement[];
   activeColors?: number[];
   representativeStatements?: Record<string, FinalizedCommentStats[]>;
+  consensusStatements?: { agree: ConsensusStatement[]; disagree: ConsensusStatement[] } | null;
   isCalculatingRepStatements?: boolean;
   repStatementsError?: string | null;
   isUnpaintedGrouped?: boolean;
@@ -69,6 +70,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   statements,
   activeColors = [],
   representativeStatements = {},
+  consensusStatements = null,
   isCalculatingRepStatements = false,
   repStatementsError = null,
   isUnpaintedGrouped = false,
@@ -170,6 +172,43 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       } else if (repStat.repful_for === 'disagree') {
         colors[statementId] = VOTE_COLORS.disagree;
       }
+    });
+
+    return colors;
+  };
+
+  // Convert consensus statements to Statement format for display
+  const convertConsensusStatementsToStatements = (): { agree: Statement[]; disagree: Statement[] } => {
+    if (!consensusStatements) {
+      return { agree: [], disagree: [] };
+    }
+
+    const convertGroup = (statements: ConsensusStatement[]): Statement[] => {
+      return statements.map((consStat) => ({
+        statement_id: consStat.tid,
+        txt: statementTextMap[consStat.tid] || `Statement ${consStat.tid}`,
+        moderated: undefined,
+      }));
+    };
+
+    return {
+      agree: convertGroup(consensusStatements.agree),
+      disagree: convertGroup(consensusStatements.disagree),
+    };
+  };
+
+  // Generate statement colors for consensus statements
+  const getConsensusStatementColors = (): Record<number, string> => {
+    if (!consensusStatements) return {};
+
+    const colors: Record<number, string> = {};
+
+    consensusStatements.agree.forEach((consStat) => {
+      colors[consStat.tid] = VOTE_COLORS.agree;
+    });
+
+    consensusStatements.disagree.forEach((consStat) => {
+      colors[consStat.tid] = VOTE_COLORS.disagree;
     });
 
     return colors;
@@ -292,14 +331,97 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
               {/* Consensus tab */}
               <TabsContent value="consensus" className="select-text">
-                <div className="px-4 py-8 text-center">
-                  <div className="text-gray-500 text-sm">
-                    <p className="mb-2">Consensus statements coming soon.</p>
-                    <p className="text-xs">
-                      This will show statements with high consensus across all groups.
-                    </p>
+                {isCalculatingRepStatements ? (
+                  <div className="px-4 py-8 text-center">
+                    <div className="flex items-center justify-center space-x-2 text-gray-500">
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                      <span className="text-sm">Calculating consensus statements...</span>
+                    </div>
                   </div>
-                </div>
+                ) : repStatementsError ? (
+                  <div className="px-4 py-8 text-center">
+                    <div className="text-red-500 text-sm">
+                      <p className="mb-2">Error calculating consensus statements:</p>
+                      <p className="text-xs">{repStatementsError}</p>
+                    </div>
+                  </div>
+                ) : consensusStatements && (consensusStatements.agree.length > 0 || consensusStatements.disagree.length > 0) ? (
+                  (() => {
+                    const { agree, disagree } = convertConsensusStatementsToStatements();
+                    const consensusColors = getConsensusStatementColors();
+                    const hasAgree = agree.length > 0;
+                    const hasDisagree = disagree.length > 0;
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="px-4 py-2 bg-gray-50 rounded-lg">
+                          <h3 className="font-medium text-sm text-gray-700 mb-1">
+                            Consensus Statements
+                          </h3>
+                          <p className="text-xs text-gray-500">
+                            These statements show high consensus across all groups - either broad agreement or disagreement.
+                          </p>
+                        </div>
+
+                        {hasAgree && (
+                          <div className="space-y-2">
+                            <div className="px-4">
+                              <h4 className="font-medium text-sm text-green-700 flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VOTE_COLORS.agree }}></div>
+                                High Agreement ({agree.length} statement{agree.length !== 1 ? 's' : ''})
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Statements with broad consensus for agreement across groups.
+                              </p>
+                            </div>
+                            <StatementTable
+                              statements={agree}
+                              onStatementClick={onStatementClick}
+                              statementColors={consensusColors}
+                            />
+                          </div>
+                        )}
+
+                        {hasDisagree && (
+                          <div className="space-y-2">
+                            <div className="px-4">
+                              <h4 className="font-medium text-sm text-red-700 flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VOTE_COLORS.disagree }}></div>
+                                High Disagreement ({disagree.length} statement{disagree.length !== 1 ? 's' : ''})
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Statements with broad consensus for disagreement across groups.
+                              </p>
+                            </div>
+                            <StatementTable
+                              statements={disagree}
+                              onStatementClick={onStatementClick}
+                              statementColors={consensusColors}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : sortedColors.length < 2 ? (
+                  <div className="px-4 py-8 text-center">
+                    <div className="text-gray-500 text-sm">
+                      <p className="mb-2">Paint at least two groups to calculate consensus statements.</p>
+                      <p className="text-xs">
+                        Consensus statements show areas of broad agreement or disagreement across all groups.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-4 py-8 text-center">
+                    <div className="text-gray-500 text-sm">
+                      <p className="mb-2">No consensus statements found.</p>
+                      <p className="text-xs">
+                        This means there are no statements with strong consensus across all groups.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
 
               {/* Representative statements for each group */}

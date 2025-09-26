@@ -9,7 +9,7 @@ import { ToggleToolBar } from "./ToggleToolBar";
 import { AboutDialog } from "./AboutDialog";
 import { INITIAL_ACTION, isUnpainted } from "@/constants";
 import type { Statement } from "./StatementExplorerDrawer";
-import type { FinalizedCommentStats } from "@/lib/stats";
+import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 
 type MapOverlayProps = {
   action?: "move-map" | "paint-groups";
@@ -35,6 +35,7 @@ type MapOverlayProps = {
 
   // Representative statements props
   representativeStatements?: Record<string, FinalizedCommentStats[]>;
+  consensusStatements?: { agree: ConsensusStatement[]; disagree: ConsensusStatement[] } | null;
   isCalculatingRepStatements?: boolean;
   repStatementsError?: string | null;
 };
@@ -63,6 +64,7 @@ export function MapOverlay({
 
   // Representative statements props
   representativeStatements = {},
+  consensusStatements = null,
   isCalculatingRepStatements = false,
   repStatementsError = null,
 }: MapOverlayProps) {
@@ -127,6 +129,7 @@ export function MapOverlay({
           statements={statements}
           activeColors={activeColors}
           representativeStatements={representativeStatements}
+          consensusStatements={consensusStatements}
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
           isUnpaintedGrouped={isUnpaintedGrouped}
