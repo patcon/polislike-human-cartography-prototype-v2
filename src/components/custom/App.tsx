@@ -278,16 +278,16 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const handleClearAllColors = React.useCallback(() => {
     if (layerMode === "groups") {
       setPointGroups(Array(dataset.length).fill(null));
-      
+
       // Clear representative statements since all groups are now empty
       setRepresentativeStatements({});
       setRepStatementsError(null);
-      
+
       // Reset drawer to "all" tab since group tabs are no longer valid
       if (drawerTab !== "all") {
         setDrawerTab("all");
       }
-      
+
       console.log('All painted colors cleared');
     }
   }, [layerMode, dataset.length, drawerTab, setDrawerTab]);

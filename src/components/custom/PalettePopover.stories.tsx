@@ -33,7 +33,7 @@ export const Default: Story = {
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     return (
       <>
         <div className="fixed bottom-4 right-4 z-50">
@@ -66,7 +66,7 @@ export const DifferentColor: Story = {
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(3);
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     return (
       <>
         <div className="fixed bottom-4 right-4 z-50">
@@ -100,7 +100,7 @@ export const Disabled: Story = {
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     return (
       <>
         <div className="fixed bottom-4 right-4 z-50">

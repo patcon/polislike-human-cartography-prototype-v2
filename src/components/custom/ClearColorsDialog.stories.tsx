@@ -22,7 +22,7 @@ export const Default: Story = {
   },
   render: () => {
     const [open, setOpen] = useState(false);
-    
+
     return (
       <div className="p-4">
         <Button onClick={() => setOpen(true)}>

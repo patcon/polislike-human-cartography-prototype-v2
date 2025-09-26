@@ -223,7 +223,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       </TabsTrigger>
                     )}
                   </TabsList>
-                  
+
                   {/* Second row: All tab (and future Consensus tab) */}
                   <TabsList className="flex w-full gap-2 bg-white h-auto">
                     <TabsTrigger value="all">All</TabsTrigger>

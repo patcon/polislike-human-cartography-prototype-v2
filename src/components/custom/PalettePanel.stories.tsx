@@ -24,7 +24,7 @@ export const Default: Story = {
   render: () => {
     const [activeIndex, setActiveIndex] = useState(0); // default to first color (blue)
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     return (
       <>
         <PalettePanel
@@ -55,7 +55,7 @@ export const OrangeSelected: Story = {
     const orangeIndex = PALETTE_COLORS.indexOf("#ff7f0e");
     const [activeIndex, setActiveIndex] = useState(orangeIndex);
     const [dialogOpen, setDialogOpen] = useState(false);
-    
+
     return (
       <>
         <PalettePanel
