@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { PalettePopover } from "./PalettePopover";
+import { ClearColorsDialog } from "./ClearColorsDialog";
 
 const meta = {
   title: "Components/PalettePopover",
@@ -31,14 +32,27 @@ export const Default: Story = {
   },
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    
     return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <PalettePopover
-          {...args}
-          activeIndex={activeIndex}
-          onSelectIndex={setActiveIndex}
+      <>
+        <div className="fixed bottom-4 right-4 z-50">
+          <PalettePopover
+            {...args}
+            activeIndex={activeIndex}
+            onSelectIndex={setActiveIndex}
+            onEraserReselect={() => setDialogOpen(true)}
+          />
+        </div>
+        <ClearColorsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={() => {
+            alert("All colors erased!");
+            console.log("Erase colors confirmed");
+          }}
         />
-      </div>
+      </>
     );
   },
 };
@@ -51,14 +65,27 @@ export const DifferentColor: Story = {
   },
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(3);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    
     return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <PalettePopover
-          {...args}
-          activeIndex={activeIndex}
-          onSelectIndex={setActiveIndex}
+      <>
+        <div className="fixed bottom-4 right-4 z-50">
+          <PalettePopover
+            {...args}
+            activeIndex={activeIndex}
+            onSelectIndex={setActiveIndex}
+            onEraserReselect={() => setDialogOpen(true)}
+          />
+        </div>
+        <ClearColorsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={() => {
+            alert("All colors erased!");
+            console.log("Erase colors confirmed");
+          }}
         />
-      </div>
+      </>
     );
   },
 };
@@ -72,14 +99,27 @@ export const Disabled: Story = {
   },
   render: (args) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    
     return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <PalettePopover
-          {...args}
-          activeIndex={activeIndex}
-          onSelectIndex={setActiveIndex}
+      <>
+        <div className="fixed bottom-4 right-4 z-50">
+          <PalettePopover
+            {...args}
+            activeIndex={activeIndex}
+            onSelectIndex={setActiveIndex}
+            onEraserReselect={() => setDialogOpen(true)}
+          />
+        </div>
+        <ClearColorsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={() => {
+            alert("All colors erased!");
+            console.log("Erase colors confirmed");
+          }}
         />
-      </div>
+      </>
     );
   },
 };

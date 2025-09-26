@@ -31,6 +31,7 @@ type MapOverlayProps = {
   highlightPassVotes?: boolean;
   onHighlightPassVotesChange?: (value: boolean) => void;
   isUnpaintedGrouped?: boolean;
+  onClearAllColors?: () => void;
 
   // Representative statements props
   representativeStatements?: Record<string, FinalizedCommentStats[]>;
@@ -58,6 +59,7 @@ export function MapOverlay({
   highlightPassVotes = true,
   onHighlightPassVotesChange,
   isUnpaintedGrouped = false,
+  onClearAllColors,
 
   // Representative statements props
   representativeStatements = {},
@@ -146,6 +148,7 @@ export function MapOverlay({
           <PalettePopover
             activeIndex={colorIndex}
             onSelectIndex={handleColorIndexChange}
+            onEraserReselect={onClearAllColors}
             disabled={action !== "paint-groups" || layerMode === "votes"} // 👈 disable palette when not painting or in votes mode
           />
         </div>

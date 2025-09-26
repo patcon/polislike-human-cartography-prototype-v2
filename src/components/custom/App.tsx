@@ -4,6 +4,7 @@ import * as React from "react";
 import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
+import { ClearColorsDialog } from "./ClearColorsDialog";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getParticipantDataForStatement, initializeDuckDB } from "../../lib/duckdb";
@@ -70,6 +71,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Unpainted grouping state
   const [isUnpaintedGrouped, setIsUnpaintedGrouped] = React.useState(false);
+
+  // Clear colors dialog state
+  const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
 
   // Load data and initialize DuckDB on component mount
   React.useEffect(() => {
@@ -265,6 +269,29 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     }
   }
 
+  // Open clear colors dialog
+  const handleOpenClearDialog = React.useCallback(() => {
+    setClearDialogOpen(true);
+  }, []);
+
+  // Clear all painted colors - reset all points to unpainted
+  const handleClearAllColors = React.useCallback(() => {
+    if (layerMode === "groups") {
+      setPointGroups(Array(dataset.length).fill(null));
+      
+      // Clear representative statements since all groups are now empty
+      setRepresentativeStatements({});
+      setRepStatementsError(null);
+      
+      // Reset drawer to "all" tab since group tabs are no longer valid
+      if (drawerTab !== "all") {
+        setDrawerTab("all");
+      }
+      
+      console.log('All painted colors cleared');
+    }
+  }, [layerMode, dataset.length, drawerTab, setDrawerTab]);
+
   // handle quick select (single point click) - opens drawer to specific tab
   function handleQuickSelect(id: string): boolean {
     console.log('🔍 QuickSelect:', id, '(', typeof id, ')');
@@ -374,6 +401,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onStatementIdChange={setStatementId}
           highlightPassVotes={highlightPassVotes}
           onHighlightPassVotesChange={setHighlightPassVotes}
+          onClearAllColors={handleOpenClearDialog}
           // Representative statements props
           representativeStatements={representativeStatements}
           isCalculatingRepStatements={isCalculatingRepStatements}
@@ -402,6 +430,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           />
         </div>
       </div>
+
+      {/* Clear Colors Dialog */}
+      <ClearColorsDialog
+        open={clearDialogOpen}
+        onOpenChange={setClearDialogOpen}
+        onConfirm={handleClearAllColors}
+      />
     </div>
   );
 };
