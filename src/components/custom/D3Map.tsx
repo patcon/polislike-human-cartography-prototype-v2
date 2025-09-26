@@ -71,7 +71,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     umap: null
   });
   const [isAnimating, setIsAnimating] = React.useState(false);
-  
+
   // Pipeline switching state - use internal pipeline fetching if availablePipelines not provided
   const shouldFetchPipelines = kedroBaseUrl && testAnimation && !availablePipelines?.length;
   const { pipelines: fetchedPipelines } = usePipelineOptions(shouldFetchPipelines ? kedroBaseUrl : undefined);
@@ -96,7 +96,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           // Load pipeline data from Kedro API
           const { fetchAndProcessKedroData } = await import('../../lib/kedro-api');
           const pipelineDataMap: Record<string, ProjectionData | null> = {};
-          
+
           for (const pipeline of effectivePipelines) {
             try {
               const data = await fetchAndProcessKedroData(kedroBaseUrl, pipeline.id);
@@ -106,7 +106,7 @@ export const D3Map: React.FC<D3MapProps> = ({
               pipelineDataMap[pipeline.id] = null;
             }
           }
-          
+
           setPipelineData(pipelineDataMap);
           if (!selectedPipeline && effectivePipelines[0]) {
             setSelectedPipeline(effectivePipelines[0].id);
