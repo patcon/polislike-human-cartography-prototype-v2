@@ -10,7 +10,8 @@ type StatementTableProps = {
 };
 
 export const StatementTable: React.FC<StatementTableProps> = ({ statements, onStatementClick, statementColors }) => {
-  const insertBreaks = (val: string) => {
+  const insertBreaks = (val: string | null | undefined) => {
+    if (!val) return "";
     const ZWSP = "\u200B";
     return val
       .replace(/(?<!:)\/(?!\/)/g, "/" + ZWSP)
