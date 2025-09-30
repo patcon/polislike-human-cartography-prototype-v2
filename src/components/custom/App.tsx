@@ -91,7 +91,17 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
           // Kedro data is already sorted in fetchAndProcessKedroData
           setDataset(kedroData);
-          setStatements(statementsData);
+          // Sort statements by statement_id to ensure consistent ordering
+          setStatements([...statementsData].sort((a, b) => {
+            // Try integer sorting first
+            const aInt = parseInt(String(a.statement_id), 10);
+            const bInt = parseInt(String(b.statement_id), 10);
+            if (!isNaN(aInt) && !isNaN(bInt)) {
+              return aInt - bInt;
+            }
+            // Fall back to string sorting
+            return String(a.statement_id).localeCompare(String(b.statement_id));
+          }));
 
           // Note: DuckDB initialization might not be needed for Kedro mode
           // depending on whether votes functionality is required
@@ -113,7 +123,17 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           const sortedProjectionsData = [...projectionsData].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
           setDataset(sortedProjectionsData);
-          setStatements(statementsData);
+          // Sort statements by statement_id to ensure consistent ordering
+          setStatements([...statementsData].sort((a, b) => {
+            // Try integer sorting first
+            const aInt = parseInt(String(a.statement_id), 10);
+            const bInt = parseInt(String(b.statement_id), 10);
+            if (!isNaN(aInt) && !isNaN(bInt)) {
+              return aInt - bInt;
+            }
+            // Fall back to string sorting
+            return String(a.statement_id).localeCompare(String(b.statement_id));
+          }));
 
           await initializeDuckDB();
           console.log('Local data loaded and DuckDB initialized');
