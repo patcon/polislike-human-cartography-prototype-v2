@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { StatementExplorerDrawer } from "./StatementExplorerDrawer";
-import { resolveAssetPath } from "../../lib/paths";
+import { loadStatementsData } from "../../lib/kedro-api";
 
 const meta: Meta<typeof StatementExplorerDrawer> = {
   title: "Components/StatementExplorerDrawer",
@@ -18,9 +18,9 @@ export const Default: Story = {
     const [statementsData, setStatementsData] = useState(null);
 
     useEffect(() => {
-      fetch(resolveAssetPath('/statements.json'))
-        .then(response => response.json())
-        .then(data => setStatementsData(data));
+      loadStatementsData()
+        .then(data => setStatementsData(data))
+        .catch(error => console.error('Error loading statements:', error));
     }, []);
 
     if (!statementsData) return <div>Loading...</div>;
@@ -39,9 +39,9 @@ export const SevenTabs: Story = {
     const [statementsData, setStatementsData] = useState(null);
 
     useEffect(() => {
-      fetch(resolveAssetPath('/statements.json'))
-        .then(response => response.json())
-        .then(data => setStatementsData(data));
+      loadStatementsData()
+        .then(data => setStatementsData(data))
+        .catch(error => console.error('Error loading statements:', error));
     }, []);
 
     if (!statementsData) return <div>Loading...</div>;
@@ -60,9 +60,9 @@ export const EveryColor: Story = {
     const [statementsData, setStatementsData] = useState(null);
 
     useEffect(() => {
-      fetch(resolveAssetPath('/statements.json'))
-        .then(response => response.json())
-        .then(data => setStatementsData(data));
+      loadStatementsData()
+        .then(data => setStatementsData(data))
+        .catch(error => console.error('Error loading statements:', error));
     }, []);
 
     if (!statementsData) return <div>Loading...</div>;
@@ -83,9 +83,9 @@ export const OpenToGroupC: Story = {
     const [statementsData, setStatementsData] = useState(null);
 
     useEffect(() => {
-      fetch(resolveAssetPath('/statements.json'))
-        .then(response => response.json())
-        .then(data => setStatementsData(data));
+      loadStatementsData()
+        .then(data => setStatementsData(data))
+        .catch(error => console.error('Error loading statements:', error));
     }, []);
 
     const handleOpenGroupA = () => {

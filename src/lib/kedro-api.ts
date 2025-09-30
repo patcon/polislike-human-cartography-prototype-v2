@@ -90,6 +90,24 @@ export function findScatterPlotNode(apiResponse: KedroApiResponse, pipelineId: s
 }
 
 /**
+ * Find the votes parquet node in the pipeline data
+ */
+export function findVotesParquetNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
+  return apiResponse.nodes.find(node =>
+    node.name === `${pipelineId}__votes_parquet`
+  ) || null;
+}
+
+/**
+ * Find the statements JSON node in the pipeline data
+ */
+export function findStatementsJsonNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
+  return apiResponse.nodes.find(node =>
+    node.name === `${pipelineId}__statements_json`
+  ) || null;
+}
+
+/**
  * Fetch node data from Kedro API
  */
 export async function fetchKedroNodeData(kedroBaseUrl: string, nodeId: string): Promise<KedroNodeDataResponse> {
@@ -200,6 +218,122 @@ export async function fetchAndProcessKedroData(kedroBaseUrl: string, pipelineId:
 
   } catch (error) {
     console.error('Error in Kedro data workflow:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the votes parquet file path from Kedro API
+ */
+export async function getVotesParquetPath(kedroBaseUrl: string, pipelineId: string = 'mean_localmap_bestkmeans'): Promise<string> {
+  try {
+    console.log('🔄 Fetching Kedro pipeline data for votes parquet...', { kedroBaseUrl, pipelineId });
+    const apiResponse = await fetchKedroApiData(kedroBaseUrl, pipelineId);
+
+    console.log('🔍 Finding votes parquet node...');
+    const votesParquetNode = findVotesParquetNode(apiResponse, pipelineId);
+
+    if (!votesParquetNode) {
+      throw new Error(`Could not find votes parquet node with name "${pipelineId}__votes_parquet"`);
+    }
+
+    console.log(`✅ Found votes parquet node with ID: ${votesParquetNode.id}`);
+
+    console.log('📡 Fetching node data for votes parquet...');
+    const nodeData = await fetchKedroNodeData(kedroBaseUrl, votesParquetNode.id);
+
+    // The node data should contain a filepath key with the relative path
+    if (!nodeData || !('filepath' in nodeData) || typeof nodeData.filepath !== 'string') {
+      throw new Error(`Node data does not contain a valid filepath key. Available keys: ${Object.keys(nodeData || {}).join(', ')}`);
+    }
+
+    const filepath = nodeData.filepath as string;
+    console.log(`📄 Found votes parquet file path: ${filepath}`);
+    return filepath;
+
+  } catch (error) {
+    console.error('❌ Error getting votes parquet path:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the statements JSON file path from Kedro API
+ */
+export async function getStatementsJsonPath(kedroBaseUrl: string, pipelineId: string = 'mean_localmap_bestkmeans'): Promise<string> {
+  try {
+    console.log('Fetching Kedro pipeline data for statements JSON...');
+    const apiResponse = await fetchKedroApiData(kedroBaseUrl, pipelineId);
+
+    console.log('Finding statements JSON node...');
+    const statementsJsonNode = findStatementsJsonNode(apiResponse, pipelineId);
+
+    if (!statementsJsonNode) {
+      throw new Error(`Could not find statements JSON node with name "${pipelineId}__statements_json"`);
+    }
+
+    console.log(`Found statements JSON node with ID: ${statementsJsonNode.id}`);
+
+    console.log('Fetching node data for statements JSON...');
+    const nodeData = await fetchKedroNodeData(kedroBaseUrl, statementsJsonNode.id);
+
+    // Debug: log the actual node data structure
+    console.log('Statements node data structure:', JSON.stringify(nodeData, null, 2));
+
+    // The node data should contain a filepath key with the relative path
+    if (!nodeData || !('filepath' in nodeData) || typeof nodeData.filepath !== 'string') {
+      throw new Error(`Node data does not contain a valid filepath key. Available keys: ${Object.keys(nodeData || {}).join(', ')}`);
+    }
+
+    const filepath = nodeData.filepath as string;
+    console.log(`Found statements JSON file path: ${filepath}`);
+    return filepath;
+
+  } catch (error) {
+    console.error('Error getting statements JSON path:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load statements JSON data with optional Kedro API support
+ * Falls back to local file if Kedro parameters are not provided
+ */
+export async function loadStatementsData(kedroBaseUrl?: string, pipelineId?: string): Promise<any> {
+  try {
+    if (kedroBaseUrl) {
+      // Use Kedro API to get the statements JSON file path
+      console.log('🔄 Loading statements from Kedro API...', { kedroBaseUrl, pipelineId });
+      const relativePath = await getStatementsJsonPath(kedroBaseUrl, pipelineId);
+      const statementsUrl = `${kedroBaseUrl}/${relativePath}`;
+      console.log('📄 Loading statements from:', statementsUrl);
+
+      // Add cache-busting parameter to ensure fresh data
+      const cacheBustUrl = `${statementsUrl}?t=${Date.now()}`;
+      const response = await fetch(cacheBustUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch statements: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Successfully loaded statements from Kedro API, count:', data?.length || 'unknown');
+      return data;
+    } else {
+      // Fallback to local file
+      console.log('📁 Loading statements from local file...');
+      const response = await fetch('/statements.json');
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch local statements: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Successfully loaded statements from local file, count:', data?.length || 'unknown');
+      return data;
+    }
+  } catch (error) {
+    console.error('❌ Error loading statements data:', error);
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
 import { VOTE_COLORS } from '../constants';
 import { resolveAssetPath, getAssetUrl } from './paths';
+import { getVotesParquetPath } from './kedro-api';
 
 // DuckDB instance and connection
 let db: duckdb.AsyncDuckDB | null = null;
@@ -8,6 +9,7 @@ let conn: duckdb.AsyncDuckDBConnection | null = null;
 
 // Track if votes table has been loaded
 let votesTableLoaded = false;
+let lastVotesConfig: string | null = null;
 
 /**
  * Initialize DuckDB WASM instance
@@ -71,11 +73,21 @@ export function getConnection(): duckdb.AsyncDuckDBConnection | null {
 }
 
 /**
- * Ensure votes table is loaded (only loads once)
+ * Ensure votes table is loaded (only loads once per configuration)
  */
-export async function ensureVotesTableLoaded(): Promise<void> {
-  if (votesTableLoaded) {
-    return; // Already loaded
+export async function ensureVotesTableLoaded(kedroBaseUrl?: string, pipelineId?: string): Promise<void> {
+  // Create a unique key for this configuration
+  const configKey = `${kedroBaseUrl || 'local'}:${pipelineId || 'default'}`;
+
+  // Check if we've already loaded votes for this exact configuration
+  if (votesTableLoaded && lastVotesConfig === configKey) {
+    return; // Already loaded for this configuration
+  }
+
+  // Reset the loaded flag if configuration changed
+  if (lastVotesConfig !== configKey) {
+    votesTableLoaded = false;
+    console.log('🔄 Votes configuration changed, will reload votes table');
   }
 
   if (!conn) {
@@ -83,7 +95,19 @@ export async function ensureVotesTableLoaded(): Promise<void> {
   }
 
   try {
-    const votesUrl = getAssetUrl('/votes.parquet');
+    let votesUrl: string;
+
+    if (kedroBaseUrl) {
+      // Use Kedro API to get the votes parquet file path
+      console.log('Getting votes parquet path from Kedro API...');
+      const relativePath = await getVotesParquetPath(kedroBaseUrl, pipelineId);
+      // Convert relative path to full URL (assuming it's relative to the Kedro base URL)
+      votesUrl = `${kedroBaseUrl}/${relativePath}`;
+    } else {
+      // Fallback to hardcoded local path
+      votesUrl = getAssetUrl('/votes.parquet');
+    }
+
     console.log('Loading votes table from:', votesUrl);
 
     await conn!.query(`
@@ -92,7 +116,8 @@ export async function ensureVotesTableLoaded(): Promise<void> {
     `);
 
     votesTableLoaded = true;
-    console.log('Votes table loaded successfully');
+    lastVotesConfig = configKey;
+    console.log('✅ Votes table loaded successfully for config:', configKey);
   } catch (error) {
     console.error('Failed to load votes table:', error);
     throw new Error('Failed to load votes data');
@@ -129,16 +154,23 @@ export async function loadParquetFile(filePath: string, tableName: string): Prom
  * Get votes for specific participants and statement
  * @param statementId - The statement ID to get votes for
  * @param participantIds - Array of participant IDs to get votes for
+ * @param kedroBaseUrl - Optional Kedro base URL for API access
+ * @param pipelineId - Optional pipeline ID for Kedro API
  * @returns Map of participant IDs to their votes
  */
-export async function getVotesForParticipants(statementId: string, participantIds: string[]): Promise<Map<string, number>> {
+export async function getVotesForParticipants(
+  statementId: string,
+  participantIds: string[],
+  kedroBaseUrl?: string,
+  pipelineId?: string
+): Promise<Map<string, number>> {
   if (!conn) {
     await initializeDuckDB();
   }
 
   try {
     // Ensure votes table is loaded (uses optimized single-load function)
-    await ensureVotesTableLoaded();
+    await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
 
     // Create a comma-separated list of participant IDs for the IN clause
     const participantIdList = participantIds.map(id => `'${id}'`).join(',');
@@ -223,9 +255,15 @@ function getVoteType(vote: number): keyof typeof VOTE_COLORS {
  * Get participant data with votes and colors for a specific statement
  * More efficient approach: load all projections first, then query votes for those participants
  * @param statementId - The statement ID to get data for
+ * @param kedroBaseUrl - Optional Kedro base URL for API access
+ * @param pipelineId - Optional pipeline ID for Kedro API
  * @returns Array of participant data with coordinates, votes, and colors
  */
-export async function getParticipantDataForStatement(statementId: string): Promise<Array<{
+export async function getParticipantDataForStatement(
+  statementId: string,
+  kedroBaseUrl?: string,
+  pipelineId?: string
+): Promise<Array<{
   participantId: string;
   coordinates: [number, number];
   vote: number | null;
@@ -238,7 +276,7 @@ export async function getParticipantDataForStatement(statementId: string): Promi
     const participantIds = Array.from(projections.keys());
 
     // Then get votes for all those participants in a single query
-    const votes = await getVotesForParticipants(statementId, participantIds);
+    const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, pipelineId);
 
     const participantData: Array<{
       participantId: string;
@@ -298,6 +336,7 @@ export async function closeDuckDB(): Promise<void> {
     }
     // Reset votes table tracking
     votesTableLoaded = false;
+    lastVotesConfig = null;
     console.log('DuckDB connection closed');
   } catch (error) {
     console.error('Error closing DuckDB:', error);

@@ -16,7 +16,7 @@ import {
   getLabelArrayWithOptionalUngrouped,
 } from "../../lib/representative-statements";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
-import { fetchAndProcessKedroData } from "@/lib/kedro-api";
+import { fetchAndProcessKedroData, loadStatementsData } from "@/lib/kedro-api";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -84,12 +84,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           // Kedro mode: fetch data from Kedro API
           console.log('Loading data from Kedro API:', kedroBaseUrl);
 
-          const [kedroData, statementsResponse] = await Promise.all([
+          const [kedroData, statementsData] = await Promise.all([
             fetchAndProcessKedroData(kedroBaseUrl, pipelineId),
-            fetch(resolveAssetPath('/statements.json'))
+            loadStatementsData(kedroBaseUrl, pipelineId)
           ]);
-
-          const statementsData = await statementsResponse.json();
 
           // Kedro data is already sorted in fetchAndProcessKedroData
           setDataset(kedroData);
@@ -179,7 +177,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       const loadVotes = async () => {
         try {
           console.log(`Loading votes for statement ${statementId}`);
-          const participantData = await getParticipantDataForStatement(statementId);
+          const participantData = await getParticipantDataForStatement(statementId, kedroBaseUrl, pipelineId);
 
           // Create a map for quick lookup
           // voteMap variable removed as it was unused
