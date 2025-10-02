@@ -33,6 +33,8 @@ type D3MapProps = {
   onQuickSelect?: (id: string) => boolean | void;
   flipX?: boolean;
   flipY?: boolean;
+  /** Bring colored points to front (render on top of unpainted points) */
+  colorsToFront?: boolean;
   /** Enable animation testing between projection sets */
   testAnimation?: boolean;
   /** Kedro base URL for fetching pipeline data */
@@ -50,6 +52,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   onQuickSelect,
   flipX,
   flipY,
+  colorsToFront = false,
   testAnimation = false,
   kedroBaseUrl,
   availablePipelines = [],
@@ -176,11 +179,30 @@ export const D3Map: React.FC<D3MapProps> = ({
     const xExtent = d3.extent(currentData, ([, [x]]) => x)! as [number, number];
     const yExtent = d3.extent(currentData, ([, [, y]]) => y)! as [number, number];
 
-    const points = currentData.map(([i, [x, y]]) => ({
+    let points = currentData.map(([i, [x, y]], originalIndex) => ({
       i,
       x: flipX ? xExtent[1] - (x - xExtent[0]) : x,
       y: flipY ? yExtent[1] - (y - yExtent[0]) : y,
+      originalIndex, // Store original index to preserve order when toggle is off
     }));
+
+    // Sort points to bring colored ones to front if colorsToFront is enabled
+    if (colorsToFront) {
+      points = [...points].sort((a, b) => {
+        const aColorIndex = pointColors[a.originalIndex];
+        const bColorIndex = pointColors[b.originalIndex];
+        const aIsColored = aColorIndex != null;
+        const bIsColored = bColorIndex != null;
+
+        // If both are colored or both are uncolored, maintain original order
+        if (aIsColored === bIsColored) {
+          return a.originalIndex - b.originalIndex;
+        }
+
+        // Uncolored points come first (render behind), colored points come last (render on top)
+        return aIsColored ? 1 : -1;
+      });
+    }
 
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -210,7 +232,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     const yScale = d3.scaleLinear().domain(yExtent).range(yRange);
 
     return { points, xScale, yScale };
-  }, [data, flipX, flipY, testAnimation, projectionData, selectedProjection, pipelineData, selectedPipeline, kedroBaseUrl]);
+  }, [data, flipX, flipY, colorsToFront, pointColors, testAnimation, projectionData, selectedProjection, pipelineData, selectedPipeline, kedroBaseUrl]);
 
   const quadtree = React.useMemo(
     () => d3.quadtree(points, d => d.x, d => d.y),
@@ -236,7 +258,11 @@ export const D3Map: React.FC<D3MapProps> = ({
     (container as any).xScale = xScale;
     (container as any).yScale = yScale;
 
-    const circles = container.selectAll<SVGCircleElement, typeof points[0]>("circle")
+    // Force complete re-render when colorsToFront changes or when pointColors change while sorted
+    // Use a unique selector that includes a hash of the pointColors to force re-render when vote data changes
+    const pointColorsHash = pointColors.slice(0, 100).join(','); // Sample first 100 for performance
+    const circleSelector = colorsToFront ? `circle.sorted-${pointColorsHash.length}` : "circle.original";
+    const circles = container.selectAll<SVGCircleElement, typeof points[0]>(circleSelector)
       .data(points, (d: any) => d.i);
 
     let transformK: any = null
@@ -250,11 +276,13 @@ export const D3Map: React.FC<D3MapProps> = ({
     // UPDATE with animation
     const updateSelection = circles
       .attr("r", BASE_RADIUS / transformK)
-      .attr("fill", (_, i) =>
-        pointColors[i] != null
-          ? palette[pointColors[i]! % palette.length]
-          : UNPAINTED_COLOR
-      );
+      .attr("fill", (d, i) => {
+        // Use originalIndex to get the correct color from pointColors array
+        const colorIndex = pointColors[d.originalIndex];
+        return colorIndex != null
+          ? palette[colorIndex % palette.length]
+          : UNPAINTED_COLOR;
+      });
 
     if (isAnimating) {
       updateSelection
@@ -273,19 +301,31 @@ export const D3Map: React.FC<D3MapProps> = ({
     // ENTER
     circles.enter()
       .append("circle")
+      .attr("class", colorsToFront ? `sorted-${pointColorsHash.length}` : "original")
       .attr("cx", d => xScale(d.x))
       .attr("cy", d => yScale(d.y))
       .attr("r", BASE_RADIUS / transformK)
-      .attr("fill", (_, i) =>
-        pointColors[i] != null
-          ? palette[pointColors[i]! % palette.length]
-          : UNPAINTED_COLOR
-      )
+      .attr("fill", (d) => {
+        // Use originalIndex to get the correct color from pointColors array
+        const colorIndex = pointColors[d.originalIndex];
+        return colorIndex != null
+          ? palette[colorIndex % palette.length]
+          : UNPAINTED_COLOR;
+      })
       .attr("opacity", 0.7);
 
     // EXIT
     circles.exit().remove();
-  }, [points, xScale, yScale, pointColors, palette, isAnimating]);
+
+    // When colorsToFront changes or pointColors change, remove all circles with different classes
+    if (colorsToFront) {
+      container.selectAll("circle.original").remove();
+      // Also remove any old sorted circles with different hash
+      container.selectAll("circle[class^='sorted-']:not(.sorted-" + pointColorsHash.length + ")").remove();
+    } else {
+      container.selectAll("circle[class^='sorted-']").remove();
+    }
+  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront]);
 
   // Handle projection change with animation
   const handleProjectionChange = React.useCallback((newProjection: ProjectionType) => {
@@ -521,7 +561,6 @@ export const D3Map: React.FC<D3MapProps> = ({
         cleanupLasso();
       }
 
-      console.log('🎨 Setting up lasso drag behavior');
       svg.call(
         d3.drag<SVGSVGElement, unknown>()
           .filter((event) => (event.sourceEvent?.touches?.length ?? 0) <= 1)
@@ -559,12 +598,15 @@ export const D3Map: React.FC<D3MapProps> = ({
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {
     if (!containerRef.current) return;
+    // Update colors for all circles regardless of class
     containerRef.current.selectAll("circle")
-      .attr("fill", (_, i) =>
-        pointColors[i] != null
-          ? palette[pointColors[i]! % palette.length]
-          : UNPAINTED_COLOR
-      );
+      .attr("fill", (d: any) => {
+        // Use originalIndex to get the correct color from pointColors array
+        const colorIndex = pointColors[d.originalIndex];
+        return colorIndex != null
+          ? palette[colorIndex % palette.length]
+          : UNPAINTED_COLOR;
+      });
   }, [pointColors, palette]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
@@ -671,6 +713,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           )}
         </div>
       )}
+      
     </div>
   );
 };

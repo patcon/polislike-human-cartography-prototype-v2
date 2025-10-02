@@ -32,7 +32,7 @@ export function ToggleToolBar({
       <ToggleGroupItem disabled value="show-named-labels" aria-label="Show named labels" className="data-[state=on]:bg-gray-200">
         <Tags className="h-5 w-5" />
       </ToggleGroupItem>
-      <ToggleGroupItem disabled value="colors-to-front" aria-label="Bring colors to front" className="data-[state=on]:bg-gray-200">
+      <ToggleGroupItem value="colors-to-front" aria-label="Bring colors to front" className="data-[state=on]:bg-gray-200">
         <BringToFrontSolid className="h-5 w-5" />
       </ToggleGroupItem>
     </ToggleGroup>

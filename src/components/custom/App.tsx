@@ -45,6 +45,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   const [toggles, setToggles] = React.useState<string[]>([]);
 
+  // Colors to front toggle state
+  const colorsToFront = toggles.includes("colors-to-front");
+
   // Layer mode: "groups" or "votes"
   const [layerMode, setLayerMode] = React.useState<"groups" | "votes">("groups");
 
@@ -59,6 +62,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // array parallel to dataset: vote-based color indices (for votes mode)
   const [pointVotes, setPointVotes] = React.useState<(number | null)[]>([]);
+
 
   // StatementExplorerDrawer state
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -436,6 +440,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onQuickSelect={handleQuickSelect}
           flipX={toggles.includes("flip-horizontal")}
           flipY={toggles.includes("flip-vertical")}
+          colorsToFront={colorsToFront}
           testAnimation={testAnimation}
           kedroBaseUrl={kedroBaseUrl}
           availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
