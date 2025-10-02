@@ -407,7 +407,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   }
 
   return (
-    <div className="relative h-screen w-screen">
+    <div
+      className="relative h-screen w-screen"
+      /**
+       * Prevent Google Translate from modifying DOM during animations
+       * which causes React "removeChild" errors when animating SVG elements
+       */
+      translate="no"
+      data-notranslate="true"
+    >
       <PathasLogo />
 
       {/* D3Map: absolutely positioned to fill parent */}
