@@ -219,7 +219,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   };
 
   return (
-    <Drawer open={isOpen} onOpenChange={handleOpenChange} defaultOpen={defaultOpen}>
+    <Drawer
+      open={isOpen}
+      onOpenChange={handleOpenChange}
+      defaultOpen={defaultOpen}
+      snapPoints={["56px", 1]}
+    >
       <DrawerTrigger asChild>
         <StatementExplorerButton iconVariant="telescope" label="Explore Statements" />
       </DrawerTrigger>
