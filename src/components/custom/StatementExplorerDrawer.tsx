@@ -19,6 +19,7 @@ import { StatementExplorerButton } from "./StatementExplorerButton";
 import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
+import { useGoogleTranslateRefresh } from "@/hooks/useGoogleTranslateRefresh";
 
 export type Statement = {
   statement_id: number;
@@ -97,28 +98,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   const activeTab = tabValue ?? internalTab;
   const handleTabChange = onTabValueChange ?? setInternalTab;
 
-  // Trigger Google Translate re-scan when active tab changes
-  React.useEffect(() => {
-    if (isOpen && typeof window !== 'undefined') {
-      // Small delay to ensure tab content is rendered
-      const timer = setTimeout(() => {
-        try {
-          // Force DOM mutation on the active tab content to trigger Google Translate re-scan
-          const activeTabContent = document.querySelector(`[data-state="active"][translate="yes"]`);
-          if (activeTabContent) {
-            activeTabContent.removeAttribute('translate');
-            requestAnimationFrame(() => {
-              activeTabContent.setAttribute('translate', 'yes');
-            });
-          }
-        } catch (error) {
-          console.debug('Google Translate re-scan on tab change failed:', error);
-        }
-      }, 100);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, activeTab]);
+  // Trigger Google Translate re-scan when drawer opens or tab changes
+  useGoogleTranslateRefresh([isOpen, activeTab]);
 
   const letterForIndex = (index: number) => String.fromCharCode(65 + index);
   const sortedColors = React.useMemo(() =>
