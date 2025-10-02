@@ -144,7 +144,7 @@ export function addComparativeStats(inStats: BasicCommentStats, restStats: Basic
  * @param {Array} participants - Array of participant data
  * @returns {Promise<Object>} - Group vote matrices
  */
-export async function getGroupVoteMatrices(conn: any, labelArray: (string | null)[], participants?: string[]): Promise<Record<string, GroupVoteMatrix>> {
+export async function getGroupVoteMatrices(conn: any, labelArray: (string | null)[], participants?: string[], kedroBaseUrl?: string, pipelineId?: string): Promise<Record<string, GroupVoteMatrix>> {
   const groups: Record<string, any[]> = {};
   labelArray.forEach((label, index) => {
     if (label != null) {
@@ -156,9 +156,10 @@ export async function getGroupVoteMatrices(conn: any, labelArray: (string | null
     }
   });
 
-  // Ensure votes table is loaded
+  // Ensure votes table is loaded with correct configuration
+  console.log('🔍 getGroupVoteMatrices: Loading votes table with config:', { kedroBaseUrl, pipelineId });
   const { ensureVotesTableLoaded } = await import('@/lib/duckdb');
-  await ensureVotesTableLoaded();
+  await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
 
   const groupVotes: Record<string, GroupVoteMatrix> = {};
   for (const [label, indices] of Object.entries(groups)) {
@@ -636,6 +637,8 @@ export async function analyzePaintedClusters(
     minVoteCount?: number;
     maxStatementsCount?: number;
     commentTextMap?: Record<string, any>;
+    kedroBaseUrl?: string;
+    pipelineId?: string;
   } = {}
 ): Promise<{
   repComments: Record<string, FinalizedCommentStats[]>;
@@ -648,7 +651,8 @@ export async function analyzePaintedClusters(
     throw new Error('Database connection not available');
   }
 
-  const groupVotes = await getGroupVoteMatrices(conn, labelArray, participants);
+  console.log('🔍 analyzePaintedClusters: Using config:', { kedroBaseUrl: options.kedroBaseUrl, pipelineId: options.pipelineId });
+  const groupVotes = await getGroupVoteMatrices(conn, labelArray, participants, options.kedroBaseUrl, options.pipelineId);
   const repComments = calculateRepresentativeComments(groupVotes, commentTexts, options);
 
   // Calculate consensus statements if we have at least 2 groups

@@ -21,6 +21,8 @@ export interface AnalysisOptions {
   includeModerated?: boolean;
   minVoteCount?: number;
   maxStatementsCount?: number;
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 }
 
 /**
@@ -40,8 +42,12 @@ export async function calculateRepresentativeStatements(
   const {
     includeModerated = false,
     minVoteCount = 1,
-    maxStatementsCount = 10
+    maxStatementsCount = 10,
+    kedroBaseUrl,
+    pipelineId
   } = options;
+
+  console.log('🔍 calculateRepresentativeStatements: Passing config:', { kedroBaseUrl, pipelineId });
 
   try {
     const result = await analyzePaintedClusters(
@@ -52,7 +58,9 @@ export async function calculateRepresentativeStatements(
         includeModerated,
         minVoteCount,
         maxStatementsCount,
-        commentTextMap
+        commentTextMap,
+        kedroBaseUrl,
+        pipelineId
       }
     );
 

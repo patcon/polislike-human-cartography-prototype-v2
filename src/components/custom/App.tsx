@@ -279,7 +279,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
         {
           includeModerated: false,
           minVoteCount: 1,
-          maxStatementsCount: 10
+          maxStatementsCount: 10,
+          kedroBaseUrl,
+          pipelineId
         }
       );
 
