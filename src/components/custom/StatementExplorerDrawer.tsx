@@ -97,6 +97,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   const activeTab = tabValue ?? internalTab;
   const handleTabChange = onTabValueChange ?? setInternalTab;
 
+
   const letterForIndex = (index: number) => String.fromCharCode(65 + index);
   const sortedColors = React.useMemo(() =>
     [...activeColors].filter(index => !isUnpainted(index)).sort((a, b) => a - b),
@@ -325,12 +326,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
               </div>
 
               {/* All tab */}
-              <TabsContent value="all" className="select-text">
+              <TabsContent value="all" className="select-text" translate="yes">
                 <StatementTable statements={statements} onStatementClick={onStatementClick} />
               </TabsContent>
 
               {/* Consensus tab */}
-              <TabsContent value="consensus" className="select-text">
+              <TabsContent value="consensus" className="select-text" translate="yes">
                 {isCalculatingRepStatements ? (
                   <div className="px-4 py-8 text-center">
                     <div className="flex items-center justify-center space-x-2 text-gray-500">
@@ -432,9 +433,9 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
                 return (
                   <TabsContent
-                    key={colorIndex}
                     value={`group-${colorIndex}`}
                     className="select-text"
+                    translate="yes"
                   >
                     {isCalculatingRepStatements ? (
                       <div className="px-4 py-8 text-center">
@@ -482,7 +483,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
               {/* Unpainted group tab */}
               {hasUnpaintedGroup && (
-                <TabsContent value="unpainted" className="select-text">
+                <TabsContent value="unpainted" className="select-text" translate="yes">
                   {(() => {
                     const unpaintedRepStatements = getRepresentativeStatementsForUnpainted();
                     const hasRepStatements = unpaintedRepStatements.length > 0;
