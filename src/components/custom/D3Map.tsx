@@ -276,7 +276,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     // UPDATE with animation
     const updateSelection = circles
       .attr("r", BASE_RADIUS / transformK)
-      .attr("fill", (d, i) => {
+      .attr("fill", (d) => {
         // Use originalIndex to get the correct color from pointColors array
         const colorIndex = pointColors[d.originalIndex];
         return colorIndex != null
@@ -713,7 +713,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           )}
         </div>
       )}
-      
+
     </div>
   );
 };
