@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { App } from './App';
+import { decodeStorybookArgs, encodeStorybookParam } from '../../../.storybook/preview';
 
 const meta: Meta<typeof App> = {
   title: 'Components/App/Kedro Mode',
@@ -33,16 +34,17 @@ type Story = StoryObj<typeof meta>;
 
 export const KedroMode: Story = {
   render: (args) => {
+    const decodedArgs = decodeStorybookArgs(args);
     return (
       <App
-        kedroBaseUrl={args.kedroBaseUrl}
-        pipelineId={args.pipelineId}
-        testAnimation={args.testAnimation}
+        kedroBaseUrl={decodedArgs.kedroBaseUrl}
+        pipelineId={decodedArgs.pipelineId}
+        testAnimation={decodedArgs.testAnimation}
       />
     );
   },
   args: {
-    kedroBaseUrl: 'https://patcon.github.io/kedro-polislike-pipelines',
+    kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
     pipelineId: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
@@ -89,16 +91,17 @@ and merges all traces into a single dataset suitable for visualization.
 
 export const LocalKedroMode: Story = {
   render: (args) => {
+    const decodedArgs = decodeStorybookArgs(args);
     return (
       <App
-        kedroBaseUrl={args.kedroBaseUrl}
-        pipelineId={args.pipelineId}
-        testAnimation={args.testAnimation}
+        kedroBaseUrl={decodedArgs.kedroBaseUrl}
+        pipelineId={decodedArgs.pipelineId}
+        testAnimation={decodedArgs.testAnimation}
       />
     );
   },
   args: {
-    kedroBaseUrl: 'http://localhost:4141',
+    kedroBaseUrl: encodeStorybookParam('http://localhost:4141'),
     pipelineId: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
@@ -116,16 +119,17 @@ a local Kedro instance with the API plugin enabled at http://localhost:4141.
 
 export const KedroModeWithAnimation: Story = {
   render: (args) => {
+    const decodedArgs = decodeStorybookArgs(args);
     return (
       <App
-        kedroBaseUrl={args.kedroBaseUrl}
-        pipelineId={args.pipelineId}
-        testAnimation={args.testAnimation}
+        kedroBaseUrl={decodedArgs.kedroBaseUrl}
+        pipelineId={decodedArgs.pipelineId}
+        testAnimation={decodedArgs.testAnimation}
       />
     );
   },
   args: {
-    kedroBaseUrl: 'https://patcon.github.io/kedro-polislike-pipelines',
+    kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
     pipelineId: 'mean_localmap_bestkmeans',
     testAnimation: true,
   },

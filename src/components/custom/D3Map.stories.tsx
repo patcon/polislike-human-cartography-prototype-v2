@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { D3Map } from "./D3Map";
 import { useStorybookDataLoader } from "../../../.storybook/hooks/useStorybookDataLoader";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
+import { decodeStorybookArgs, encodeStorybookParam } from "../../../.storybook/preview";
 
 // Extend the D3Map props to include kedroBaseUrl and pipelineId for stories
 type D3MapStoryArgs = React.ComponentProps<typeof D3Map> & {
@@ -43,7 +44,8 @@ type Story = StoryObj<D3MapStoryArgs>;
 /** Pan/zoom only with live mode control */
 export const MoveMode: Story = {
   render: (args) => {
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const decodedArgs = decodeStorybookArgs(args);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
@@ -66,7 +68,8 @@ MoveMode.storyName = "Move Mode (broken)"
 /** Freeform lasso select with live mode control */
 export const PaintMode: Story = {
   render: (args) => {
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const decodedArgs = decodeStorybookArgs(args);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
@@ -89,7 +92,8 @@ PaintMode.storyName = "Paint Mode (broken)"
 /** Lasso select with selection state and live mode control */
 export const PaintModeWithSelection: Story = {
   render: (args) => {
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const decodedArgs = decodeStorybookArgs(args);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
@@ -131,7 +135,8 @@ export const PaintModeWithSelection: Story = {
 
 export const QuickSelectDemo: Story = {
   render: (args) => {
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args;
+    const decodedArgs = decodeStorybookArgs(args);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
@@ -191,7 +196,8 @@ export const QuickSelectDemo: Story = {
 export const KedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args as any;
+    const decodedArgs = decodeStorybookArgs(args as any);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
@@ -217,7 +223,7 @@ export const KedroMode: Story = {
     );
   },
   args: {
-    kedroBaseUrl: 'https://patcon.github.io/kedro-polislike-pipelines',
+    kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
     pipelineId: 'mean_localmap_bestkmeans',
     mode: 'move' as const,
     testAnimation: false,
@@ -229,7 +235,8 @@ KedroMode.storyName = "Kedro Mode";
 export const LocalKedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = args as any;
+    const decodedArgs = decodeStorybookArgs(args as any);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
@@ -255,7 +262,7 @@ export const LocalKedroMode: Story = {
     );
   },
   args: {
-    kedroBaseUrl: 'http://localhost:4141',
+    kedroBaseUrl: encodeStorybookParam('http://localhost:4141'),
     pipelineId: 'mean_localmap_bestkmeans',
     mode: 'move' as const,
     testAnimation: false,
