@@ -7,7 +7,7 @@ import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted, UNPAINTED_INDEX } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
-import { getParticipantDataForStatement, initializeDuckDB } from "../../lib/duckdb";
+import { getVotesForParticipants, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
 import {
@@ -193,26 +193,23 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Load votes data when switching to votes mode or changing statement ID
   React.useEffect(() => {
-    if (layerMode === "votes") {
+    if (layerMode === "votes" && dataset.length > 0) {
       const loadVotes = async () => {
         try {
-          console.log(`Loading votes for statement ${statementId}`);
-          const participantData = await getParticipantDataForStatement(statementId, kedroBaseUrl, pipelineId);
-
-          // Create a map for quick lookup
-          // voteMap variable removed as it was unused
+          // Use the current dataset instead of loading projections from file
+          const participantIds = dataset.map(([id]) => id);
+          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, pipelineId);
 
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
-            const participantVoteData = participantData.find(p => p.participantId === participantId);
+            const vote = votes.get(participantId) ?? null;
 
-            if (!participantVoteData || participantVoteData.vote === null) {
-              // Participant has no vote - should be black (unpainted)
-              return null;
+            if (vote === null) {
+              return null; // Participant has no vote - should be black (unpainted)
             }
 
             // Map actual vote values to indices for color lookup
-            switch (participantVoteData.vote) {
+            switch (vote) {
               case 1: return 0;    // agree - green
               case -1: return 1;   // disagree - red
               case 0: return 2;    // pass - yellow
@@ -221,7 +218,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           });
 
           setPointVotes(newPointVotes);
-          console.log('Loaded votes data for visualization');
         } catch (err) {
           console.error('Error loading votes:', err);
         }
@@ -229,7 +225,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       loadVotes();
     }
-  }, [layerMode, statementId]);
+  }, [layerMode, statementId, dataset, kedroBaseUrl, pipelineId]);
 
   const mode: "move" | "paint" = action === "paint-groups" ? "paint" : "move";
 
