@@ -5,8 +5,6 @@ import * as React from "react";
 import {
   Drawer,
   DrawerTrigger,
-  DrawerPortal,
-  DrawerOverlay,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
@@ -228,9 +226,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       <DrawerTrigger asChild>
         <StatementExplorerButton iconVariant="telescope" label="Explore Statements" />
       </DrawerTrigger>
-
-      <DrawerPortal>
-        <DrawerOverlay />
 
         <DrawerContent className="w-full max-w-full flex flex-col h-full">
           <DrawerHeader className="relative">
@@ -547,7 +542,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             </Tabs>
           </div>
         </DrawerContent>
-      </DrawerPortal>
     </Drawer>
   );
 };
