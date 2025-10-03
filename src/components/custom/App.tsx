@@ -5,6 +5,7 @@ import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
+import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted, UNPAINTED_INDEX } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getVotesForParticipants, initializeDuckDB } from "../../lib/duckdb";
@@ -498,6 +499,26 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           />
         </div>
       </div>
+
+      {/* FloatingModal - shows current statement in votes mode */}
+      {layerMode === "votes" && (
+        <FloatingModal
+          statement={(() => {
+            const currentStatement = statements.find(s => String(s.statement_id) === statementId);
+            return currentStatement ? {
+              txt: currentStatement.txt || "",
+              statement_id: currentStatement.statement_id,
+              moderated: currentStatement.moderated
+            } : {
+              txt: `Statement ${statementId} not found`,
+              statement_id: parseInt(statementId) || 0,
+              moderated: 0
+            };
+          })()}
+          isVisible={true}
+          onClose={() => setLayerMode("groups")}
+        />
+      )}
 
       {/* Clear Colors Dialog */}
       <ClearColorsDialog
