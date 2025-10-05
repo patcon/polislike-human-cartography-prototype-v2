@@ -81,7 +81,7 @@ export const ModerationStates: Story = {
   },
   render: () => {
     const [currentState, setCurrentState] = useState(0);
-    
+
     const states = [
       { txt: "This statement is approved and shows in normal text.", statement_id: 100, moderated: 1 },
       { txt: "This statement is unmoderated and shows in gray text.", statement_id: 101, moderated: 0 },
@@ -101,7 +101,7 @@ export const ModerationStates: Story = {
             Current: {currentState === 0 ? "Approved" : currentState === 1 ? "Unmoderated" : "Moderated"}
           </p>
         </div>
-        
+
         <FloatingModal
           statement={states[currentState]}
           isVisible={true}

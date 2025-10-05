@@ -88,6 +88,9 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
 
+  // State to trigger re-calculation of radius on resize
+  const [resizeCounter, forceUpdate] = React.useReducer(x => x + 1, 0);
+
   // Initialize selectedPipeline when effectivePipelines becomes available
   React.useEffect(() => {
     if (effectivePipelines.length > 0 && !selectedPipeline) {
@@ -97,6 +100,24 @@ export const D3Map: React.FC<D3MapProps> = ({
       setSelectedPipeline(defaultPipeline.id);
     }
   }, [effectivePipelines, selectedPipeline]);
+
+  // Handle window resize to update radius (with throttling)
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        forceUpdate(); // Trigger re-calculation of BASE_RADIUS
+      }, 100); // Throttle to avoid excessive updates
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Load projection data only if testAnimation is enabled
   React.useEffect(() => {
@@ -158,7 +179,26 @@ export const D3Map: React.FC<D3MapProps> = ({
     loadProjections();
   }, [testAnimation, kedroBaseUrl, effectivePipelines]);
 
-  const BASE_RADIUS = 1 * (window.devicePixelRatio || 1);
+  // Calculate responsive base radius directly in JavaScript
+  const BASE_RADIUS = React.useMemo(() => {
+    const screenWidth = window.innerWidth;
+    const devicePixelRatio = window.devicePixelRatio || 1;
+
+    // Define breakpoints and corresponding radius multipliers
+    // Mobile (≤480px) is the baseline (original size)
+    let radiusMultiplier: number;
+    if (screenWidth <= 480) {
+      radiusMultiplier = 1.0; // Mobile: original baseline size
+    } else if (screenWidth <= 768) {
+      radiusMultiplier = 1.2; // Tablet: slightly larger
+    } else if (screenWidth <= 1200) {
+      radiusMultiplier = 1.4; // Desktop: larger
+    } else {
+      radiusMultiplier = 1.6; // Large desktop: largest
+    }
+
+    return radiusMultiplier * devicePixelRatio;
+  }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
 
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
@@ -325,7 +365,18 @@ export const D3Map: React.FC<D3MapProps> = ({
     } else {
       container.selectAll("circle[class^='sorted-']").remove();
     }
-  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront]);
+  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront, BASE_RADIUS]);
+
+  // Update existing circle radii when BASE_RADIUS changes
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+
+    const transform = d3.zoomTransform(svgRef.current!);
+    const transformK = FEATURE_SCALE_RADIUS_ON_ZOOM ? transform.k : 1;
+
+    containerRef.current.selectAll("circle")
+      .attr("r", BASE_RADIUS / transformK);
+  }, [BASE_RADIUS]);
 
   // Handle projection change with animation
   const handleProjectionChange = React.useCallback((newProjection: ProjectionType) => {
