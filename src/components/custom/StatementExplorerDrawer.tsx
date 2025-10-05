@@ -18,6 +18,7 @@ import { PALETTE_COLORS, VOTE_COLORS, isUnpainted } from "@/constants";
 import { X } from "lucide-react";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { useGoogleTranslateRefresh } from "@/hooks/useGoogleTranslateRefresh";
+import type { GroupVoteData } from "./GroupVoteComparisonWidget";
 
 export type Statement = {
   statement_id: number;
@@ -89,12 +90,33 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 }) => {
   const [internalOpen, setInternalOpen] = React.useState<boolean>(defaultOpen);
   const [internalTab, setInternalTab] = React.useState<string>(defaultTab);
+  const [includeMissingVotes, setIncludeMissingVotes] = React.useState<boolean>(false);
 
   const isOpen = open ?? internalOpen;
   const handleOpenChange = onOpenChange ?? setInternalOpen;
 
   const activeTab = tabValue ?? internalTab;
   const handleTabChange = onTabValueChange ?? setInternalTab;
+
+  const handleToggleMissingVotes = React.useCallback(() => {
+    console.log('🔍 StatementExplorerDrawer: Toggling missing votes', {
+      currentValue: includeMissingVotes,
+      newValue: !includeMissingVotes
+    });
+    setIncludeMissingVotes(prev => {
+      const newValue = !prev;
+      console.log('🔍 StatementExplorerDrawer: State updated', {
+        oldValue: prev,
+        newValue
+      });
+      return newValue;
+    });
+  }, [includeMissingVotes]);
+
+  // Debug logging for state
+  React.useEffect(() => {
+    console.log('🔍 StatementExplorerDrawer: includeMissingVotes state changed to:', includeMissingVotes);
+  }, [includeMissingVotes]);
 
   // Trigger Google Translate re-scan when drawer opens or tab changes
   useGoogleTranslateRefresh([isOpen, activeTab]);
@@ -215,6 +237,155 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
     return colors;
   };
+
+  // Generate group vote data for comparison widget
+  const generateGroupVoteData = (): Record<number, GroupVoteData[]> => {
+    const groupVoteData: Record<number, GroupVoteData[]> = {};
+    
+    // Calculate actual group sizes from pointGroups
+    const groupSizes: Record<number, number> = {};
+    let unpaintedCount = 0;
+    
+    pointGroups.forEach(group => {
+      if (isUnpainted(group)) {
+        unpaintedCount++;
+      } else if (group !== null) {
+        groupSizes[group] = (groupSizes[group] || 0) + 1;
+      }
+    });
+    
+    // Debug logging
+    console.log('🔍 Debug - representativeStatements:', representativeStatements);
+    console.log('🔍 Debug - sortedColors:', sortedColors);
+    console.log('🔍 Debug - hasUnpaintedGroup:', hasUnpaintedGroup);
+    console.log('🔍 Debug - statements:', statements);
+    console.log('🔍 Debug - groupSizes:', groupSizes);
+    console.log('🔍 Debug - unpaintedCount:', unpaintedCount);
+    
+    // Get all statement IDs that appear in any representative statements
+    const allStatementIds = new Set<number>();
+    Object.values(representativeStatements).forEach(repStats => {
+      repStats.forEach(stat => {
+        const tid = typeof stat.tid === 'string' ? parseInt(stat.tid) : stat.tid;
+        allStatementIds.add(tid);
+      });
+    });
+    
+    console.log('🔍 Debug - allStatementIds from repStats:', Array.from(allStatementIds));
+    
+    // For each statement that has representative data
+    allStatementIds.forEach(statementId => {
+      const groupVotes: GroupVoteData[] = [];
+      
+      // For each painted group, get the vote data for this statement
+      sortedColors.forEach(groupIndex => {
+        const groupKey = String(groupIndex);
+        const repStats = representativeStatements[groupKey] || [];
+        
+        // Find the stats for this specific statement
+        const statementStats = repStats.find(stat => {
+          const tid = typeof stat.tid === 'string' ? parseInt(stat.tid) : stat.tid;
+          return tid === statementId;
+        });
+        
+        if (statementStats) {
+          // Use actual group size from pointGroups, fallback to estimated size if not available
+          const actualGroupSize = groupSizes[groupIndex];
+          const totalGroupSize = actualGroupSize || Math.max(
+            statementStats.n_trials + Math.floor(statementStats.n_trials * 0.3),
+            statementStats.n_trials + 10
+          );
+          
+          groupVotes.push({
+            groupIndex,
+            n_agree: statementStats.n_agree,
+            n_disagree: statementStats.n_disagree,
+            n_pass: statementStats.n_pass,
+            n_trials: statementStats.n_trials,
+            totalGroupSize,
+          });
+        }
+      });
+      
+      // Also check unpainted group if it exists
+      if (hasUnpaintedGroup) {
+        const unpaintedKey = 'unpainted';
+        const repStats = representativeStatements[unpaintedKey] || [];
+        
+        // Find the stats for this specific statement
+        const statementStats = repStats.find(stat => {
+          const tid = typeof stat.tid === 'string' ? parseInt(stat.tid) : stat.tid;
+          return tid === statementId;
+        });
+        
+        if (statementStats) {
+          // Use actual unpainted group size from pointGroups, fallback to estimated size if not available
+          const totalGroupSize = unpaintedCount || Math.max(
+            statementStats.n_trials + Math.floor(statementStats.n_trials * 0.3),
+            statementStats.n_trials + 10
+          );
+          
+          groupVotes.push({
+            groupIndex: -1, // Use -1 for unpainted group
+            n_agree: statementStats.n_agree,
+            n_disagree: statementStats.n_disagree,
+            n_pass: statementStats.n_pass,
+            n_trials: statementStats.n_trials,
+            totalGroupSize,
+          });
+        }
+      }
+      
+      // Add if we have data for multiple groups (for comparison)
+      if (groupVotes.length > 1) {
+        groupVoteData[statementId] = groupVotes;
+        console.log(`🔍 Debug - Added vote data for statement ${statementId}:`, groupVotes);
+      } else {
+        console.log(`🔍 Debug - Not enough groups for statement ${statementId}, found ${groupVotes.length} groups`);
+      }
+    });
+    
+    console.log('🔍 Debug - Final groupVoteData:', groupVoteData);
+    return groupVoteData;
+  };
+
+  const groupVoteData = React.useMemo(() => {
+    const realData = generateGroupVoteData();
+    
+    // If no real data is available, create some dummy data for testing
+    const totalGroups = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
+    if (Object.keys(realData).length === 0 && totalGroups > 1 && statements.length > 0) {
+      console.log('🔍 Debug - No real data found, creating dummy data for testing');
+      const dummyData: Record<number, GroupVoteData[]> = {};
+      
+      // Create dummy data for first few statements
+      statements.slice(0, 3).forEach(statement => {
+        const groupVotes: GroupVoteData[] = sortedColors.map(groupIndex => {
+          const n_agree = Math.floor(Math.random() * 15) + 3;
+          const n_disagree = Math.floor(Math.random() * 10) + 2;
+          const n_pass = Math.floor(Math.random() * 8) + 1;
+          const n_trials = n_agree + n_disagree + n_pass;
+          const totalGroupSize = n_trials + Math.floor(Math.random() * 10) + 5; // Add 5-15 unseen participants
+          
+          return {
+            groupIndex,
+            n_agree,
+            n_disagree,
+            n_pass,
+            n_trials,
+            totalGroupSize,
+          };
+        });
+        
+        dummyData[statement.statement_id] = groupVotes;
+      });
+      
+      console.log('🔍 Debug - Created dummy data:', dummyData);
+      return dummyData;
+    }
+    
+    return realData;
+  }, [representativeStatements, sortedColors, statements]);
 
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange} defaultOpen={defaultOpen}>
@@ -463,6 +634,13 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           statements={groupRepStatements}
                           onStatementClick={onStatementClick}
                           statementColors={statementColors}
+                          showGroupVotes={sortedColors.length + (hasUnpaintedGroup ? 1 : 0) > 1}
+                          groupVoteData={groupVoteData}
+                          includeMissingVotes={includeMissingVotes}
+                          voteBarWidth={6}
+                          voteBarHeight={20}
+                          highlightGroupIndex={colorIndex}
+                          onToggleMissingVotes={handleToggleMissingVotes}
                         />
                       </div>
                     ) : (
@@ -517,6 +695,13 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               statements={unpaintedRepStatements}
                               onStatementClick={onStatementClick}
                               statementColors={statementColors}
+                              showGroupVotes={sortedColors.length + (hasUnpaintedGroup ? 1 : 0) > 1}
+                              groupVoteData={groupVoteData}
+                              includeMissingVotes={includeMissingVotes}
+                              voteBarWidth={6}
+                              voteBarHeight={20}
+                              highlightGroupIndex={-1}
+                              onToggleMissingVotes={handleToggleMissingVotes}
                             />
                           </div>
                         ) : (

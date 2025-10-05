@@ -18,6 +18,7 @@ export type GroupVoteComparisonWidgetProps = {
   className?: string;
   voteColors?: typeof VOTE_COLORS | typeof VOTE_COLORS_HIGHLIGHT_PASS;
   voteOrder?: string; // Order of vote types from top to bottom (U=unseen, D=disagree, P=pass, A=agree)
+  highlightGroupIndex?: number; // Group index to highlight (dims other columns)
 };
 
 export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps> = ({
@@ -28,7 +29,14 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
   className = "",
   voteColors = VOTE_COLORS,
   voteOrder = "UDPA", // Default: Unseen, Disagree, Pass, Agree (top to bottom)
+  highlightGroupIndex,
 }) => {
+  // Debug logging to see if component re-renders with new props
+  console.log('🔍 GroupVoteComparisonWidget rendered with:', {
+    includeMissingVotes,
+    groupVotesLength: groupVotes?.length
+  });
+
   if (!groupVotes || groupVotes.length === 0) {
     return null;
   }
@@ -42,14 +50,26 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
     // Calculate proportions based on includeMissingVotes setting
     const totalForCalculation = includeMissingVotes ? totalGroupSize : n_trials;
     
+    // Get group color - use black for unpainted group (index -1)
+    const groupColor = groupIndex === -1 ? "#000000" : (PALETTE_COLORS[groupIndex] || "#000000");
+    
+    // Determine if this column should be dimmed (dim others when highlighting is active)
+    const shouldDim = highlightGroupIndex !== undefined && groupIndex !== highlightGroupIndex;
+
+    const NON_HIGHLIGHT_GROUP_OPACITY = 0.5;
+    
     if (totalForCalculation === 0) {
       return {
         groupIndex,
-        colorIndicator: null,
+        colorIndicator: groupColor,
         barContent: (
           <div
             className="bg-gray-100"
-            style={{ height: `${height}px`, width: `${width}px` }}
+            style={{
+              height: `${height}px`,
+              width: `${width}px`,
+              opacity: shouldDim ? NON_HIGHLIGHT_GROUP_OPACITY : 1
+            }}
           />
         )
       };
@@ -63,11 +83,15 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
 
     return {
       groupIndex,
-      colorIndicator: PALETTE_COLORS[groupIndex] || "#000000",
+      colorIndicator: groupColor,
       barContent: (
         <div
           className="flex flex-col overflow-hidden"
-          style={{ height: `${height}px`, width: `${width}px` }}
+          style={{
+            height: `${height}px`,
+            width: `${width}px`,
+            opacity: shouldDim ? NON_HIGHLIGHT_GROUP_OPACITY : 1
+          }}
         >
           {voteOrder.split('').map((voteType, index) => {
             let voteHeight = 0;

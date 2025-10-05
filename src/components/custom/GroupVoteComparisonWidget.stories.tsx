@@ -3,7 +3,7 @@ import { GroupVoteComparisonWidget } from "./GroupVoteComparisonWidget";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 
 const meta: Meta<typeof GroupVoteComparisonWidget> = {
-  title: "Custom/GroupVoteComparisonWidget",
+  title: "Components/GroupVoteComparisonWidget",
   component: GroupVoteComparisonWidget,
   parameters: {
     layout: "centered",
@@ -34,6 +34,10 @@ const meta: Meta<typeof GroupVoteComparisonWidget> = {
     voteOrder: {
       control: "text",
       description: "Order of vote types from top to bottom (U=unseen, D=disagree, P=pass, A=agree)",
+    },
+    highlightGroupIndex: {
+      control: { type: "number", min: -1, max: 9, step: 1 },
+      description: "Group index to highlight (dims other columns)",
     },
   },
 };
@@ -83,6 +87,7 @@ export const Default: Story = {
     includeMissingVotes: false,
     height: 40,
     width: 12,
+    highlightGroupIndex: 3, // Highlight the first group (blue)
   },
 };
 
@@ -440,5 +445,38 @@ export const VeryShort: Story = {
     includeMissingVotes: false,
     height: 6,
     width: 8,
+  },
+};
+
+// Example with highlighting feature
+export const HighlightedGroup: Story = {
+  args: {
+    groupVotes: sampleGroupVotes,
+    includeMissingVotes: false,
+    height: 40,
+    width: 12,
+    highlightGroupIndex: 4, // Highlight the orange group
+  },
+};
+
+// Example with highlighting and missing votes
+export const HighlightedGroupWithMissing: Story = {
+  args: {
+    groupVotes: sampleGroupVotes,
+    includeMissingVotes: true,
+    height: 40,
+    width: 12,
+    highlightGroupIndex: 6, // Highlight the pink group
+  },
+};
+
+// Example with no highlighting (all columns normal opacity)
+export const NoHighlighting: Story = {
+  args: {
+    groupVotes: sampleGroupVotes,
+    includeMissingVotes: false,
+    height: 40,
+    width: 12,
+    // highlightGroupIndex is undefined, so no dimming occurs
   },
 };

@@ -16,6 +16,8 @@ type StatementTableProps = {
   voteOrder?: string;
   voteBarWidth?: number;
   voteBarHeight?: number;
+  highlightGroupIndex?: number; // Group index to highlight in vote comparison widgets
+  onToggleMissingVotes?: () => void; // Callback to toggle includeMissingVotes
 };
 
 export const StatementTable: React.FC<StatementTableProps> = ({
@@ -29,7 +31,12 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   voteOrder = "UDPA",
   voteBarWidth = 12,
   voteBarHeight = 30,
+  highlightGroupIndex,
+  onToggleMissingVotes,
 }) => {
+  const handleToggleMissingVotes = React.useCallback(() => {
+    onToggleMissingVotes?.();
+  }, [onToggleMissingVotes]);
   const insertBreaks = (val: string | null | undefined) => {
     if (!val) return "";
     const ZWSP = "\u200B";
@@ -44,12 +51,10 @@ export const StatementTable: React.FC<StatementTableProps> = ({
       <TableHeader>
         <TableRow>
           <TableHead className="text-right text-[12px] text-gray-400">#</TableHead>
-          <TableHead>Statement</TableHead>
           {showGroupVotes && (
-            <TableHead className="text-center text-[12px] text-gray-400 w-24">
-              Group Votes
-            </TableHead>
+            <TableHead className="w-8"></TableHead>
           )}
+          <TableHead>Statement</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -73,6 +78,29 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                   <span className="text-gray-400">{s.statement_id}</span>
                 )}
               </TableCell>
+              {showGroupVotes && (
+                <TableCell
+                  className="text-center w-8 px-1 cursor-pointer hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleMissingVotes();
+                  }}
+                  title={includeMissingVotes ? 'Hide missing votes' : 'Show missing votes'}
+                >
+                  {groupVoteData?.[s.statement_id] ? (
+                    <GroupVoteComparisonWidget
+                      groupVotes={groupVoteData[s.statement_id]}
+                      includeMissingVotes={includeMissingVotes}
+                      height={voteBarHeight}
+                      width={voteBarWidth}
+                      className="justify-center"
+                      voteColors={voteColors}
+                      voteOrder={voteOrder}
+                      highlightGroupIndex={highlightGroupIndex}
+                    />
+                  ) : null}
+                </TableCell>
+              )}
               <TableCell className="whitespace-normal">
                 <span
                   className={`
@@ -86,23 +114,6 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                   {s.moderated === 0 ? " (unmoderated)" : ""}
                 </span>
               </TableCell>
-              {showGroupVotes && (
-                <TableCell className="text-center">
-                  {groupVoteData?.[s.statement_id] ? (
-                    <GroupVoteComparisonWidget
-                      groupVotes={groupVoteData[s.statement_id]}
-                      includeMissingVotes={includeMissingVotes}
-                      height={voteBarHeight}
-                      width={voteBarWidth}
-                      className="justify-center"
-                      voteColors={voteColors}
-                      voteOrder={voteOrder}
-                    />
-                  ) : (
-                    <span className="text-gray-400 text-xs">No data</span>
-                  )}
-                </TableCell>
-              )}
             </TableRow>
           );
         })}
