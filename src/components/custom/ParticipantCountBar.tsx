@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PALETTE_COLORS, type PointGroupAssignment, isUnpainted } from "@/constants";
 import { cn } from "@/lib/utils";
 import { SquaresSubtract as ExcludesUnpainted, SquaresUnite as IncludesUnpainted } from "lucide-react";
@@ -258,12 +259,14 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
 
         {/* Unpainted group - proportional if grouped, minimal if not */}
         {proportionalData.unpaintedGroup && (
-          <Badge
+          <Button
             variant="outline"
+            size="sm"
             className={cn(
-              "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
+              "text-xs py-0.5 h-6 pl-2 pr-2 border-2",
+              "transition-none", // Disable all transitions to prevent hopping/movement
               isUnpaintedGrouped
-                ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800"
+                ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800 hover:text-white"
                 : "bg-white text-unpainted-600 border-unpainted-300 hover:bg-unpainted-200 hover:border-unpainted-400",
               // Make unpainted group flexible when it's large and grouped
               proportionalData.unpaintedGroup.widthPercent > 80 && !proportionalData.unpaintedGroup.useMinimalWidth
@@ -298,7 +301,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
               )}
               {proportionalData.unpaintedGroup.label}
             </div>
-          </Badge>
+          </Button>
         )}
       </div>
     );
@@ -354,12 +357,14 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
 
       {/* Unpainted group on the right */}
       {groupData.unpaintedGroup && (
-        <Badge
+        <Button
           variant="outline"
+          size="sm"
           className={cn(
-            "cursor-pointer border text-xs py-0.5 h-6 pl-2 pr-2 border-2",
+            "text-xs py-0.5 h-6 pl-2 pr-2 border-2",
+            "transition-none", // Disable all transitions to prevent hopping/movement
             isUnpaintedGrouped
-              ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800"
+              ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800 hover:text-white"
               : "bg-white text-unpainted-600 border-unpainted-300 hover:bg-unpainted-200 hover:border-unpainted-400"
           )}
           onClick={handleUnpaintedClick}
@@ -378,7 +383,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
             )}
             {groupData.unpaintedGroup.label}
           </div>
-        </Badge>
+        </Button>
       )}
     </div>
   );
