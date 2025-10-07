@@ -26,8 +26,6 @@ type StatementTableProps = {
   dataset?: [string, [number, number]][];
   pointGroups?: number[];
   activeColors?: number[];
-  kedroBaseUrl?: string;
-  pipelineId?: string;
 
   // Vote stats props (calculated at App level)
   voteStats?: Record<number, StatementDebugStats>;
@@ -55,8 +53,6 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   dataset = [],
   pointGroups = [],
   activeColors = [],
-  kedroBaseUrl,
-  pipelineId,
 
   // Vote stats props
   voteStats = {},

@@ -42,8 +42,6 @@ type MapOverlayProps = {
   // Debug mode props
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
-  kedroBaseUrl?: string;
-  pipelineId?: string;
 };
 
 export function MapOverlay({
@@ -77,8 +75,6 @@ export function MapOverlay({
   // Debug mode props
   debugMode = false,
   dataset = [],
-  kedroBaseUrl,
-  pipelineId,
 }: MapOverlayProps) {
   // if no props passed, create local state
   const [internalAction, setInternalAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
@@ -157,8 +153,6 @@ export function MapOverlay({
           onStatementClick={handleStatementClick}
           debugMode={debugMode}
           dataset={dataset}
-          kedroBaseUrl={kedroBaseUrl}
-          pipelineId={pipelineId}
         />
         <AboutDialog autoOpen />
       </div>

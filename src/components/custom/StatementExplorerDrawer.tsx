@@ -69,8 +69,6 @@ type StatementExplorerDrawerProps = {
   // Debug mode props
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
-  kedroBaseUrl?: string;
-  pipelineId?: string;
 };
 
 export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = ({
@@ -98,8 +96,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Debug mode props
   debugMode = false,
   dataset = [],
-  kedroBaseUrl,
-  pipelineId,
 }) => {
   const [internalOpen, setInternalOpen] = React.useState<boolean>(defaultOpen);
   const [internalTab, setInternalTab] = React.useState<string>(defaultTab);
@@ -159,8 +155,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             dataset,
             pointGroups,
             activeColors,
-            kedroBaseUrl,
-            pipelineId
           );
           newStats[statementId] = stats;
         } catch (error) {
@@ -178,7 +172,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
         return next;
       });
     }
-  }, [dataset, pointGroups, isUnpaintedGrouped, kedroBaseUrl, pipelineId]);
+  }, [dataset, pointGroups, isUnpaintedGrouped]);
 
   // Clear vote stats when groups change (will be recalculated on demand)
   React.useEffect(() => {
@@ -451,8 +445,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   dataset={dataset}
                   pointGroups={pointGroups}
                   activeColors={sortedColors}
-                  kedroBaseUrl={kedroBaseUrl}
-                  pipelineId={pipelineId}
                   // Optimization: Don't pass vote stats props to avoid calculating stats for all statements
                   // Vote stats are only needed for group tabs (representative statements) and consensus tab
                 />
@@ -511,8 +503,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               dataset={dataset}
                               pointGroups={pointGroups}
                               activeColors={sortedColors}
-                              kedroBaseUrl={kedroBaseUrl}
-                              pipelineId={pipelineId}
                               voteStats={voteStats}
                               loadingVoteStats={loadingVoteStats}
                               calculateVoteStatsForStatements={calculateVoteStatsForStatements}
@@ -540,8 +530,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               dataset={dataset}
                               pointGroups={pointGroups}
                               activeColors={sortedColors}
-                              kedroBaseUrl={kedroBaseUrl}
-                              pipelineId={pipelineId}
                               voteStats={voteStats}
                               loadingVoteStats={loadingVoteStats}
                               calculateVoteStatsForStatements={calculateVoteStatsForStatements}
@@ -632,8 +620,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           dataset={dataset}
                           pointGroups={pointGroups}
                           activeColors={sortedColors}
-                          kedroBaseUrl={kedroBaseUrl}
-                          pipelineId={pipelineId}
                           voteStats={voteStats}
                           loadingVoteStats={loadingVoteStats}
                           calculateVoteStatsForStatements={calculateVoteStatsForStatements}
