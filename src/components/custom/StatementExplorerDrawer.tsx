@@ -175,8 +175,28 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   }, [dataset, pointGroups, isUnpaintedGrouped]);
 
   // Clear vote stats when groups change (will be recalculated on demand)
+  // Use a ref to track the previous state to avoid unnecessary clearing
+  const prevPointGroupsRef = React.useRef<number[]>([]);
+  const prevIsUnpaintedGroupedRef = React.useRef<boolean>(isUnpaintedGrouped);
+
   React.useEffect(() => {
-    setVoteStats({});
+    // Only clear vote stats if the groups have actually changed, not just on re-renders
+    const groupsChanged = JSON.stringify(pointGroups) !== JSON.stringify(prevPointGroupsRef.current);
+    const unpaintedGroupedChanged = isUnpaintedGrouped !== prevIsUnpaintedGroupedRef.current;
+
+    if (groupsChanged || unpaintedGroupedChanged) {
+      console.log('🔍 StatementExplorerDrawer: Clearing vote stats due to group changes', {
+        groupsChanged,
+        unpaintedGroupedChanged,
+        prevGroups: prevPointGroupsRef.current.length,
+        newGroups: pointGroups.length
+      });
+      setVoteStats({});
+    }
+
+    // Update refs for next comparison
+    prevPointGroupsRef.current = [...pointGroups];
+    prevIsUnpaintedGroupedRef.current = isUnpaintedGrouped;
   }, [pointGroups, isUnpaintedGrouped]);
 
   // Debug logging for state

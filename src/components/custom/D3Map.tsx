@@ -513,7 +513,6 @@ export const D3Map: React.FC<D3MapProps> = ({
 
           // Only prevent default if quick select was processed
           if (shouldPreventDefault !== false) {
-            onSelectionChange?.([]);
             event.preventDefault();
             event.stopPropagation();
           }
