@@ -239,119 +239,96 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     return colors;
   };
 
-  // Generate group vote data for comparison widget
-  const generateGroupVoteData = (): Record<number, GroupVoteData[]> => {
+  // Generate group vote data for comparison widget using real vote data from DuckDB
+  const generateGroupVoteData = async (): Promise<Record<number, GroupVoteData[]>> => {
     const groupVoteData: Record<number, GroupVoteData[]> = {};
+
+    // Only generate data if we have the necessary data
+    if (!dataset.length || !pointGroups.length || sortedColors.length < 2) {
+      console.log('🔍 Debug - Insufficient data for group vote comparison');
+      return groupVoteData;
+    }
 
     // Calculate actual group sizes from pointGroups
     const groupSizes: Record<number, number> = {};
-
     pointGroups.forEach(group => {
       groupSizes[group] = (groupSizes[group] || 0) + 1;
     });
 
-    // Debug logging
-    console.log('🔍 Debug - representativeStatements:', representativeStatements);
+    console.log('🔍 Debug - Generating real vote data for statements:', statements.length);
     console.log('🔍 Debug - sortedColors:', sortedColors);
-    console.log('🔍 Debug - hasUnpaintedGroup:', hasUnpaintedGroup);
-    console.log('🔍 Debug - statements:', statements);
     console.log('🔍 Debug - groupSizes:', groupSizes);
 
-    // Get all statement IDs that appear in any representative statements
-    const allStatementIds = new Set<number>();
-    Object.values(representativeStatements).forEach(repStats => {
-      repStats.forEach(stat => {
-        const tid = typeof stat.tid === 'string' ? parseInt(stat.tid) : stat.tid;
-        allStatementIds.add(tid);
-      });
-    });
+    // Import the vote stats calculation function
+    const { calculateStatementVoteStats } = await import('@/lib/debug-vote-stats');
 
-    console.log('🔍 Debug - allStatementIds from repStats:', Array.from(allStatementIds));
+    // For each statement, calculate real vote data
+    for (const statement of statements) {
+      try {
+        const stats = await calculateStatementVoteStats(
+          statement.statement_id,
+          dataset,
+          pointGroups,
+          sortedColors,
+          kedroBaseUrl,
+          pipelineId
+        );
 
-    // For each statement that has representative data
-    allStatementIds.forEach(statementId => {
-      const groupVotes: GroupVoteData[] = [];
-
-      // For each group (including unpainted), get the vote data for this statement
-      sortedColors.forEach(groupIndex => {
-        const groupKey = String(groupIndex);
-        const repStats = representativeStatements[groupKey] || [];
-
-        // Find the stats for this specific statement
-        const statementStats = repStats.find(stat => {
-          const tid = typeof stat.tid === 'string' ? parseInt(stat.tid) : stat.tid;
-          return tid === statementId;
+        // Convert debug stats to GroupVoteData format
+        const groupVotes: GroupVoteData[] = [];
+        sortedColors.forEach(groupIndex => {
+          const groupStats = stats[groupIndex];
+          if (groupStats) {
+            groupVotes.push({
+              groupIndex,
+              n_agree: groupStats.agree,
+              n_disagree: groupStats.disagree,
+              n_pass: groupStats.pass,
+              n_trials: groupStats.total,
+              totalGroupSize: groupSizes[groupIndex] || groupStats.total,
+            });
+          }
         });
 
-        if (statementStats) {
-          // Use actual group size from pointGroups, fallback to estimated size if not available
-          const actualGroupSize = groupSizes[groupIndex];
-          const totalGroupSize = actualGroupSize || Math.max(
-            statementStats.n_trials + Math.floor(statementStats.n_trials * 0.3),
-            statementStats.n_trials + 10
-          );
-
-          groupVotes.push({
-            groupIndex,
-            n_agree: statementStats.n_agree,
-            n_disagree: statementStats.n_disagree,
-            n_pass: statementStats.n_pass,
-            n_trials: statementStats.n_trials,
-            totalGroupSize,
-          });
+        // Add if we have data for multiple groups (for comparison)
+        if (groupVotes.length > 1) {
+          groupVoteData[statement.statement_id] = groupVotes;
+          console.log(`🔍 Debug - Added real vote data for statement ${statement.statement_id}:`, groupVotes);
         }
-      });
-
-      // Add if we have data for multiple groups (for comparison)
-      if (groupVotes.length > 1) {
-        groupVoteData[statementId] = groupVotes;
-        console.log(`🔍 Debug - Added vote data for statement ${statementId}:`, groupVotes);
-      } else {
-        console.log(`🔍 Debug - Not enough groups for statement ${statementId}, found ${groupVotes.length} groups`);
+      } catch (error) {
+        console.error(`Failed to load vote data for statement ${statement.statement_id}:`, error);
       }
-    });
+    }
 
-    console.log('🔍 Debug - Final groupVoteData:', groupVoteData);
+    console.log('🔍 Debug - Final real groupVoteData:', groupVoteData);
     return groupVoteData;
   };
 
-  const groupVoteData = React.useMemo(() => {
-    const realData = generateGroupVoteData();
+  const [groupVoteData, setGroupVoteData] = React.useState<Record<number, GroupVoteData[]>>({});
+  const [loadingGroupVoteData, setLoadingGroupVoteData] = React.useState(false);
 
-    // If no real data is available, create some dummy data for testing
-    const totalGroups = sortedColors.length;
-    if (Object.keys(realData).length === 0 && totalGroups > 1 && statements.length > 0) {
-      console.log('🔍 Debug - No real data found, creating dummy data for testing');
-      const dummyData: Record<number, GroupVoteData[]> = {};
+  // Generate group vote data using real vote calculations
+  React.useEffect(() => {
+    const loadGroupVoteData = async () => {
+      if (!dataset.length || !pointGroups.length || sortedColors.length < 2) {
+        setGroupVoteData({});
+        return;
+      }
 
-      // Create dummy data for first few statements
-      statements.slice(0, 3).forEach(statement => {
-        const groupVotes: GroupVoteData[] = sortedColors.map(groupIndex => {
-          const n_agree = Math.floor(Math.random() * 15) + 3;
-          const n_disagree = Math.floor(Math.random() * 10) + 2;
-          const n_pass = Math.floor(Math.random() * 8) + 1;
-          const n_trials = n_agree + n_disagree + n_pass;
-          const totalGroupSize = n_trials + Math.floor(Math.random() * 10) + 5; // Add 5-15 unseen participants
+      setLoadingGroupVoteData(true);
+      try {
+        const realData = await generateGroupVoteData();
+        setGroupVoteData(realData);
+      } catch (error) {
+        console.error('Failed to generate group vote data:', error);
+        setGroupVoteData({});
+      } finally {
+        setLoadingGroupVoteData(false);
+      }
+    };
 
-          return {
-            groupIndex,
-            n_agree,
-            n_disagree,
-            n_pass,
-            n_trials,
-            totalGroupSize,
-          };
-        });
-
-        dummyData[statement.statement_id] = groupVotes;
-      });
-
-      console.log('🔍 Debug - Created dummy data:', dummyData);
-      return dummyData;
-    }
-
-    return realData;
-  }, [representativeStatements, sortedColors, statements]);
+    loadGroupVoteData();
+  }, [dataset, pointGroups, sortedColors, statements, kedroBaseUrl, pipelineId]);
 
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange} defaultOpen={defaultOpen}>
