@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Grid2x2Plus, Grid2x2X } from "lucide-react";
+import { TextAlignJustify, TextAlignStart } from "lucide-react";
 
 type MissingVotesToggleButtonProps = {
   includeMissingVotes: boolean;
@@ -26,16 +26,16 @@ export const MissingVotesToggleButton: React.FC<MissingVotesToggleButtonProps> =
         >
           {/* Show active state by default, hide on hover */}
           {includeMissingVotes ? (
-            <Grid2x2Plus className="h-4 w-4 group-hover:hidden" />
+            <TextAlignStart className="h-4 w-4 group-hover:hidden -rotate-90 stroke-4 scale-y-75" />
           ) : (
-            <Grid2x2X className="h-4 w-4 group-hover:hidden" />
+            <TextAlignJustify className="h-4 w-4 group-hover:hidden -rotate-90 stroke-4 scale-y-75" />
           )}
 
           {/* Show opposite state on hover only */}
           {includeMissingVotes ? (
-            <Grid2x2X className="h-4 w-4 hidden group-hover:block" />
+            <TextAlignJustify className="h-4 w-4 hidden group-hover:block -rotate-90 stroke-4 scale-y-75" />
           ) : (
-          <Grid2x2Plus className="h-4 w-4 hidden group-hover:block" />
+            <TextAlignStart className="h-4 w-4 hidden group-hover:block -rotate-90 stroke-4 scale-y-75" />
           )}
         </Button>
       </TooltipTrigger>
