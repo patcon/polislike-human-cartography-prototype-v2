@@ -64,6 +64,12 @@ type StatementExplorerDrawerProps = {
   groupTabStyle?: GroupTabsStyle;
 
   onStatementClick?: (statementId: number) => void;
+
+  // Debug mode props
+  debugMode?: boolean;
+  dataset?: [string, [number, number]][];
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
 export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = ({
@@ -87,6 +93,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   groupTabStyle = "enclosure",
 
   onStatementClick,
+
+  // Debug mode props
+  debugMode = false,
+  dataset = [],
+  kedroBaseUrl,
+  pipelineId,
 }) => {
   const [internalOpen, setInternalOpen] = React.useState<boolean>(defaultOpen);
   const [internalTab, setInternalTab] = React.useState<string>(defaultTab);
@@ -438,7 +450,16 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
               {/* All tab */}
               <TabsContent value="all" className="select-text" translate="yes">
-                <StatementTable statements={statements} onStatementClick={onStatementClick} />
+                <StatementTable
+                  statements={statements}
+                  onStatementClick={onStatementClick}
+                  debugMode={debugMode}
+                  dataset={dataset}
+                  pointGroups={pointGroups}
+                  activeColors={sortedColors}
+                  kedroBaseUrl={kedroBaseUrl}
+                  pipelineId={pipelineId}
+                />
               </TabsContent>
 
               {/* Consensus tab */}
@@ -490,6 +511,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               statements={agree}
                               onStatementClick={onStatementClick}
                               statementColors={consensusColors}
+                              debugMode={debugMode}
+                              dataset={dataset}
+                              pointGroups={pointGroups}
+                              activeColors={sortedColors}
+                              kedroBaseUrl={kedroBaseUrl}
+                              pipelineId={pipelineId}
                             />
                           </div>
                         )}
@@ -509,6 +536,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               statements={disagree}
                               onStatementClick={onStatementClick}
                               statementColors={consensusColors}
+                              debugMode={debugMode}
+                              dataset={dataset}
+                              pointGroups={pointGroups}
+                              activeColors={sortedColors}
+                              kedroBaseUrl={kedroBaseUrl}
+                              pipelineId={pipelineId}
                             />
                           </div>
                         )}
@@ -591,6 +624,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           voteBarHeight={20}
                           highlightGroupIndex={colorIndex}
                           onToggleMissingVotes={handleToggleMissingVotes}
+                          debugMode={debugMode}
+                          dataset={dataset}
+                          pointGroups={pointGroups}
+                          activeColors={sortedColors}
+                          kedroBaseUrl={kedroBaseUrl}
+                          pipelineId={pipelineId}
                         />
                       </div>
                     ) : (

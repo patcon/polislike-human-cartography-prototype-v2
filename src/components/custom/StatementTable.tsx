@@ -5,6 +5,7 @@ import type { Statement } from "./StatementExplorerDrawer";
 import { GroupVoteComparisonWidget, type GroupVoteData } from "./GroupVoteComparisonWidget";
 import { MissingVotesToggleButton } from "./MissingVotesToggleButton";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
+import { calculateStatementVoteStats, formatDebugVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
 
 type StatementTableProps = {
   statements: Statement[];
@@ -19,6 +20,14 @@ type StatementTableProps = {
   voteBarHeight?: number;
   highlightGroupIndex?: number; // Group index to highlight in vote comparison widgets
   onToggleMissingVotes?: () => void; // Callback to toggle includeMissingVotes
+  
+  // Debug mode props
+  debugMode?: boolean;
+  dataset?: [string, [number, number]][];
+  pointGroups?: number[];
+  activeColors?: number[];
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
 export const StatementTable: React.FC<StatementTableProps> = ({
@@ -34,10 +43,65 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   voteBarHeight = 30,
   highlightGroupIndex,
   onToggleMissingVotes,
+  
+  // Debug mode props
+  debugMode = false,
+  dataset = [],
+  pointGroups = [],
+  activeColors = [],
+  kedroBaseUrl,
+  pipelineId,
 }) => {
   const handleToggleMissingVotes = React.useCallback(() => {
     onToggleMissingVotes?.();
   }, [onToggleMissingVotes]);
+
+  // Debug vote stats state
+  const [debugVoteStats, setDebugVoteStats] = React.useState<Record<number, StatementDebugStats>>({});
+  const [loadingDebugStats, setLoadingDebugStats] = React.useState<Set<number>>(new Set());
+
+  // Load debug vote stats when debug mode is enabled
+  React.useEffect(() => {
+    if (!debugMode || !dataset.length || !pointGroups.length || !activeColors.length) {
+      setDebugVoteStats({});
+      return;
+    }
+
+    const loadStatsForStatements = async () => {
+      const newStats: Record<number, StatementDebugStats> = {};
+      const loadingSet = new Set<number>();
+
+      for (const statement of statements) {
+        loadingSet.add(statement.statement_id);
+        setLoadingDebugStats(prev => new Set([...prev, statement.statement_id]));
+
+        try {
+          const stats = await calculateStatementVoteStats(
+            statement.statement_id,
+            dataset,
+            pointGroups,
+            activeColors,
+            kedroBaseUrl,
+            pipelineId
+          );
+          newStats[statement.statement_id] = stats;
+        } catch (error) {
+          console.error(`Failed to load debug stats for statement ${statement.statement_id}:`, error);
+        } finally {
+          setLoadingDebugStats(prev => {
+            const next = new Set(prev);
+            next.delete(statement.statement_id);
+            return next;
+          });
+        }
+      }
+
+      setDebugVoteStats(newStats);
+    };
+
+    loadStatsForStatements();
+  }, [debugMode, statements, dataset, pointGroups, activeColors, kedroBaseUrl, pipelineId]);
+
   const insertBreaks = (val: string | null | undefined) => {
     if (!val) return "";
     const ZWSP = "\u200B";
@@ -120,6 +184,23 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                   {s.moderated === -1 ? " (moderated)" : ""}
                   {s.moderated === 0 ? " (unmoderated)" : ""}
                 </span>
+                
+                {/* Debug mode: Show vote statistics */}
+                {debugMode && (
+                  <div className="mt-2 space-y-1">
+                    {loadingDebugStats.has(s.statement_id) ? (
+                      <div className="text-xs text-gray-400 italic">Loading debug stats...</div>
+                    ) : debugVoteStats[s.statement_id] ? (
+                      Object.entries(debugVoteStats[s.statement_id]).map(([groupIndex, stats]) => (
+                        <div key={groupIndex} className="text-xs text-gray-500 opacity-60">
+                          Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatDebugVoteStats(stats)}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-gray-400 italic">No debug stats available</div>
+                    )}
+                  </div>
+                )}
               </TableCell>
             </TableRow>
           );

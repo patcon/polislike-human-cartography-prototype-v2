@@ -18,6 +18,7 @@ import {
 } from "../../lib/representative-statements";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { fetchAndProcessKedroData, loadStatementsData } from "@/lib/kedro-api";
+import { useDebugMode } from "../../hooks/useDebugMode";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -64,6 +65,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // array parallel to dataset: vote-based color indices (for votes mode)
   const [pointVotes, setPointVotes] = React.useState<(number | null)[]>([]);
 
+  // Debug mode state
+  const debugMode = useDebugMode();
 
   // StatementExplorerDrawer state
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -476,6 +479,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           isCalculatingRepStatements={isCalculatingRepStatements}
           repStatementsError={repStatementsError}
           isUnpaintedGrouped={isUnpaintedGrouped}
+          // Debug mode props
+          debugMode={debugMode}
+          dataset={dataset}
+          kedroBaseUrl={kedroBaseUrl}
+          pipelineId={pipelineId}
         />
       </div>
 

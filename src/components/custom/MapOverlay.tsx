@@ -38,6 +38,12 @@ type MapOverlayProps = {
   consensusStatements?: { agree: ConsensusStatement[]; disagree: ConsensusStatement[] } | null;
   isCalculatingRepStatements?: boolean;
   repStatementsError?: string | null;
+
+  // Debug mode props
+  debugMode?: boolean;
+  dataset?: [string, [number, number]][];
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
 export function MapOverlay({
@@ -67,6 +73,12 @@ export function MapOverlay({
   consensusStatements = null,
   isCalculatingRepStatements = false,
   repStatementsError = null,
+
+  // Debug mode props
+  debugMode = false,
+  dataset = [],
+  kedroBaseUrl,
+  pipelineId,
 }: MapOverlayProps) {
   // if no props passed, create local state
   const [internalAction, setInternalAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
@@ -143,6 +155,10 @@ export function MapOverlay({
           tabValue={drawerTab}
           onTabValueChange={handleDrawerTabChange}
           onStatementClick={handleStatementClick}
+          debugMode={debugMode}
+          dataset={dataset}
+          kedroBaseUrl={kedroBaseUrl}
+          pipelineId={pipelineId}
         />
         <AboutDialog autoOpen />
       </div>
