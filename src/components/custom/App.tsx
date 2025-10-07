@@ -6,7 +6,7 @@ import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, isUnpainted, UNPAINTED_INDEX } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
 import { getVotesForParticipants, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
@@ -58,8 +58,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Highlight pass votes toggle state
   const [highlightPassVotes, setHighlightPassVotes] = React.useState(true);
 
-  // array parallel to dataset: null = ungrouped, number = palette index (for groups mode)
-  const [pointGroups, setPointGroups] = React.useState<(number | null)[]>([]);
+  // array parallel to dataset: UNPAINTED_VALUE = ungrouped, number = palette index (for groups mode)
+  const [pointGroups, setPointGroups] = React.useState<number[]>([]);
 
   // array parallel to dataset: vote-based color indices (for votes mode)
   const [pointVotes, setPointVotes] = React.useState<(number | null)[]>([]);
@@ -176,8 +176,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
         setColorIndex(0);
         event.preventDefault();
       } else if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Delete key selects eraser (UNPAINTED_INDEX)
-        setColorIndex(UNPAINTED_INDEX);
+        // Delete key selects eraser (UNPAINTED_VALUE)
+        setColorIndex(UNPAINTED_VALUE);
         event.preventDefault();
       }
     };
@@ -191,7 +191,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
     if (dataset.length > 0) {
-      setPointGroups(Array(dataset.length).fill(null));
+      setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
       setPointVotes(Array(dataset.length).fill(null));
     }
   }, [dataset]);
@@ -235,7 +235,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const mode: "move" | "paint" = action === "paint-groups" ? "paint" : "move";
 
   // Calculate representative statements
-  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: (number | null)[], updatedIsUnpaintedGrouped?: boolean) => {
+  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean) => {
     if (layerMode !== "groups" || isCalculatingRepStatements) return;
 
     // Use the provided updated groups or fall back to current state
@@ -335,7 +335,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Clear all painted colors - reset all points to unpainted
   const handleClearAllColors = React.useCallback(() => {
     if (layerMode === "groups") {
-      setPointGroups(Array(dataset.length).fill(null));
+      setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
 
       // Clear representative statements since all groups are now empty
       setRepresentativeStatements({});
@@ -363,7 +363,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
         // get the color index for this point
         const pointColorIndex = pointGroups[idx];
 
-        if (!isUnpainted(pointColorIndex)) {
+        if (pointColorIndex !== UNPAINTED_VALUE) {
           const targetTab = `group-${pointColorIndex}`;
           console.log('  - Opening drawer to', targetTab);
 
@@ -377,7 +377,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
             console.log('  - Opening drawer to unpainted tab');
 
             // open drawer to the unpainted group tab
-            setDrawerTab("unpainted");
+            setDrawerTab(`group-${UNPAINTED_VALUE}`);
             setDrawerOpen(true);
             return true; // Successfully processed - prevent other behaviors
           } else {

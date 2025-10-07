@@ -4,7 +4,7 @@
  */
 
 import { analyzePaintedClusters } from '@/lib/stats';
-import { isUnpainted } from '@/constants';
+import { UNPAINTED_VALUE } from '@/constants';
 import type {
   FinalizedCommentStats,
   ConsensusStatement,
@@ -96,20 +96,18 @@ export function createStatementTextMap(
  * @returns Label array
  */
 export function getLabelArrayWithOptionalUngrouped(
-  colorByIndex: (number | null)[],
+  colorByIndex: number[],
   includeUnpainted: boolean = false
 ): (string | null)[] {
   const labels: (string | null)[] = [];
 
   for (let i = 0; i < colorByIndex.length; i++) {
     const colorIndex = colorByIndex[i];
-    // Use isUnpainted helper to check for both null and UNPAINTED_INDEX
-    if (colorIndex !== undefined && !isUnpainted(colorIndex)) {
-      labels.push(colorIndex!.toString());
-    } else if (includeUnpainted) {
-      labels.push("unpainted"); // Treat unpainted points as a group
-    } else {
+    // Include unpainted points as a group if requested, otherwise exclude them
+    if (colorIndex === UNPAINTED_VALUE && !includeUnpainted) {
       labels.push(null); // Exclude from analysis
+    } else {
+      labels.push(colorIndex.toString()); // Include all groups (including unpainted if requested)
     }
   }
 

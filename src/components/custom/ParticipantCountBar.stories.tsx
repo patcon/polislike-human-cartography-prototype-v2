@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { ParticipantCountBar } from "./ParticipantCountBar";
+import { UNPAINTED_VALUE } from "@/constants";
 
 const meta = {
   title: "Components/ParticipantCountBar",
@@ -16,33 +17,33 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Sample data representing different point group scenarios
-const samplePointGroups: (number | null)[] = [
-  null, null, null, null, null, // 5 unpainted points
+const samplePointGroups: number[] = [
+  UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, // 5 unpainted points
   0, 0, 0, 0, 0, 0, 0, 0, // 8 blue points (A)
-  1, 1, 1, 1, 1, // 5 orange points (B)  
+  1, 1, 1, 1, 1, // 5 orange points (B)
   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, // 10 green points (C)
   4, 4, 4, // 3 purple points (E)
 ];
 
 // Medium conversation (~250 points) with small selection (40 points)
-const samplePointGroupsMed: (number | null)[] = [
+const samplePointGroupsMed: number[] = [
   // 40 selected points across different groups
   ...Array(40).fill(0),   // 40 blue (A)
-  // 210 unselected points (all null/unpainted)
-  ...Array(210).fill(null),
+  // 210 unselected points (all unpainted)
+  ...Array(210).fill(UNPAINTED_VALUE),
 ];
 
 // Large conversation (~3000 points) with small selection (40 points)
-const samplePointGroupsLarge: (number | null)[] = [
+const samplePointGroupsLarge: number[] = [
   // 40 selected points across different groups
   ...Array(40).fill(0),   // 40 blue (A)
-  // 2960 unselected points (all null/unpainted)
-  ...Array(2960).fill(null),
+  // 2960 unselected points (all unpainted)
+  ...Array(2960).fill(UNPAINTED_VALUE),
 ];
 
 // Helper function to generate random point groups
-const generateRandomPointGroups = (totalPoints: number, selectedPoints: number): (number | null)[] => {
-  const points: (number | null)[] = Array(totalPoints).fill(null);
+const generateRandomPointGroups = (totalPoints: number, selectedPoints: number): number[] => {
+  const points: number[] = Array(totalPoints).fill(UNPAINTED_VALUE);
 
   // Randomly assign selected points to different groups
   const selectedIndices = new Set<number>();
@@ -51,9 +52,9 @@ const generateRandomPointGroups = (totalPoints: number, selectedPoints: number):
   }
 
   selectedIndices.forEach(index => {
-    // Randomly assign to groups 0-4 or leave as null (unpainted)
+    // Randomly assign to groups 0-4 or leave as UNPAINTED_VALUE (unpainted)
     const groupChoice = Math.random();
-    if (groupChoice < 0.2) points[index] = null;      // 20% unpainted
+    if (groupChoice < 0.2) points[index] = UNPAINTED_VALUE; // 20% unpainted
     else if (groupChoice < 0.4) points[index] = 0;    // 20% blue
     else if (groupChoice < 0.6) points[index] = 1;    // 20% orange
     else if (groupChoice < 0.75) points[index] = 2;   // 15% green
@@ -98,7 +99,7 @@ export const UncontrolledState: Story = {
 
 export const OnlyUnpainted: Story = {
   args: {
-    pointGroups: [null, null, null, null, null, null, null, null, null, null],
+    pointGroups: [UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE, UNPAINTED_VALUE],
   },
   render: (args) => {
     return (

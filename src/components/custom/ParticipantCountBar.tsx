@@ -3,14 +3,14 @@
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PALETTE_COLORS, type PointGroupAssignment, isUnpainted } from "@/constants";
+import { PALETTE_COLORS, type PointGroupAssignment, UNPAINTED_VALUE } from "@/constants";
 import { cn } from "@/lib/utils";
 import { SquaresSubtract as ExcludesUnpainted, SquaresUnite as IncludesUnpainted } from "lucide-react";
 
 type PointGroupData = {
   label: string;
   count: number;
-  colorIndex: number | null; // null for unpainted group
+  colorIndex: number; // UNPAINTED_VALUE for unpainted group
 };
 
 type ParticipantCountBarProps = {
@@ -39,17 +39,17 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   const groupData = React.useMemo(() => {
     const coloredGroups: PointGroupData[] = [];
     let unpaintedGroup: PointGroupData | null = null;
-    const groupCounts = new Map<number | null, number>();
+    const groupCounts = new Map<number, number>();
 
     // Count occurrences of each group
     pointGroups.forEach(group => {
       groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
     });
 
-    // Handle unpainted group separately - count both null and -1 as unpainted
+    // Handle unpainted group separately
     let unpaintedCount = 0;
     pointGroups.forEach(group => {
-      if (isUnpainted(group)) {
+      if (group === UNPAINTED_VALUE) {
         unpaintedCount++;
       }
     });
@@ -58,7 +58,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
       unpaintedGroup = {
         label: unpaintedCount.toString(),
         count: unpaintedCount,
-        colorIndex: null,
+        colorIndex: UNPAINTED_VALUE,
       };
     }
 
@@ -99,7 +99,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     } else {
       // All badges (including unpainted if grouped) share space proportionally
       // Calculate total excluding unpainted points when they're not grouped
-      const unpaintedPoints = pointGroups.filter(isUnpainted).length;
+      const unpaintedPoints = pointGroups.filter(group => group === UNPAINTED_VALUE).length;
       coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? unpaintedPoints : 0);
       availableWidthPercent = 100;
     }

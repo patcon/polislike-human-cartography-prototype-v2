@@ -2,25 +2,25 @@
 
 import * as React from "react";
 import { Card } from "@/components/ui/card";
-import { PALETTE_COLORS, PALETTE_COLOR_NAMES, UNPAINTED_INDEX } from "@/constants";
+import { PALETTE_COLORS, PALETTE_COLOR_NAMES, UNPAINTED_VALUE } from "@/constants";
 import { Eraser } from "lucide-react";
 
 type PalettePanelProps = {
-  activeIndex: number; // UNPAINTED_INDEX means eraser is selected
+  activeIndex: number; // UNPAINTED_VALUE means eraser is selected
   onSelectIndex?: (index: number) => void;
   onEraserReselect?: () => void;
 } & React.ComponentPropsWithoutRef<typeof Card>; // allow extra props
 
 export const PalettePanel = React.forwardRef<HTMLDivElement, PalettePanelProps>(
   ({ activeIndex, onSelectIndex, onEraserReselect, className, ...props }, ref) => {
-    const isEraserSelected = activeIndex === UNPAINTED_INDEX;
+    const isEraserSelected = activeIndex === UNPAINTED_VALUE;
 
     const handleEraserClick = () => {
       // If eraser is already selected, trigger the callback
       if (isEraserSelected) {
         onEraserReselect?.();
       } else {
-        onSelectIndex?.(UNPAINTED_INDEX);
+        onSelectIndex?.(UNPAINTED_VALUE);
       }
     };
 

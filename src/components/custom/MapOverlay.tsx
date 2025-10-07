@@ -7,7 +7,7 @@ import { StatementExplorerDrawer } from "./StatementExplorerDrawer";
 import { PalettePopover } from "./PalettePopover";
 import { ToggleToolBar } from "./ToggleToolBar";
 import { AboutDialog } from "./AboutDialog";
-import { INITIAL_ACTION, isUnpainted } from "@/constants";
+import { INITIAL_ACTION, UNPAINTED_VALUE } from "@/constants";
 import type { Statement } from "./StatementExplorerDrawer";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 
@@ -19,7 +19,7 @@ type MapOverlayProps = {
   statements?: Statement[];
   toggles?: string[];
   onTogglesChange?: (values: string[]) => void;
-  pointGroups?: (number | null)[]; // 👈 NEW: palette index per point
+  pointGroups?: number[]; // 👈 NEW: palette index per point
   drawerOpen?: boolean;
   onDrawerOpenChange?: (open: boolean) => void;
   drawerTab?: string;
@@ -93,10 +93,14 @@ export function MapOverlay({
   const handleDrawerTabChange = onDrawerTabChange ?? setInternalDrawerTab;
 
   // --- NEW: compute activeColors from pointGroups ---
-  const activeColors = React.useMemo(
-    () => [...new Set(pointGroups.filter((x): x is number => !isUnpainted(x)))],
-    [pointGroups]
-  );
+  const activeColors = React.useMemo(() => {
+    const filtered = pointGroups.filter((x): x is number => x !== UNPAINTED_VALUE);
+    const unique = [...new Set(filtered)];
+    const hasUnpainted = pointGroups.some(group => group === UNPAINTED_VALUE);
+
+    // Include UNPAINTED_VALUE in activeColors if there are unpainted points
+    return hasUnpainted ? [...unique, UNPAINTED_VALUE] : unique;
+  }, [pointGroups]);
 
   // Handle statement row click
   const handleStatementClick = React.useCallback((statementId: number) => {

@@ -43,21 +43,21 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
 
   const renderGroupData = (groupData: GroupVoteData) => {
     const { groupIndex, n_agree, n_disagree, n_pass, n_trials, totalGroupSize } = groupData;
-    
+
     // Calculate unseen participants (those who never voted on this statement)
     const unseen = Math.max(0, totalGroupSize - n_trials);
-    
+
     // Calculate proportions based on includeMissingVotes setting
     const totalForCalculation = includeMissingVotes ? totalGroupSize : n_trials;
-    
+
     // Get group color - use black for unpainted group (index -1)
     const groupColor = groupIndex === -1 ? "#000000" : (PALETTE_COLORS[groupIndex] || "#000000");
-    
+
     // Determine if this column should be dimmed (dim others when highlighting is active)
     const shouldDim = highlightGroupIndex !== undefined && groupIndex !== highlightGroupIndex;
 
     const NON_HIGHLIGHT_GROUP_OPACITY = 0.5;
-    
+
     if (totalForCalculation === 0) {
       return {
         groupIndex,
@@ -165,7 +165,7 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
           </div>
         ))}
       </div>
-      
+
       {/* Bottom row: Vertical bars with no border */}
       <div className="inline-flex gap-0">
         {renderedGroups.map(({ groupIndex, barContent }) => (
