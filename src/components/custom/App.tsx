@@ -84,6 +84,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Clear colors dialog state
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
 
+  // Vote stats are now calculated at StatementExplorerDrawer level for better performance
+  // Removed global vote stats calculation to avoid calculating stats for all statements
+
   // Load data and initialize DuckDB on component mount
   React.useEffect(() => {
     const init = async () => {
@@ -304,6 +307,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       setIsCalculatingRepStatements(false);
     }
   }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, drawerTab, setDrawerTab]);
+
+  // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
+  // This avoids calculating stats for all statements when only group tab statements need them
 
   // update both selectedIds and pointGroups when selection changes (only in groups mode)
   function handleSelectionChange(ids: (number | string)[]) {

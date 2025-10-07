@@ -5,7 +5,7 @@ import type { Statement } from "./StatementExplorerDrawer";
 import { GroupVoteComparisonWidget, type GroupVoteData } from "./GroupVoteComparisonWidget";
 import { MissingVotesToggleButton } from "./MissingVotesToggleButton";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
-import { calculateStatementVoteStats, formatDebugVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
+import { formatDebugVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
 
 type StatementTableProps = {
   statements: Statement[];
@@ -20,7 +20,7 @@ type StatementTableProps = {
   voteBarHeight?: number;
   highlightGroupIndex?: number; // Group index to highlight in vote comparison widgets
   onToggleMissingVotes?: () => void; // Callback to toggle includeMissingVotes
-  
+
   // Debug mode props
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
@@ -28,6 +28,12 @@ type StatementTableProps = {
   activeColors?: number[];
   kedroBaseUrl?: string;
   pipelineId?: string;
+
+  // Vote stats props (calculated at App level)
+  voteStats?: Record<number, StatementDebugStats>;
+  loadingVoteStats?: Set<number>;
+  setLoadingVoteStats?: React.Dispatch<React.SetStateAction<Set<number>>>;
+  calculateVoteStatsForStatements?: (statementIds: number[]) => Promise<void>;
 };
 
 export const StatementTable: React.FC<StatementTableProps> = ({
@@ -43,7 +49,7 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   voteBarHeight = 30,
   highlightGroupIndex,
   onToggleMissingVotes,
-  
+
   // Debug mode props
   debugMode = false,
   dataset = [],
@@ -51,60 +57,65 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   activeColors = [],
   kedroBaseUrl,
   pipelineId,
+
+  // Vote stats props
+  voteStats = {},
+  loadingVoteStats = new Set(),
+  calculateVoteStatsForStatements,
 }) => {
   const handleToggleMissingVotes = React.useCallback(() => {
     onToggleMissingVotes?.();
   }, [onToggleMissingVotes]);
 
-  // Debug vote stats state
-  const [debugVoteStats, setDebugVoteStats] = React.useState<Record<number, StatementDebugStats>>({});
-  const [loadingDebugStats, setLoadingDebugStats] = React.useState<Set<number>>(new Set());
-
-  // Memoize statement IDs to prevent unnecessary effect triggers
-  const statementIds = React.useMemo(() =>
-    statements.map(s => s.statement_id).sort((a, b) => a - b),
-    [statements]
-  );
-
-  // Load debug vote stats when debug mode is enabled
+  // Auto-calculate vote stats for displayed statements when component mounts or statements change
   React.useEffect(() => {
-    if (!debugMode || !dataset.length || !pointGroups.length || !activeColors.length) {
-      setDebugVoteStats({});
-      return;
+    if (calculateVoteStatsForStatements && statements.length > 0) {
+      const statementIds = statements.map(s => s.statement_id);
+      // Only calculate for statements that don't already have stats and aren't currently loading
+      const missingStatementIds = statementIds.filter(id =>
+        !voteStats[id] && !loadingVoteStats.has(id)
+      );
+
+      if (missingStatementIds.length > 0) {
+        console.log('🔍 StatementTable: Auto-calculating vote stats for', missingStatementIds.length, 'statements');
+        calculateVoteStatsForStatements(missingStatementIds);
+      }
+    }
+  }, [statements, calculateVoteStatsForStatements, voteStats, loadingVoteStats]);
+
+  // Convert vote stats to GroupVoteData format for widgets
+  const convertVoteStatsToGroupVoteData = React.useCallback((statementId: number): GroupVoteData[] | undefined => {
+    const stats = voteStats[statementId];
+    if (!stats || !dataset.length || !pointGroups.length) {
+      return undefined;
     }
 
-    const loadStatsForStatements = async () => {
-      const newStats: Record<number, StatementDebugStats> = {};
+    // Calculate actual group sizes from pointGroups
+    const groupSizes: Record<number, number> = {};
+    pointGroups.forEach(group => {
+      groupSizes[group] = (groupSizes[group] || 0) + 1;
+    });
 
-      for (const statementId of statementIds) {
-        setLoadingDebugStats(prev => new Set([...prev, statementId]));
-
-        try {
-          const stats = await calculateStatementVoteStats(
-            statementId,
-            dataset,
-            pointGroups,
-            activeColors,
-            kedroBaseUrl,
-            pipelineId
-          );
-          newStats[statementId] = stats;
-        } catch (error) {
-          console.error(`Failed to load debug stats for statement ${statementId}:`, error);
-        } finally {
-          setLoadingDebugStats(prev => {
-            const next = new Set(prev);
-            next.delete(statementId);
-            return next;
-          });
-        }
+    // Convert vote stats to GroupVoteData format
+    const groupVotes: GroupVoteData[] = [];
+    Object.entries(stats).forEach(([groupIndexStr, groupStats]) => {
+      const groupIndex = parseInt(groupIndexStr);
+      if (activeColors.includes(groupIndex) && typeof groupStats === 'object' && groupStats !== null) {
+        const typedStats = groupStats as { agree: number; disagree: number; pass: number; total: number };
+        groupVotes.push({
+          groupIndex,
+          n_agree: typedStats.agree,
+          n_disagree: typedStats.disagree,
+          n_pass: typedStats.pass,
+          n_trials: typedStats.total,
+          totalGroupSize: groupSizes[groupIndex] || typedStats.total,
+        });
       }
+    });
 
-      setDebugVoteStats(newStats);
-    };
+    return groupVotes.length > 1 ? groupVotes : undefined;
+  }, [voteStats, dataset, pointGroups, activeColors]);
 
-    loadStatsForStatements();
-  }, [debugMode, statementIds, dataset, pointGroups, activeColors, kedroBaseUrl, pipelineId]);
 
   const insertBreaks = (val: string | null | undefined) => {
     if (!val) return "";
@@ -153,29 +164,33 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                 )}
               </TableCell>
               {showGroupVotes && (
-                <TableCell className="text-center w-8 px-1">
-                  {groupVoteData?.[s.statement_id] ? (
-                    <div
-                      className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleMissingVotes();
-                      }}
-                    >
-                      <GroupVoteComparisonWidget
-                        groupVotes={groupVoteData[s.statement_id]}
-                        includeMissingVotes={includeMissingVotes}
-                        height={voteBarHeight}
-                        width={voteBarWidth}
-                        className="justify-center"
-                        voteColors={voteColors}
-                        voteOrder={voteOrder}
-                        highlightGroupIndex={highlightGroupIndex}
-                      />
-                    </div>
-                  ) : null}
-                </TableCell>
-              )}
+               <TableCell className="text-center w-8 px-1">
+                 {(() => {
+                   // Use vote stats to generate widget data for immediate updates
+                   const widgetData = convertVoteStatsToGroupVoteData(s.statement_id) || groupVoteData?.[s.statement_id];
+                   return widgetData ? (
+                     <div
+                       className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         handleToggleMissingVotes();
+                       }}
+                     >
+                       <GroupVoteComparisonWidget
+                         groupVotes={widgetData}
+                         includeMissingVotes={includeMissingVotes}
+                         height={voteBarHeight}
+                         width={voteBarWidth}
+                         className="justify-center"
+                         voteColors={voteColors}
+                         voteOrder={voteOrder}
+                         highlightGroupIndex={highlightGroupIndex}
+                       />
+                     </div>
+                   ) : null;
+                 })()}
+               </TableCell>
+             )}
               <TableCell className="whitespace-normal">
                 <span
                   className={`
@@ -188,15 +203,15 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                   {s.moderated === -1 ? " (moderated)" : ""}
                   {s.moderated === 0 ? " (unmoderated)" : ""}
                 </span>
-                
+
                 {/* Debug mode: Show vote statistics with fixed height */}
                 {debugMode && (
                   <div className="mt-2 min-h-[60px] flex flex-col justify-start">
-                    {loadingDebugStats.has(s.statement_id) ? (
+                    {loadingVoteStats.has(s.statement_id) ? (
                       <div className="text-xs text-gray-400 italic">Loading debug stats...</div>
-                    ) : debugVoteStats[s.statement_id] ? (
+                    ) : voteStats[s.statement_id] ? (
                       <div className="space-y-1">
-                        {Object.entries(debugVoteStats[s.statement_id]).map(([groupIndex, stats]) => (
+                        {Object.entries(voteStats[s.statement_id]).map(([groupIndex, stats]) => (
                           <div key={groupIndex} className="text-xs text-gray-500 opacity-60">
                             Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatDebugVoteStats(stats)}
                           </div>

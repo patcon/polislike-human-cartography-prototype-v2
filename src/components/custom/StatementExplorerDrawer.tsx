@@ -19,6 +19,7 @@ import { X } from "lucide-react";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { useGoogleTranslateRefresh } from "@/hooks/useGoogleTranslateRefresh";
 import type { GroupVoteData } from "./GroupVoteComparisonWidget";
+import { calculateStatementVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
 
 export type Statement = {
   statement_id: number;
@@ -124,6 +125,65 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       return newValue;
     });
   }, [includeMissingVotes]);
+
+  // Vote stats state - managed locally in StatementExplorerDrawer
+  // Only calculated for statements in group tabs and consensus tab, not for "All" tab
+  const [voteStats, setVoteStats] = React.useState<Record<number, StatementDebugStats>>({});
+  const [loadingVoteStats, setLoadingVoteStats] = React.useState<Set<number>>(new Set());
+
+  // Calculate vote stats for specific statements when needed (lazy loading)
+  // This is only used for group tabs (representative statements) and consensus tab
+  const calculateVoteStatsForStatements = React.useCallback(async (statementIds: number[]): Promise<void> => {
+    // Mark statements as loading
+    setLoadingVoteStats(prev => new Set([...prev, ...statementIds]));
+
+    try {
+      // Get active colors (including unpainted if grouped)
+      const filtered = pointGroups.filter((x): x is number => x !== UNPAINTED_VALUE);
+      const unique = [...new Set(filtered)];
+      const hasUnpainted = pointGroups.some(group => group === UNPAINTED_VALUE);
+      const activeColors = hasUnpainted && isUnpaintedGrouped ? [...unique, UNPAINTED_VALUE] : unique;
+
+      // Only calculate if we have the necessary data
+      if (!dataset.length || !pointGroups.length || activeColors.length === 0) {
+        return;
+      }
+
+      const newStats: Record<number, StatementDebugStats> = {};
+
+      // Calculate stats only for requested statements
+      for (const statementId of statementIds) {
+        try {
+          const stats = await calculateStatementVoteStats(
+            statementId,
+            dataset,
+            pointGroups,
+            activeColors,
+            kedroBaseUrl,
+            pipelineId
+          );
+          newStats[statementId] = stats;
+        } catch (error) {
+          console.error(`Failed to load vote stats for statement ${statementId}:`, error);
+        }
+      }
+
+      // Update vote stats state
+      setVoteStats(prev => ({ ...prev, ...newStats }));
+    } finally {
+      // Remove statements from loading state
+      setLoadingVoteStats(prev => {
+        const next = new Set(prev);
+        statementIds.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  }, [dataset, pointGroups, isUnpaintedGrouped, kedroBaseUrl, pipelineId]);
+
+  // Clear vote stats when groups change (will be recalculated on demand)
+  React.useEffect(() => {
+    setVoteStats({});
+  }, [pointGroups, isUnpaintedGrouped]);
 
   // Debug logging for state
   React.useEffect(() => {
@@ -239,13 +299,11 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     return colors;
   };
 
-  // Generate group vote data for comparison widget using real vote data from DuckDB
-  const generateGroupVoteData = async (): Promise<Record<number, GroupVoteData[]>> => {
+  // Convert vote stats to GroupVoteData format for widgets (only when needed)
+  const convertVoteStatsToGroupVoteData = React.useCallback((statsData: Record<number, StatementDebugStats>): Record<number, GroupVoteData[]> => {
     const groupVoteData: Record<number, GroupVoteData[]> = {};
 
-    // Only generate data if we have the necessary data
-    if (!dataset.length || !pointGroups.length || sortedColors.length < 2) {
-      console.log('🔍 Debug - Insufficient data for group vote comparison');
+    if (!statsData || !dataset.length || !pointGroups.length || sortedColors.length < 2) {
       return groupVoteData;
     }
 
@@ -255,80 +313,39 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       groupSizes[group] = (groupSizes[group] || 0) + 1;
     });
 
-    console.log('🔍 Debug - Generating real vote data for statements:', statements.length);
-    console.log('🔍 Debug - sortedColors:', sortedColors);
-    console.log('🔍 Debug - groupSizes:', groupSizes);
+    // For each statement, convert vote stats to GroupVoteData format
+    Object.entries(statsData).forEach(([statementIdStr, stats]) => {
+      const statementId = parseInt(statementIdStr);
 
-    // Import the vote stats calculation function
-    const { calculateStatementVoteStats } = await import('@/lib/debug-vote-stats');
-
-    // For each statement, calculate real vote data
-    for (const statement of statements) {
-      try {
-        const stats = await calculateStatementVoteStats(
-          statement.statement_id,
-          dataset,
-          pointGroups,
-          sortedColors,
-          kedroBaseUrl,
-          pipelineId
-        );
-
-        // Convert debug stats to GroupVoteData format
-        const groupVotes: GroupVoteData[] = [];
-        sortedColors.forEach(groupIndex => {
-          const groupStats = stats[groupIndex];
-          if (groupStats) {
-            groupVotes.push({
-              groupIndex,
-              n_agree: groupStats.agree,
-              n_disagree: groupStats.disagree,
-              n_pass: groupStats.pass,
-              n_trials: groupStats.total,
-              totalGroupSize: groupSizes[groupIndex] || groupStats.total,
-            });
-          }
-        });
-
-        // Add if we have data for multiple groups (for comparison)
-        if (groupVotes.length > 1) {
-          groupVoteData[statement.statement_id] = groupVotes;
-          console.log(`🔍 Debug - Added real vote data for statement ${statement.statement_id}:`, groupVotes);
+      // Convert stats to GroupVoteData format
+      const groupVotes: GroupVoteData[] = [];
+      sortedColors.forEach(groupIndex => {
+        const groupStats = stats[groupIndex];
+        if (groupStats && typeof groupStats === 'object') {
+          groupVotes.push({
+            groupIndex,
+            n_agree: groupStats.agree,
+            n_disagree: groupStats.disagree,
+            n_pass: groupStats.pass,
+            n_trials: groupStats.total,
+            totalGroupSize: groupSizes[groupIndex] || groupStats.total,
+          });
         }
-      } catch (error) {
-        console.error(`Failed to load vote data for statement ${statement.statement_id}:`, error);
-      }
-    }
+      });
 
-    console.log('🔍 Debug - Final real groupVoteData:', groupVoteData);
+      // Add if we have data for multiple groups (for comparison)
+      if (groupVotes.length > 1) {
+        groupVoteData[statementId] = groupVotes;
+      }
+    });
+
     return groupVoteData;
-  };
+  }, [dataset, pointGroups, sortedColors]);
 
-  const [groupVoteData, setGroupVoteData] = React.useState<Record<number, GroupVoteData[]>>({});
-  const [loadingGroupVoteData, setLoadingGroupVoteData] = React.useState(false);
-
-  // Generate group vote data using real vote calculations
-  React.useEffect(() => {
-    const loadGroupVoteData = async () => {
-      if (!dataset.length || !pointGroups.length || sortedColors.length < 2) {
-        setGroupVoteData({});
-        return;
-      }
-
-      setLoadingGroupVoteData(true);
-      try {
-        const realData = await generateGroupVoteData();
-        setGroupVoteData(realData);
-      } catch (error) {
-        console.error('Failed to generate group vote data:', error);
-        setGroupVoteData({});
-      } finally {
-        setLoadingGroupVoteData(false);
-      }
-    };
-
-    loadGroupVoteData();
-  }, [dataset, pointGroups, sortedColors, statements, kedroBaseUrl, pipelineId]);
+  // Generate group vote data from vote stats (only when vote stats are available)
+  const groupVoteData = React.useMemo(() => {
+    return convertVoteStatsToGroupVoteData(voteStats);
+  }, [convertVoteStatsToGroupVoteData, voteStats]);
 
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange} defaultOpen={defaultOpen}>
@@ -425,7 +442,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                 </div>
               </div>
 
-              {/* All tab */}
+              {/* All tab - no vote stats calculation needed for performance */}
               <TabsContent value="all" className="select-text" translate="yes">
                 <StatementTable
                   statements={statements}
@@ -436,6 +453,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   activeColors={sortedColors}
                   kedroBaseUrl={kedroBaseUrl}
                   pipelineId={pipelineId}
+                  // Optimization: Don't pass vote stats props to avoid calculating stats for all statements
+                  // Vote stats are only needed for group tabs (representative statements) and consensus tab
                 />
               </TabsContent>
 
@@ -494,6 +513,10 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               activeColors={sortedColors}
                               kedroBaseUrl={kedroBaseUrl}
                               pipelineId={pipelineId}
+                              voteStats={voteStats}
+                              loadingVoteStats={loadingVoteStats}
+                              calculateVoteStatsForStatements={calculateVoteStatsForStatements}
+                              setLoadingVoteStats={setLoadingVoteStats}
                             />
                           </div>
                         )}
@@ -519,6 +542,10 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               activeColors={sortedColors}
                               kedroBaseUrl={kedroBaseUrl}
                               pipelineId={pipelineId}
+                              voteStats={voteStats}
+                              loadingVoteStats={loadingVoteStats}
+                              calculateVoteStatsForStatements={calculateVoteStatsForStatements}
+                              setLoadingVoteStats={setLoadingVoteStats}
                             />
                           </div>
                         )}
@@ -607,6 +634,10 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           activeColors={sortedColors}
                           kedroBaseUrl={kedroBaseUrl}
                           pipelineId={pipelineId}
+                          voteStats={voteStats}
+                          loadingVoteStats={loadingVoteStats}
+                          calculateVoteStatsForStatements={calculateVoteStatsForStatements}
+                          setLoadingVoteStats={setLoadingVoteStats}
                         />
                       </div>
                     ) : (

@@ -23,7 +23,7 @@ export async function calculateStatementVoteStats(
   try {
     // Get all participant IDs from dataset
     const participantIds = dataset.map(([id]) => id);
-    
+
     // Get votes for all participants for this statement
     const votes = await getVotesForParticipants(
       statementId.toString(),
@@ -46,17 +46,17 @@ export async function calculateStatementVoteStats(
     // Count votes for each group
     dataset.forEach(([participantId], index) => {
       const groupIndex = pointGroups[index];
-      
+
       // Only count if this group is active
       if (!activeColors.includes(groupIndex)) {
         return;
       }
 
       const vote = votes.get(participantId);
-      
+
       if (vote !== undefined) {
         const groupStats = stats[groupIndex];
-        
+
         switch (vote) {
           case 1:
             groupStats.agree++;
@@ -68,7 +68,7 @@ export async function calculateStatementVoteStats(
             groupStats.pass++;
             break;
         }
-        
+
         groupStats.total++;
       }
     });
