@@ -197,6 +197,15 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     [activeColors]
   );
 
+  // Calculate group member counts from pointGroups (shared with convertVoteStatsToGroupVoteData)
+  const groupMemberCounts = React.useMemo(() => {
+    const counts: Record<number, number> = {};
+    pointGroups.forEach(group => {
+      counts[group] = (counts[group] || 0) + 1;
+    });
+    return counts;
+  }, [pointGroups]);
+
   // Check if unpainted group should be shown as a tab
   const hasUnpaintedGroup = React.useMemo(() => {
     return activeColors.includes(UNPAINTED_VALUE) && isUnpaintedGrouped;
@@ -301,12 +310,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       return groupVoteData;
     }
 
-    // Calculate actual group sizes from pointGroups
-    const groupSizes: Record<number, number> = {};
-    pointGroups.forEach(group => {
-      groupSizes[group] = (groupSizes[group] || 0) + 1;
-    });
-
     // For each statement, convert vote stats to GroupVoteData format
     Object.entries(statsData).forEach(([statementIdStr, stats]) => {
       const statementId = parseInt(statementIdStr);
@@ -322,7 +325,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             n_disagree: groupStats.disagree,
             n_pass: groupStats.pass,
             n_trials: groupStats.total,
-            totalGroupSize: groupSizes[groupIndex] || groupStats.total,
+            totalGroupSize: groupMemberCounts[groupIndex],
           });
         }
       });
@@ -334,7 +337,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     });
 
     return groupVoteData;
-  }, [dataset, pointGroups, sortedColors]);
+  }, [dataset, pointGroups, sortedColors, groupMemberCounts]);
 
   // Generate group vote data from vote stats (only when vote stats are available)
   const groupVoteData = React.useMemo(() => {
@@ -381,27 +384,34 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
                       return (
                         <>
-                          {sortedColors.map((colorIndex, index) => (
-                            <GroupTabsTrigger
-                              key={colorIndex}
-                              value={`group-${colorIndex}`}
-                              tabStyle={groupTabStyle}
-                              color={colorIndex === UNPAINTED_VALUE ? "black" : PALETTE_COLORS[colorIndex]}
-                              style={{
-                                gridRow: 1,
-                                gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : index + 2
-                              }}
-                            >
-                              {colorIndex === UNPAINTED_VALUE ? (
-                                <>
-                                  <span translate="no" className="sm:hidden">X</span>
-                                  <span className="hidden sm:inline">Rest</span>
-                                </>
-                              ) : (
-                                <span translate="no">{letterForIndex(colorIndex)}</span>
-                              )}
-                            </GroupTabsTrigger>
-                          ))}
+                          {sortedColors.map((colorIndex, index) => {
+                            const memberCount = groupMemberCounts[colorIndex] || 0;
+                            return (
+                              <GroupTabsTrigger
+                                key={colorIndex}
+                                value={`group-${colorIndex}`}
+                                tabStyle={groupTabStyle}
+                                color={colorIndex === UNPAINTED_VALUE ? "black" : PALETTE_COLORS[colorIndex]}
+                                style={{
+                                  gridRow: 1,
+                                  gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : index + 2
+                                }}
+                              >
+                                {colorIndex === UNPAINTED_VALUE ? (
+                                  <>
+                                    <span translate="no" className="sm:hidden">X</span>
+                                    <span className="hidden sm:inline">Rest</span>
+                                    <span className="hidden md:inline text-xs ml-1 opacity-75">({memberCount})</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span translate="no">{letterForIndex(colorIndex)}</span>
+                                    <span className="hidden md:inline text-xs ml-1 opacity-75">({memberCount})</span>
+                                  </>
+                                )}
+                              </GroupTabsTrigger>
+                            );
+                          })}
                         </>
                       );
                     })()}
