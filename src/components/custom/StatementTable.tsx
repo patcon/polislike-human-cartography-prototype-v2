@@ -60,6 +60,12 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   const [debugVoteStats, setDebugVoteStats] = React.useState<Record<number, StatementDebugStats>>({});
   const [loadingDebugStats, setLoadingDebugStats] = React.useState<Set<number>>(new Set());
 
+  // Memoize statement IDs to prevent unnecessary effect triggers
+  const statementIds = React.useMemo(() =>
+    statements.map(s => s.statement_id).sort((a, b) => a - b),
+    [statements]
+  );
+
   // Load debug vote stats when debug mode is enabled
   React.useEffect(() => {
     if (!debugMode || !dataset.length || !pointGroups.length || !activeColors.length) {
@@ -69,28 +75,26 @@ export const StatementTable: React.FC<StatementTableProps> = ({
 
     const loadStatsForStatements = async () => {
       const newStats: Record<number, StatementDebugStats> = {};
-      const loadingSet = new Set<number>();
 
-      for (const statement of statements) {
-        loadingSet.add(statement.statement_id);
-        setLoadingDebugStats(prev => new Set([...prev, statement.statement_id]));
+      for (const statementId of statementIds) {
+        setLoadingDebugStats(prev => new Set([...prev, statementId]));
 
         try {
           const stats = await calculateStatementVoteStats(
-            statement.statement_id,
+            statementId,
             dataset,
             pointGroups,
             activeColors,
             kedroBaseUrl,
             pipelineId
           );
-          newStats[statement.statement_id] = stats;
+          newStats[statementId] = stats;
         } catch (error) {
-          console.error(`Failed to load debug stats for statement ${statement.statement_id}:`, error);
+          console.error(`Failed to load debug stats for statement ${statementId}:`, error);
         } finally {
           setLoadingDebugStats(prev => {
             const next = new Set(prev);
-            next.delete(statement.statement_id);
+            next.delete(statementId);
             return next;
           });
         }
@@ -100,7 +104,7 @@ export const StatementTable: React.FC<StatementTableProps> = ({
     };
 
     loadStatsForStatements();
-  }, [debugMode, statements, dataset, pointGroups, activeColors, kedroBaseUrl, pipelineId]);
+  }, [debugMode, statementIds, dataset, pointGroups, activeColors, kedroBaseUrl, pipelineId]);
 
   const insertBreaks = (val: string | null | undefined) => {
     if (!val) return "";

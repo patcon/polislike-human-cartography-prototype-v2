@@ -21,7 +21,7 @@ export type GroupVoteComparisonWidgetProps = {
   highlightGroupIndex?: number; // Group index to highlight (dims other columns)
 };
 
-export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps> = ({
+export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps> = React.memo(({
   groupVotes,
   includeMissingVotes = false,
   height = 40,
@@ -31,17 +31,11 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
   voteOrder = "UDPA", // Default: Unseen, Disagree, Pass, Agree (top to bottom)
   highlightGroupIndex,
 }) => {
-  // Debug logging to see if component re-renders with new props
-  console.log('🔍 GroupVoteComparisonWidget rendered with:', {
-    includeMissingVotes,
-    groupVotesLength: groupVotes?.length
-  });
-
   if (!groupVotes || groupVotes.length === 0) {
     return null;
   }
 
-  const renderGroupData = (groupData: GroupVoteData) => {
+  const renderGroupData = React.useCallback((groupData: GroupVoteData) => {
     const { groupIndex, n_agree, n_disagree, n_pass, n_trials, totalGroupSize } = groupData;
 
     // Calculate unseen participants (those who never voted on this statement)
@@ -135,7 +129,7 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
         </div>
       )
     };
-  };
+  }, [includeMissingVotes, height, width, voteColors, voteOrder, highlightGroupIndex]);
 
   const renderedGroups = groupVotes.map(renderGroupData);
 
@@ -176,4 +170,6 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
       </div>
     </div>
   );
-};
+});
+
+GroupVoteComparisonWidget.displayName = 'GroupVoteComparisonWidget';
