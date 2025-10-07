@@ -76,7 +76,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const [repStatementsError, setRepStatementsError] = React.useState<string | null>(null);
 
   // Unpainted grouping state
-  const [isUnpaintedGrouped, setIsUnpaintedGrouped] = React.useState(false);
+  const [isUnpaintedGrouped, setIsUnpaintedGrouped] = React.useState(true);
 
   // Clear colors dialog state
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
