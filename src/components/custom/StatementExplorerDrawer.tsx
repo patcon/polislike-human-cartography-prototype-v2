@@ -125,7 +125,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     if (index === UNPAINTED_VALUE) return "X"; // Special case for unpainted
     return String.fromCharCode(65 + index);
   };
-  const sortedColors = React.useMemo(() =>
+  // Just the painted colors (excluding unpainted), sorted
+  const paintedColors = React.useMemo(() =>
     [...activeColors].filter(color => color !== UNPAINTED_VALUE).sort((a, b) => a - b),
     [activeColors]
   );
@@ -134,6 +135,15 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   const hasUnpaintedGroup = React.useMemo(() => {
     return activeColors.includes(UNPAINTED_VALUE) && isUnpaintedGrouped;
   }, [activeColors, isUnpaintedGrouped]);
+
+  // All groups with painted colors first, then unpainted at the end (only if grouped)
+  const sortedColors = React.useMemo(() => {
+    const result = [...paintedColors];
+    if (hasUnpaintedGroup) {
+      result.push(UNPAINTED_VALUE);
+    }
+    return result;
+  }, [paintedColors, hasUnpaintedGroup]);
 
   // Create statement text map from statements
   const statementTextMap = React.useMemo(() => {
@@ -297,7 +307,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
     const realData = generateGroupVoteData();
 
     // If no real data is available, create some dummy data for testing
-    const totalGroups = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
+    const totalGroups = sortedColors.length;
     if (Object.keys(realData).length === 0 && totalGroups > 1 && statements.length > 0) {
       console.log('🔍 Debug - No real data found, creating dummy data for testing');
       const dummyData: Record<number, GroupVoteData[]> = {};
@@ -359,13 +369,13 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   <TabsList
                     className="grid w-full h-auto p-1"
                     style={{
-                      gridTemplateColumns: `repeat(${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0) + 1, 2)}, 1fr)`,
+                      gridTemplateColumns: `repeat(${Math.max(sortedColors.length + 1, 2)}, 1fr)`,
                       gridTemplateRows: 'auto auto'
                     }}
                   >
                     {/* First row: Letter groups and Rest tab */}
                     {(() => {
-                      const totalFirstRowTabs = sortedColors.length + (hasUnpaintedGroup ? 1 : 0);
+                      const totalFirstRowTabs = sortedColors.length;
                       const totalColumns = Math.max(totalFirstRowTabs + 1, 2); // +1 for the empty column
                       const shouldSpanConsensusWidth = totalFirstRowTabs === 1;
 
@@ -376,29 +386,22 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               key={colorIndex}
                               value={`group-${colorIndex}`}
                               tabStyle={groupTabStyle}
-                              color={PALETTE_COLORS[colorIndex]}
+                              color={colorIndex === UNPAINTED_VALUE ? "black" : PALETTE_COLORS[colorIndex]}
                               style={{
                                 gridRow: 1,
                                 gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : index + 2
                               }}
                             >
-                              <span translate="no">{letterForIndex(colorIndex)}</span>
+                              {colorIndex === UNPAINTED_VALUE ? (
+                                <>
+                                  <span translate="no" className="sm:hidden">X</span>
+                                  <span className="hidden sm:inline">Rest</span>
+                                </>
+                              ) : (
+                                <span translate="no">{letterForIndex(colorIndex)}</span>
+                              )}
                             </GroupTabsTrigger>
                           ))}
-                          {hasUnpaintedGroup && (
-                            <GroupTabsTrigger
-                              value={`group-${UNPAINTED_VALUE}`}
-                              tabStyle={groupTabStyle}
-                              color="black"
-                              style={{
-                                gridRow: 1,
-                                gridColumn: shouldSpanConsensusWidth ? `2 / ${totalColumns + 1}` : sortedColors.length + 2
-                              }}
-                            >
-                              <span className="sm:hidden">X</span>
-                              <span className="hidden sm:inline">Rest</span>
-                            </GroupTabsTrigger>
-                          )}
                         </>
                       );
                     })()}
@@ -415,7 +418,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       className="relative"
                       style={{
                         gridRow: 2,
-                        gridColumn: `2 / ${Math.max(sortedColors.length + (hasUnpaintedGroup ? 1 : 0) + 1, 2) + 1}`
+                        gridColumn: `2 / ${Math.max(sortedColors.length + 1, 2) + 1}`
                       }}
                     >
                       Consensus
@@ -424,14 +427,9 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           <div
                             key={colorIndex}
                             className="flex-1"
-                            style={{ backgroundColor: PALETTE_COLORS[colorIndex] }}
+                            style={{ backgroundColor: colorIndex === UNPAINTED_VALUE ? "#000000" : PALETTE_COLORS[colorIndex] }}
                           />
                         ))}
-                        {hasUnpaintedGroup && (
-                          <div
-                            className="flex-1 bg-black"
-                          />
-                        )}
                       </div>
                     </TabsTrigger>
                   </TabsList>
@@ -568,17 +566,25 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                       <div className="space-y-4">
                         <div className="px-4 py-2 bg-gray-50 rounded-lg">
                           <h3 className="font-medium text-sm text-gray-700 mb-1">
-                            Representative Statements for Group <span translate="no">{letterForIndex(colorIndex)}</span>
+                            {colorIndex === UNPAINTED_VALUE ? (
+                              "Representative Statements for Rest Group"
+                            ) : (
+                              <>Representative Statements for Group <span translate="no">{letterForIndex(colorIndex)}</span></>
+                            )}
                           </h3>
                           <p className="text-xs text-gray-500">
-                            These statements are most representative of this group's opinion patterns.
+                            {colorIndex === UNPAINTED_VALUE ? (
+                              "These statements are most representative of the remaining participants' opinion patterns."
+                            ) : (
+                              "These statements are most representative of this group's opinion patterns."
+                            )}
                           </p>
                         </div>
                         <StatementTable
                           statements={groupRepStatements}
                           onStatementClick={onStatementClick}
                           statementColors={statementColors}
-                          showGroupVotes={sortedColors.length + (hasUnpaintedGroup ? 1 : 0) > 1}
+                          showGroupVotes={sortedColors.length > 1}
                           groupVoteData={groupVoteData}
                           includeMissingVotes={includeMissingVotes}
                           voteBarWidth={6}
@@ -601,68 +607,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                 );
               })}
 
-              {/* Unpainted group tab - now treated like any other group */}
-              {hasUnpaintedGroup && (
-                <TabsContent value={`group-${UNPAINTED_VALUE}`} className="select-text" translate="yes">
-                  {(() => {
-                    const unpaintedRepStatements = getRepresentativeStatementsForGroup(UNPAINTED_VALUE);
-                    const hasRepStatements = unpaintedRepStatements.length > 0;
-                    const statementColors = getStatementColors(UNPAINTED_VALUE);
-
-                    return (
-                      <>
-                        {isCalculatingRepStatements ? (
-                          <div className="px-4 py-8 text-center">
-                            <div className="flex items-center justify-center space-x-2 text-gray-500">
-                              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-                              <span className="text-sm">Calculating representative statements...</span>
-                            </div>
-                          </div>
-                        ) : repStatementsError ? (
-                          <div className="px-4 py-8 text-center">
-                            <div className="text-red-500 text-sm">
-                              <p className="mb-2">Error calculating representative statements:</p>
-                              <p className="text-xs">{repStatementsError}</p>
-                            </div>
-                          </div>
-                        ) : hasRepStatements ? (
-                          <div className="space-y-4">
-                            <div className="px-4 py-2 bg-gray-50 rounded-lg">
-                              <h3 className="font-medium text-sm text-gray-700 mb-1">
-                                Representative Statements for Rest Group
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                These statements are most representative of the remaining participants' opinion patterns.
-                              </p>
-                            </div>
-                            <StatementTable
-                              statements={unpaintedRepStatements}
-                              onStatementClick={onStatementClick}
-                              statementColors={statementColors}
-                              showGroupVotes={sortedColors.length + (hasUnpaintedGroup ? 1 : 0) > 1}
-                              groupVoteData={groupVoteData}
-                              includeMissingVotes={includeMissingVotes}
-                              voteBarWidth={6}
-                              voteBarHeight={20}
-                              highlightGroupIndex={UNPAINTED_VALUE}
-                              onToggleMissingVotes={handleToggleMissingVotes}
-                            />
-                          </div>
-                        ) : (
-                          <div className="px-4 py-8 text-center">
-                            <div className="text-gray-500 text-sm">
-                              <p className="mb-2">No representative statements found for the rest group.</p>
-                              <p className="text-xs">
-                                Make selections to calculate representative statements for remaining participants.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </TabsContent>
-              )}
             </Tabs>
           </div>
         </DrawerContent>
