@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import type { Statement } from "./StatementExplorerDrawer";
 import { GroupVoteComparisonWidget, type GroupVoteData } from "./GroupVoteComparisonWidget";
+import { MissingVotesToggleButton } from "./MissingVotesToggleButton";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 
 type StatementTableProps = {
@@ -52,7 +53,12 @@ export const StatementTable: React.FC<StatementTableProps> = ({
         <TableRow>
           <TableHead className="text-right text-[12px] text-gray-400">#</TableHead>
           {showGroupVotes && (
-            <TableHead className="w-8"></TableHead>
+            <TableHead className="w-8 text-center">
+              <MissingVotesToggleButton
+                includeMissingVotes={includeMissingVotes}
+                onToggle={handleToggleMissingVotes}
+              />
+            </TableHead>
           )}
           <TableHead>Statement</TableHead>
         </TableRow>
@@ -79,25 +85,26 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                 )}
               </TableCell>
               {showGroupVotes && (
-                <TableCell
-                  className="text-center w-8 px-1 cursor-pointer hover:bg-gray-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleMissingVotes();
-                  }}
-                  title={includeMissingVotes ? 'Hide missing votes' : 'Show missing votes'}
-                >
+                <TableCell className="text-center w-8 px-1">
                   {groupVoteData?.[s.statement_id] ? (
-                    <GroupVoteComparisonWidget
-                      groupVotes={groupVoteData[s.statement_id]}
-                      includeMissingVotes={includeMissingVotes}
-                      height={voteBarHeight}
-                      width={voteBarWidth}
-                      className="justify-center"
-                      voteColors={voteColors}
-                      voteOrder={voteOrder}
-                      highlightGroupIndex={highlightGroupIndex}
-                    />
+                    <div
+                      className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleMissingVotes();
+                      }}
+                    >
+                      <GroupVoteComparisonWidget
+                        groupVotes={groupVoteData[s.statement_id]}
+                        includeMissingVotes={includeMissingVotes}
+                        height={voteBarHeight}
+                        width={voteBarWidth}
+                        className="justify-center"
+                        voteColors={voteColors}
+                        voteOrder={voteOrder}
+                        highlightGroupIndex={highlightGroupIndex}
+                      />
+                    </div>
                   ) : null}
                 </TableCell>
               )}
