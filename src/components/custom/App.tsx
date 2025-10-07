@@ -77,11 +77,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   });
 
   // Layer mode cycling for painting in non-group modes
-  const { effectiveLayerMode, isCycling, cycleOpacity, canPaint, startCycle, stopCycle } = useLayerModeCycling({
+  const { effectiveLayerMode, isCycling, cycleOpacity, startCycle, stopCycle } = useLayerModeCycling({
     currentLayerMode: layerMode,
-    pauseDuration: 1000, // Long pause at each layer state
-    flashDuration: 200, // Very fast fade out (flash)
-    exposureDuration: 1000, // Slower fade in (exposure)
   });
 
   // StatementExplorerDrawer state
@@ -322,7 +319,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     } finally {
       setIsCalculatingRepStatements(false);
     }
-  }, [layerMode, isCalculatingRepStatements, statements, pointGroups, dataset, drawerTab, setDrawerTab]);
+  }, [isCalculatingRepStatements, statements, pointGroups, dataset, drawerTab, setDrawerTab]);
 
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
@@ -370,22 +367,20 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Clear all painted colors - reset all points to unpainted
   const handleClearAllColors = React.useCallback(() => {
-    if (layerMode === "groups") {
-      setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
+    setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
 
-      // Clear representative statements since all groups are now empty
-      setRepresentativeStatements({});
-      setConsensusStatements(null);
-      setRepStatementsError(null);
+    // Clear representative statements since all groups are now empty
+    setRepresentativeStatements({});
+    setConsensusStatements(null);
+    setRepStatementsError(null);
 
-      // Reset drawer to "all" tab since group tabs are no longer valid
-      if (drawerTab !== "all") {
-        setDrawerTab("all");
-      }
-
-      console.log('All painted colors cleared');
+    // Reset drawer to "all" tab since group tabs are no longer valid
+    if (drawerTab !== "all") {
+      setDrawerTab("all");
     }
-  }, [layerMode, dataset.length, drawerTab, setDrawerTab]);
+
+    console.log('All painted colors cleared');
+  }, [dataset.length, drawerTab, setDrawerTab]);
 
   // handle quick select (single point click) - opens drawer to specific tab
   function handleQuickSelect(id: string): boolean {
@@ -467,7 +462,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           data-layer-cycling
           style={{
             opacity: cycleOpacity,
-            transition: `opacity 50ms ease-in` // Start with fast flash transition
+            transition: `opacity 200ms ease-in` // Start with fast flash transition, will be dynamically updated
           }}
         >
           <D3Map
@@ -511,7 +506,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onDrawerTabChange={setDrawerTab}
           layerMode={layerMode}
           onLayerModeChange={setLayerMode}
-          canPaint={canPaint}
           statementId={statementId}
           onStatementIdChange={setStatementId}
           highlightPassVotes={highlightPassVotes}
@@ -539,7 +533,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
             onUnpaintedGroupedChange={(newValue) => {
               setIsUnpaintedGrouped(newValue);
               // Trigger recalculation of representative statements when grouping changes
-              if (layerMode === "groups" && pointGroups.length > 0) {
+              if (pointGroups.length > 0) {
                 // Use setTimeout to ensure state update has been processed
                 setTimeout(() => {
                   calculateRepStatements(undefined, newValue);

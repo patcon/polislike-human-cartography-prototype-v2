@@ -4,16 +4,12 @@ export type LayerMode = "groups" | "votes" | "metrics";
 
 interface UseLayerModeCyclingProps {
   currentLayerMode: LayerMode;
-  pauseDuration?: number; // Time to pause at each layer state
-  flashDuration?: number; // Fast fade out (flash)
-  exposureDuration?: number; // Slow fade in (exposure)
 }
 
 interface UseLayerModeCyclingReturn {
   effectiveLayerMode: LayerMode;
   isCycling: boolean;
   cycleOpacity: number;
-  canPaint: boolean;
   startCycle: () => void;
   stopCycle: () => void;
 }
@@ -25,10 +21,11 @@ interface UseLayerModeCyclingReturn {
  */
 export function useLayerModeCycling({
   currentLayerMode,
-  pauseDuration = 1000, // Long pause at each layer state
-  flashDuration = 200, // Very fast fade out (flash)
-  exposureDuration = 1000, // Slower fade in (exposure)
 }: UseLayerModeCyclingProps): UseLayerModeCyclingReturn {
+  // Fixed timing values for camera flash effect
+  const pauseDuration = 1000; // Pause at each layer state
+  const flashDuration = 200; // Fast fade out (flash)
+  const exposureDuration = 1000; // Slower fade in (exposure)
   const [isCycling, setIsCycling] = useState(false);
   const [cycleOpacity, setCycleOpacity] = useState(1);
   const [effectiveLayerMode, setEffectiveLayerMode] = useState<LayerMode>(currentLayerMode);
@@ -81,7 +78,7 @@ export function useLayerModeCycling({
             setEffectiveLayerMode(currentLayerMode);
           }
 
-          // Slow fade in (exposure) - need to update transition duration
+          // Update transition for slow fade in (exposure)
           const element = document.querySelector('[data-layer-cycling]') as HTMLElement;
           if (element) {
             element.style.transition = `opacity ${exposureDuration}ms ease-out`;
@@ -152,14 +149,10 @@ export function useLayerModeCycling({
     };
   }, []);
 
-  // Determine if painting is allowed
-  const canPaint = effectiveLayerMode === "groups" || isCycling;
-
   return {
     effectiveLayerMode,
     isCycling,
     cycleOpacity,
-    canPaint,
     startCycle,
     stopCycle
   };

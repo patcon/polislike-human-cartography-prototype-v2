@@ -26,7 +26,6 @@ type MapOverlayProps = {
   onDrawerTabChange?: (tab: string) => void;
   layerMode?: "groups" | "votes";
   onLayerModeChange?: (mode: "groups" | "votes") => void;
-  canPaint?: boolean;
   statementId?: string;
   onStatementIdChange?: (statementId: string) => void;
   highlightPassVotes?: boolean;
@@ -60,7 +59,6 @@ export function MapOverlay({
   onDrawerTabChange,
   layerMode = "groups",
   onLayerModeChange,
-  canPaint = false,
   statementId = "0",
   onStatementIdChange,
   highlightPassVotes = true,
