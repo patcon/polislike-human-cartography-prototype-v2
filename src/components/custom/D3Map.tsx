@@ -31,6 +31,10 @@ type D3MapProps = {
   onSelectionChange?: (ids: (number | string)[]) => void;
   /** Called when exactly one point is clicked/tapped. Return false to allow event propagation. */
   onQuickSelect?: (id: string) => boolean | void;
+  /** Called when lasso painting starts */
+  onLassoStart?: () => void;
+  /** Called when lasso painting ends */
+  onLassoEnd?: () => void;
   flipX?: boolean;
   flipY?: boolean;
   /** Bring colored points to front (render on top of unpainted points) */
@@ -50,6 +54,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   palette = PALETTE_COLORS,
   onSelectionChange,
   onQuickSelect,
+  onLassoStart,
+  onLassoEnd,
   flipX,
   flipY,
   colorsToFront = false,
@@ -551,13 +557,18 @@ export const D3Map: React.FC<D3MapProps> = ({
     }
 
     if (mode === "paint") {
-      function cleanupLasso() {
-        console.log('🎨 Lasso CLEANUP');
+      function cleanupLasso(callEndCallback = false) {
+        console.log('🎨 Lasso CLEANUP, callEndCallback:', callEndCallback);
         if (lassoStateRef.current.path) {
           lassoStateRef.current.path.remove();
           lassoStateRef.current.path = null;
         }
         lassoStateRef.current.coords = [];
+
+        // Only call onLassoEnd when explicitly requested (normal end, not cleanup)
+        if (callEndCallback) {
+          onLassoEnd?.();
+        }
       }
 
       // Store cleanup function in ref so zoom can access it
@@ -566,9 +577,12 @@ export const D3Map: React.FC<D3MapProps> = ({
       function lassoStart(event: any) {
         console.log('🎨 Lasso START:', event.sourceEvent?.type);
         if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso();
+          cleanupLasso(true); // End cycling on multi-touch
           return;
         }
+
+        // Trigger layer mode cycling when lasso starts
+        onLassoStart?.();
 
         lassoStateRef.current.coords = [];
         if (lassoStateRef.current.path) lassoStateRef.current.path.remove();
@@ -583,7 +597,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       function lassoDrag(event: any) {
         console.log('🎨 Lasso DRAG:', event.sourceEvent?.type);
         if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso();
+          cleanupLasso(true); // End cycling on multi-touch
           return;
         }
         lassoStateRef.current.coords.push([event.x, event.y]);
@@ -596,7 +610,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         console.log('🎨 Lasso END, coords:', lassoStateRef.current.coords.length);
 
         if (!lassoStateRef.current.coords.length) {
-          cleanupLasso();
+          cleanupLasso(true); // End cycling and cleanup
           return;
         }
         const transform = d3.zoomTransform(container.node()!);
@@ -608,7 +622,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         });
         if (onSelectionChange) onSelectionChange(selected.map((d: any) => d.i));
 
-        cleanupLasso();
+        cleanupLasso(true); // End cycling and cleanup
       }
 
       svg.call(
@@ -636,14 +650,14 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       // Cleanup function when mode changes
       return () => {
-        cleanupLasso();
+        cleanupLasso(true); // End cycling when mode changes
         lassoStateRef.current.cleanup = null;
       };
     } else {
       // Clear cleanup function when not in paint mode
       lassoStateRef.current.cleanup = null;
     }
-  }, [mode, onSelectionChange, xScale, yScale]);
+  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd]);
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {

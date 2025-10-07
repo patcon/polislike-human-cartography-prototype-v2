@@ -33,7 +33,7 @@ export function useShiftKeyTempMode({
 
     if (event.key === 'Shift' && !isShiftPressed) {
       setIsShiftPressed(true);
-      
+
       // Only switch to move mode if we're not already in move mode
       if (currentMode !== "move-map") {
         setOriginalMode(currentMode);
@@ -45,7 +45,7 @@ export function useShiftKeyTempMode({
   const handleKeyUp = useCallback((event: KeyboardEvent) => {
     if (event.key === 'Shift' && isShiftPressed) {
       setIsShiftPressed(false);
-      
+
       // Revert to original mode if we had switched temporarily
       if (originalMode !== null) {
         onModeChange(originalMode);

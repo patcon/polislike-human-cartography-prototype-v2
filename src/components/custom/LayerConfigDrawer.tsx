@@ -42,16 +42,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
     const setSelected = (value: string) => {
       if (onLayerModeChange && (value === "groups" || value === "votes")) {
         onLayerModeChange(value);
-        // Force move action when switching to votes mode
-        if (value === "votes" && onActionChange) {
-          onActionChange("move-map");
-        }
       } else {
         setInternalSelected(value);
-        // Force move action when switching to votes mode (internal state)
-        if (value === "votes" && onActionChange) {
-          onActionChange("move-map");
-        }
       }
     };
 

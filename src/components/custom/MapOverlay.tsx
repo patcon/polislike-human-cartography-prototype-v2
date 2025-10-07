@@ -26,6 +26,7 @@ type MapOverlayProps = {
   onDrawerTabChange?: (tab: string) => void;
   layerMode?: "groups" | "votes";
   onLayerModeChange?: (mode: "groups" | "votes") => void;
+  canPaint?: boolean;
   statementId?: string;
   onStatementIdChange?: (statementId: string) => void;
   highlightPassVotes?: boolean;
@@ -59,6 +60,7 @@ export function MapOverlay({
   onDrawerTabChange,
   layerMode = "groups",
   onLayerModeChange,
+  canPaint = false,
   statementId = "0",
   onStatementIdChange,
   highlightPassVotes = true,
@@ -166,7 +168,7 @@ export function MapOverlay({
             activeIndex={colorIndex}
             onSelectIndex={handleColorIndexChange}
             onEraserReselect={onClearAllColors}
-            disabled={action !== "paint-groups" || layerMode === "votes"} // 👈 disable palette when not painting or in votes mode
+            disabled={action !== "paint-groups"} // 👈 enable palette whenever paint tool is active, regardless of layer mode
           />
         </div>
       </div>

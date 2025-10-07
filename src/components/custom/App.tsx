@@ -20,6 +20,7 @@ import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { fetchAndProcessKedroData, loadStatementsData } from "@/lib/kedro-api";
 import { useDebugMode } from "../../hooks/useDebugMode";
 import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
+import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -73,6 +74,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const { isShiftPressed, effectiveMode } = useShiftKeyTempMode({
     currentMode: action,
     onModeChange: setAction
+  });
+
+  // Layer mode cycling for painting in non-group modes
+  const { effectiveLayerMode, isCycling, cycleOpacity, canPaint, startCycle, stopCycle } = useLayerModeCycling({
+    currentLayerMode: layerMode,
+    pauseDuration: 1000, // Long pause at each layer state
+    flashDuration: 200, // Very fast fade out (flash)
+    exposureDuration: 1000, // Slower fade in (exposure)
   });
 
   // StatementExplorerDrawer state
@@ -249,7 +258,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Calculate representative statements
   const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean) => {
-    if (layerMode !== "groups" || isCalculatingRepStatements) return;
+    if (isCalculatingRepStatements) return;
 
     // Use the provided updated groups or fall back to current state
     const groupsToAnalyze = updatedPointGroups || pointGroups;
@@ -318,29 +327,40 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
 
-  // update both selectedIds and pointGroups when selection changes (only in groups mode)
+  // Handle lasso start - trigger cycling if in non-group mode and paint mode
+  const handleLassoStart = React.useCallback(() => {
+    if (effectiveMode === "paint-groups" && layerMode !== "groups") {
+      startCycle();
+    }
+  }, [effectiveMode, layerMode, startCycle]);
+
+  // Handle lasso end - stop cycling
+  const handleLassoEnd = React.useCallback(() => {
+    stopCycle(); // Always call stopCycle to ensure cleanup
+  }, [stopCycle]);
+
+  // update both selectedIds and pointGroups when selection changes (painting allowed in all modes)
   function handleSelectionChange(ids: (number | string)[]) {
     setSelectedIds(ids as number[]);
-    if (layerMode === "groups") {
-      setPointGroups((prev) => {
-        const next = [...prev];
-        ids.forEach((id) => {
-          // find index of this id in dataset using helper function
-          const idx = findDatasetIndex(dataset, id);
-          if (idx !== -1) {
-            next[idx] = colorIndex;
-          }
-        });
-
-        // Trigger representative statements calculation with the updated groups
-        // Pass the updated state directly to avoid timing issues
-        setTimeout(() => {
-          calculateRepStatements(next);
-        }, 50);
-
-        return next;
+    // Always allow painting - the cycling will show the groups layer when needed
+    setPointGroups((prev) => {
+      const next = [...prev];
+      ids.forEach((id) => {
+        // find index of this id in dataset using helper function
+        const idx = findDatasetIndex(dataset, id);
+        if (idx !== -1) {
+          next[idx] = colorIndex;
+        }
       });
-    }
+
+      // Always trigger representative statements calculation when groups change
+      // This ensures vote stats are recalculated even when painting in votes mode
+      setTimeout(() => {
+        calculateRepStatements(next);
+      }, 50);
+
+      return next;
+    });
   }
 
   // Open clear colors dialog
@@ -443,25 +463,35 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       {/* D3Map: absolutely positioned to fill parent */}
       <div className="absolute inset-0 z-0">
-        <D3Map
-          data={dataset}
-          mode={mode}
-          pointColors={layerMode === "votes" ? pointVotes : pointGroups}
-          palette={layerMode === "votes" ?
-            (highlightPassVotes ?
-              [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass] :
-              [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
-            ) :
-            PALETTE_COLORS}
-          onSelectionChange={handleSelectionChange}
-          onQuickSelect={handleQuickSelect}
-          flipX={toggles.includes("flip-horizontal")}
-          flipY={toggles.includes("flip-vertical")}
-          colorsToFront={colorsToFront}
-          testAnimation={testAnimation}
-          kedroBaseUrl={kedroBaseUrl}
-          availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
-        />
+        <div
+          data-layer-cycling
+          style={{
+            opacity: cycleOpacity,
+            transition: `opacity 50ms ease-in` // Start with fast flash transition
+          }}
+        >
+          <D3Map
+            data={dataset}
+            mode={mode}
+            pointColors={effectiveLayerMode === "votes" ? pointVotes : pointGroups}
+            palette={effectiveLayerMode === "votes" ?
+              (highlightPassVotes ?
+                [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass] :
+                [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
+              ) :
+              PALETTE_COLORS}
+            onSelectionChange={handleSelectionChange}
+            onQuickSelect={handleQuickSelect}
+            onLassoStart={handleLassoStart}
+            onLassoEnd={handleLassoEnd}
+            flipX={toggles.includes("flip-horizontal")}
+            flipY={toggles.includes("flip-vertical")}
+            colorsToFront={colorsToFront}
+            testAnimation={testAnimation}
+            kedroBaseUrl={kedroBaseUrl}
+            availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
+          />
+        </div>
       </div>
 
       {/* Overlay UI */}
@@ -481,6 +511,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onDrawerTabChange={setDrawerTab}
           layerMode={layerMode}
           onLayerModeChange={setLayerMode}
+          canPaint={canPaint}
           statementId={statementId}
           onStatementIdChange={setStatementId}
           highlightPassVotes={highlightPassVotes}
