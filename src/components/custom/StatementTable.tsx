@@ -185,17 +185,19 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                   {s.moderated === 0 ? " (unmoderated)" : ""}
                 </span>
                 
-                {/* Debug mode: Show vote statistics */}
+                {/* Debug mode: Show vote statistics with fixed height */}
                 {debugMode && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2 min-h-[60px] flex flex-col justify-start">
                     {loadingDebugStats.has(s.statement_id) ? (
                       <div className="text-xs text-gray-400 italic">Loading debug stats...</div>
                     ) : debugVoteStats[s.statement_id] ? (
-                      Object.entries(debugVoteStats[s.statement_id]).map(([groupIndex, stats]) => (
-                        <div key={groupIndex} className="text-xs text-gray-500 opacity-60">
-                          Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatDebugVoteStats(stats)}
-                        </div>
-                      ))
+                      <div className="space-y-1">
+                        {Object.entries(debugVoteStats[s.statement_id]).map(([groupIndex, stats]) => (
+                          <div key={groupIndex} className="text-xs text-gray-500 opacity-60">
+                            Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatDebugVoteStats(stats)}
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <div className="text-xs text-gray-400 italic">No debug stats available</div>
                     )}
