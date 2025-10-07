@@ -20,14 +20,22 @@ export const MissingVotesToggleButton: React.FC<MissingVotesToggleButtonProps> =
         <Button
           variant="ghost"
           size="icon"
-          className={`h-6 w-6 ${className}`}
+          className={`h-6 w-6 group ${className}`}
           onClick={onToggle}
           aria-label={includeMissingVotes ? "Exclude missing votes" : "Include missing votes"}
         >
+          {/* Show active state by default, hide on hover */}
           {includeMissingVotes ? (
-            <Grid2x2X className="h-4 w-4" />
+            <Grid2x2Plus className="h-4 w-4 group-hover:hidden" />
           ) : (
-            <Grid2x2Plus className="h-4 w-4" />
+            <Grid2x2X className="h-4 w-4 group-hover:hidden" />
+          )}
+
+          {/* Show opposite state on hover only */}
+          {includeMissingVotes ? (
+            <Grid2x2X className="h-4 w-4 hidden group-hover:block" />
+          ) : (
+          <Grid2x2Plus className="h-4 w-4 hidden group-hover:block" />
           )}
         </Button>
       </TooltipTrigger>
