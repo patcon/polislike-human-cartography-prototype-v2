@@ -134,17 +134,20 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
   const renderedGroups = groupVotes.map(renderGroupData);
 
   // Calculate proportional indicator size based on width and height
-  // Make it a rounded rectangle that scales with the column width
-  const indicatorWidth = Math.max(width * 0.7, 3); // At least 3px wide, scales with column
-  const indicatorHeight = Math.max(2, Math.min(width * 0.4, height * 0.15, 8)); // Height scales but has limits
-  const borderRadius = Math.min(indicatorHeight * 0.5, 3); // Rounded corners
+  // For small form (narrow columns), make indicators take full width and be taller
+  const isSmallForm = width <= 16; // Consider small form when width is 16px or less
+  const indicatorWidth = isSmallForm ? width : Math.max(width * 0.7, 3); // Full width for small form
+  const indicatorHeight = isSmallForm
+    ? Math.max(8, Math.min(width * 0.8, 12)) // Taller for small form (8-12px range)
+    : Math.max(2, Math.min(width * 0.4, height * 0.15, 8)); // Original logic for larger forms
+  const borderRadius = isSmallForm ? 0 : Math.min(indicatorHeight * 0.5, 3); // No rounded corners for small form
   const marginBottom = Math.max(1, Math.min(width * 0.15, height * 0.08, 6)); // Proportional margin
 
   return (
     <div className={`inline-flex flex-col items-center ${className}`}>
       {/* Top row: Group color indicators */}
       <div className="inline-flex gap-0" style={{ marginBottom: `${marginBottom}px` }}>
-        {renderedGroups.map(({ groupIndex, colorIndicator }) => (
+        {renderedGroups.map(({ groupIndex, colorIndicator }, index) => (
           <div key={`indicator-${groupIndex}`} className="flex justify-center" style={{ width: `${width}px` }}>
             {colorIndicator && (
               <div
@@ -152,7 +155,11 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
                   backgroundColor: colorIndicator,
                   width: `${indicatorWidth}px`,
                   height: `${indicatorHeight}px`,
-                  borderRadius: `${borderRadius}px`
+                  borderRadius: `${borderRadius}px`,
+                  // Add white border divider for small form (except last item)
+                  ...(isSmallForm && index < renderedGroups.length - 1 && {
+                    borderRight: '1px solid white'
+                  })
                 }}
               />
             )}
