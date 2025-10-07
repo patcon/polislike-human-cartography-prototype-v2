@@ -19,6 +19,7 @@ import {
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { fetchAndProcessKedroData, loadStatementsData } from "@/lib/kedro-api";
 import { useDebugMode } from "../../hooks/useDebugMode";
+import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -67,6 +68,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // Debug mode state
   const debugMode = useDebugMode();
+
+  // Shift key temporary mode switching
+  const { isShiftPressed, effectiveMode } = useShiftKeyTempMode({
+    currentMode: action,
+    onModeChange: setAction
+  });
 
   // StatementExplorerDrawer state
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -238,7 +245,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     }
   }, [layerMode, statementId, dataset, kedroBaseUrl, pipelineId]);
 
-  const mode: "move" | "paint" = action === "paint-groups" ? "paint" : "move";
+  const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
   // Calculate representative statements
   const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean) => {
@@ -460,7 +467,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       {/* Overlay UI */}
       <div className="absolute inset-0 z-50 pointer-events-none">
         <MapOverlay
-          action={action}
+          action={effectiveMode}
           onActionChange={setAction}
           colorIndex={colorIndex}
           onColorIndexChange={setColorIndex}
