@@ -24,8 +24,8 @@ type MapOverlayProps = {
   onDrawerOpenChange?: (open: boolean) => void;
   drawerTab?: string;
   onDrawerTabChange?: (tab: string) => void;
-  layerMode?: "groups" | "votes";
-  onLayerModeChange?: (mode: "groups" | "votes") => void;
+  layerMode?: "groups" | "votes" | "metrics";
+  onLayerModeChange?: (mode: "groups" | "votes" | "metrics") => void;
   statementId?: string;
   onStatementIdChange?: (statementId: string) => void;
   highlightPassVotes?: boolean;

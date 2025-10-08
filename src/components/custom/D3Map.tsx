@@ -24,10 +24,12 @@ type D3MapProps = {
   /** Dataset points in the format [[i, [x, y]], ...] */
   data: [string, [number, number]][];
   mode?: "move" | "paint";
-  /** Color indices parallel to data: null = default color, number = palette index */
+  /** Color indices parallel to data: null = default color, number = palette index (groups/votes) or 0-1 values (metrics) */
   pointColors?: (number | null)[];
   /** Color palette to use for rendering points */
   palette?: string[];
+  /** Current layer mode for determining coloring strategy */
+  layerMode?: "groups" | "votes" | "metrics";
   onSelectionChange?: (ids: (number | string)[]) => void;
   /** Called when exactly one point is clicked/tapped. Return false to allow event propagation. */
   onQuickSelect?: (id: string) => boolean | void;
@@ -52,6 +54,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   mode = "move",
   pointColors = [],
   palette = PALETTE_COLORS,
+  layerMode = "groups",
   onSelectionChange,
   onQuickSelect,
   onLassoStart,
@@ -206,6 +209,49 @@ export const D3Map: React.FC<D3MapProps> = ({
     return radiusMultiplier * devicePixelRatio;
   }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
 
+  // --- Color scale for metrics mode ---
+  const metricsColorScale = React.useMemo(() => {
+    const createColorScale = (
+      scheme: "gold-darkred" | "viridis" | "plasma" | "inferno" | "magma" = "gold-darkred",
+      inverse: boolean = false
+    ) => {
+      const domain = inverse ? [1, 0] : [0, 1];
+      const scale = d3.scaleSequential().domain(domain);
+      
+      switch (scheme) {
+        case "viridis":
+          return scale.interpolator(d3.interpolateViridis);
+        case "plasma":
+          return scale.interpolator(d3.interpolatePlasma);
+        case "inferno":
+          return scale.interpolator(d3.interpolateInferno);
+        case "magma":
+          return scale.interpolator(d3.interpolateMagma);
+        case "gold-darkred":
+        default:
+          return scale.interpolator(d3.interpolateHcl('gold', 'darkred'));
+      }
+    };
+    
+    // Change these parameters to switch color schemes and/or reverse
+    return createColorScale("plasma", true);
+  }, []);
+
+  // --- Color helper function ---
+  const getPointColor = React.useCallback((colorValue: number | null, originalIndex: number) => {
+    if (colorValue == null) {
+      return UNPAINTED_COLOR;
+    }
+    
+    if (layerMode === "metrics") {
+      // For metrics mode, treat colorValue as 0-1 and use custom color scale
+      return metricsColorScale(colorValue);
+    } else {
+      // For groups/votes mode, treat colorValue as palette index
+      return palette[colorValue % palette.length];
+    }
+  }, [layerMode, palette, metricsColorScale]);
+
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
     // Use projection data if testAnimation is enabled and data is available, otherwise fall back to original data
@@ -324,11 +370,8 @@ export const D3Map: React.FC<D3MapProps> = ({
     const updateSelection = circles
       .attr("r", BASE_RADIUS / transformK)
       .attr("fill", (d) => {
-        // Use originalIndex to get the correct color from pointColors array
-        const colorIndex = pointColors[d.originalIndex];
-        return colorIndex != null
-          ? palette[colorIndex % palette.length]
-          : UNPAINTED_COLOR;
+        const colorValue = pointColors[d.originalIndex];
+        return getPointColor(colorValue, d.originalIndex);
       });
 
     if (isAnimating) {
@@ -353,11 +396,8 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("cy", d => yScale(d.y))
       .attr("r", BASE_RADIUS / transformK)
       .attr("fill", (d) => {
-        // Use originalIndex to get the correct color from pointColors array
-        const colorIndex = pointColors[d.originalIndex];
-        return colorIndex != null
-          ? palette[colorIndex % palette.length]
-          : UNPAINTED_COLOR;
+        const colorValue = pointColors[d.originalIndex];
+        return getPointColor(colorValue, d.originalIndex);
       })
       .attr("opacity", 0.7);
 
@@ -669,13 +709,10 @@ export const D3Map: React.FC<D3MapProps> = ({
     // Update colors for all circles regardless of class
     containerRef.current.selectAll("circle")
       .attr("fill", (d: any) => {
-        // Use originalIndex to get the correct color from pointColors array
-        const colorIndex = pointColors[d.originalIndex];
-        return colorIndex != null
-          ? palette[colorIndex % palette.length]
-          : UNPAINTED_COLOR;
+        const colorValue = pointColors[d.originalIndex];
+        return getPointColor(colorValue, d.originalIndex);
       });
-  }, [pointColors, palette]);
+  }, [pointColors, palette, layerMode, getPointColor]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
     let inside = false;

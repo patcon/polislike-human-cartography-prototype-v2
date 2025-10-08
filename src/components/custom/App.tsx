@@ -8,7 +8,7 @@ import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
-import { getVotesForParticipants, initializeDuckDB } from "../../lib/duckdb";
+import { getVotesForParticipants, getVoteCountsForAllParticipants, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
 import {
@@ -52,8 +52,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Colors to front toggle state
   const colorsToFront = toggles.includes("colors-to-front");
 
-  // Layer mode: "groups" or "votes"
-  const [layerMode, setLayerMode] = React.useState<"groups" | "votes">("groups");
+  // Layer mode: "groups", "votes", or "metrics"
+  const [layerMode, setLayerMode] = React.useState<"groups" | "votes" | "metrics">("groups");
 
   // Statement ID for votes mode (user configurable)
   const [statementId, setStatementId] = React.useState("6");
@@ -66,6 +66,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   // array parallel to dataset: vote-based color indices (for votes mode)
   const [pointVotes, setPointVotes] = React.useState<(number | null)[]>([]);
+
+  // array parallel to dataset: metrics values 0-1 (for metrics mode)
+  const [pointMetrics, setPointMetrics] = React.useState<(number | null)[]>([]);
 
   // Debug mode state
   const debugMode = useDebugMode();
@@ -212,6 +215,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     if (dataset.length > 0) {
       setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
       setPointVotes(Array(dataset.length).fill(null));
+      setPointMetrics(Array(dataset.length).fill(null));
     }
   }, [dataset]);
 
@@ -250,6 +254,28 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
       loadVotes();
     }
   }, [layerMode, statementId, dataset, kedroBaseUrl, pipelineId]);
+
+  // Load metrics data when switching to metrics mode
+  React.useEffect(() => {
+    if (layerMode === "metrics" && dataset.length > 0) {
+      const loadMetrics = async () => {
+        try {
+          const voteCounts = await getVoteCountsForAllParticipants(kedroBaseUrl, pipelineId);
+
+          // Create metrics values array parallel to dataset
+          const newPointMetrics = dataset.map(([participantId]) => {
+            return voteCounts.get(participantId) ?? null;
+          });
+
+          setPointMetrics(newPointMetrics);
+        } catch (err) {
+          console.error('Error loading metrics:', err);
+        }
+      };
+
+      loadMetrics();
+    }
+  }, [layerMode, dataset, kedroBaseUrl, pipelineId]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
@@ -476,13 +502,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           <D3Map
             data={dataset}
             mode={mode}
-            pointColors={effectiveLayerMode === "votes" ? pointVotes : pointGroups}
+            pointColors={effectiveLayerMode === "votes" ? pointVotes :
+                        effectiveLayerMode === "metrics" ? pointMetrics : pointGroups}
             palette={effectiveLayerMode === "votes" ?
               (highlightPassVotes ?
                 [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass] :
                 [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
               ) :
               PALETTE_COLORS}
+            layerMode={effectiveLayerMode}
             onSelectionChange={handleSelectionChange}
             onQuickSelect={handleQuickSelect}
             onLassoStart={handleLassoStart}

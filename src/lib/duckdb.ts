@@ -322,6 +322,73 @@ export async function getParticipantDataForStatement(
 }
 
 /**
+ * Get vote counts for all participants (normalized 0-1 for metrics visualization)
+ * @param kedroBaseUrl - Optional Kedro base URL for API access
+ * @param pipelineId - Optional pipeline ID for Kedro API
+ * @returns Map of participant IDs to normalized vote counts (0-1)
+ */
+export async function getVoteCountsForAllParticipants(
+  kedroBaseUrl?: string,
+  pipelineId?: string
+): Promise<Map<string, number>> {
+  if (!conn) {
+    await initializeDuckDB();
+  }
+
+  try {
+    // Ensure votes table is loaded
+    await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
+
+    // Query to get vote counts per participant
+    const result = await conn!.query(`
+      SELECT
+        participant_id,
+        COUNT(*) as vote_count
+      FROM votes
+      WHERE vote IS NOT NULL
+      GROUP BY participant_id
+    `);
+
+    const voteCounts = new Map<string, number>();
+    let maxVoteCount = 0;
+
+    // First pass: collect all vote counts and find the maximum
+    for (let i = 0; i < result.numRows; i++) {
+      const participantId = result.getChild('participant_id')?.get(i)?.toString();
+      const rawVoteCount = result.getChild('vote_count')?.get(i);
+      
+      // Convert BigInt to number if needed
+      const voteCount = typeof rawVoteCount === 'bigint' ? Number(rawVoteCount) : rawVoteCount as number;
+
+      if (participantId !== undefined && voteCount !== undefined) {
+        voteCounts.set(participantId, voteCount);
+        maxVoteCount = Math.max(maxVoteCount, voteCount);
+      }
+    }
+
+    // Second pass: normalize vote counts to 0-1 range
+    const normalizedVoteCounts = new Map<string, number>();
+    if (maxVoteCount > 0) {
+      voteCounts.forEach((count, participantId) => {
+        normalizedVoteCounts.set(participantId, count / maxVoteCount);
+      });
+    }
+
+    console.log(`Calculated vote counts for ${normalizedVoteCounts.size} participants (max: ${maxVoteCount})`);
+    return normalizedVoteCounts;
+  } catch (error) {
+    console.error('Failed to get vote counts:', error);
+    // Return empty map instead of throwing in development
+    const isDev = import.meta.env.DEV;
+    if (isDev) {
+      console.warn('Returning empty vote counts map due to error in development environment');
+      return new Map<string, number>();
+    }
+    throw error;
+  }
+}
+
+/**
  * Close DuckDB connection and cleanup
  */
 export async function closeDuckDB(): Promise<void> {

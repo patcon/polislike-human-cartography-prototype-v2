@@ -18,8 +18,8 @@ import "./LayerConfigDrawer.css";
 import { SelectLayerButton } from "./SelectLayerButton";
 
   type LayerConfigDrawerProps = {
-    layerMode?: "groups" | "votes";
-    onLayerModeChange?: (mode: "groups" | "votes") => void;
+    layerMode?: "groups" | "votes" | "metrics";
+    onLayerModeChange?: (mode: "groups" | "votes" | "metrics") => void;
     statementId?: string;
     onStatementIdChange?: (statementId: string) => void;
     highlightPassVotes?: boolean;
@@ -38,7 +38,7 @@ import { SelectLayerButton } from "./SelectLayerButton";
     const [internalSelected, setInternalSelected] = React.useState<string>("groups");
     const selected = onLayerModeChange ? layerMode : internalSelected;
     const setSelected = (value: string) => {
-      if (onLayerModeChange && (value === "groups" || value === "votes")) {
+      if (onLayerModeChange && (value === "groups" || value === "votes" || value === "metrics")) {
         onLayerModeChange(value);
       } else {
         setInternalSelected(value);
@@ -97,7 +97,6 @@ import { SelectLayerButton } from "./SelectLayerButton";
                 icon={Ruler}
                 label="Metrics"
                 selected={selected === "metrics"}
-                disabled={true}
                 onClick={() => {
                   if (selected !== "metrics") setSelected("metrics");
                 }}

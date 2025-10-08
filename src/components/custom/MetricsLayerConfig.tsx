@@ -11,7 +11,7 @@ export function MetricsLayerConfig() {
   const [metric, setMetric] = React.useState("vote-count");
 
   // toggle group: always one selected
-  const [style, setStyle] = React.useState("opacity");
+  const [style, setStyle] = React.useState("color");
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -46,8 +46,8 @@ export function MetricsLayerConfig() {
           onValueChange={(v) => v && setStyle(v)} // don't allow unselect
           className="flex"
         >
-          <ToggleGroupItem value="opacity">Opacity</ToggleGroupItem>
-          <ToggleGroupItem value="color" disabled>
+          <ToggleGroupItem value="opacity" disabled>Opacity</ToggleGroupItem>
+          <ToggleGroupItem value="color">
             Color
           </ToggleGroupItem>
         </ToggleGroup>
