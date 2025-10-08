@@ -217,7 +217,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     ) => {
       const domain = inverse ? [1, 0] : [0, 1];
       const scale = d3.scaleSequential().domain(domain);
-      
+
       switch (scheme) {
         case "viridis":
           return scale.interpolator(d3.interpolateViridis);
@@ -232,17 +232,17 @@ export const D3Map: React.FC<D3MapProps> = ({
           return scale.interpolator(d3.interpolateHcl('gold', 'darkred'));
       }
     };
-    
+
     // Change these parameters to switch color schemes and/or reverse
     return createColorScale("plasma", true);
   }, []);
 
   // --- Color helper function ---
-  const getPointColor = React.useCallback((colorValue: number | null, originalIndex: number) => {
+  const getPointColor = React.useCallback((colorValue: number | null) => {
     if (colorValue == null) {
       return UNPAINTED_COLOR;
     }
-    
+
     if (layerMode === "metrics") {
       // For metrics mode, treat colorValue as 0-1 and use custom color scale
       return metricsColorScale(colorValue);
@@ -371,7 +371,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("r", BASE_RADIUS / transformK)
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
-        return getPointColor(colorValue, d.originalIndex);
+        return getPointColor(colorValue);
       });
 
     if (isAnimating) {
@@ -397,7 +397,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("r", BASE_RADIUS / transformK)
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
-        return getPointColor(colorValue, d.originalIndex);
+        return getPointColor(colorValue);
       })
       .attr("opacity", 0.7);
 
@@ -710,7 +710,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     containerRef.current.selectAll("circle")
       .attr("fill", (d: any) => {
         const colorValue = pointColors[d.originalIndex];
-        return getPointColor(colorValue, d.originalIndex);
+        return getPointColor(colorValue);
       });
   }, [pointColors, palette, layerMode, getPointColor]);
 

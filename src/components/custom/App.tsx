@@ -8,7 +8,7 @@ import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
-import { getVotesForParticipants, getVoteCountsForAllParticipants, initializeDuckDB } from "../../lib/duckdb";
+import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
 import {
@@ -260,7 +260,22 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     if (layerMode === "metrics" && dataset.length > 0) {
       const loadMetrics = async () => {
         try {
-          const voteCounts = await getVoteCountsForAllParticipants(kedroBaseUrl, pipelineId);
+          // Toggle to exclude moderated statements (set to true to enable filtering)
+          const EXCLUDE_MODERATED_STATEMENTS = true;
+
+          let statementIds: string[] | undefined;
+
+          if (EXCLUDE_MODERATED_STATEMENTS && statements.length > 0) {
+            // Filter out moderated statements
+            statementIds = getNonModeratedStatementIds(statements);
+            console.log(`Filtering to ${statementIds?.length || 0} non-moderated statements out of ${statements.length} total`);
+          }
+
+          const voteCounts = await getVoteCountsForAllParticipants({
+            kedroBaseUrl,
+            pipelineId,
+            statementIds
+          });
 
           // Create metrics values array parallel to dataset
           const newPointMetrics = dataset.map(([participantId]) => {
@@ -275,7 +290,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, pipelineId]);
+  }, [layerMode, dataset, kedroBaseUrl, pipelineId, statements]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 

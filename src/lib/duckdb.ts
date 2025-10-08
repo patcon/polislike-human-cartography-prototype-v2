@@ -323,14 +323,26 @@ export async function getParticipantDataForStatement(
 
 /**
  * Get vote counts for all participants (normalized 0-1 for metrics visualization)
- * @param kedroBaseUrl - Optional Kedro base URL for API access
- * @param pipelineId - Optional pipeline ID for Kedro API
+ *
+ * Note: When statementIds filter is applied, normalization is based on the maximum
+ * vote count within the filtered set of statements, not the original total.
+ * This means the metric represents participation rate within the available statements.
+ *
+ * @param options - Configuration options
+ * @param options.kedroBaseUrl - Optional Kedro base URL for API access
+ * @param options.pipelineId - Optional pipeline ID for Kedro API
+ * @param options.statementIds - Optional array of statement IDs to filter by
  * @returns Map of participant IDs to normalized vote counts (0-1)
  */
 export async function getVoteCountsForAllParticipants(
-  kedroBaseUrl?: string,
-  pipelineId?: string
+  options: {
+    kedroBaseUrl?: string;
+    pipelineId?: string;
+    statementIds?: string[];
+  } = {}
 ): Promise<Map<string, number>> {
+  const { kedroBaseUrl, pipelineId, statementIds } = options;
+
   if (!conn) {
     await initializeDuckDB();
   }
@@ -339,13 +351,24 @@ export async function getVoteCountsForAllParticipants(
     // Ensure votes table is loaded
     await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
 
+    // Build WHERE clause conditions
+    const conditions = ['vote IS NOT NULL'];
+
+    // Add statement ID filter if provided
+    if (statementIds && statementIds.length > 0) {
+      const statementIdList = statementIds.map(id => `'${id}'`).join(',');
+      conditions.push(`comment_id IN (${statementIdList})`);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
     // Query to get vote counts per participant
     const result = await conn!.query(`
       SELECT
         participant_id,
         COUNT(*) as vote_count
       FROM votes
-      WHERE vote IS NOT NULL
+      WHERE ${whereClause}
       GROUP BY participant_id
     `);
 
@@ -356,7 +379,7 @@ export async function getVoteCountsForAllParticipants(
     for (let i = 0; i < result.numRows; i++) {
       const participantId = result.getChild('participant_id')?.get(i)?.toString();
       const rawVoteCount = result.getChild('vote_count')?.get(i);
-      
+
       // Convert BigInt to number if needed
       const voteCount = typeof rawVoteCount === 'bigint' ? Number(rawVoteCount) : rawVoteCount as number;
 
@@ -374,7 +397,8 @@ export async function getVoteCountsForAllParticipants(
       });
     }
 
-    console.log(`Calculated vote counts for ${normalizedVoteCounts.size} participants (max: ${maxVoteCount})`);
+    const filterInfo = statementIds ? `${statementIds.length} statements` : 'all statements';
+    console.log(`Calculated vote counts for ${normalizedVoteCounts.size} participants (max: ${maxVoteCount}) from ${filterInfo}`);
     return normalizedVoteCounts;
   } catch (error) {
     console.error('Failed to get vote counts:', error);
@@ -386,6 +410,17 @@ export async function getVoteCountsForAllParticipants(
     }
     throw error;
   }
+}
+
+/**
+ * Helper function to filter non-moderated statement IDs from statements array
+ * @param statements - Array of statement objects with statement_id and moderated fields
+ * @returns Array of statement IDs where moderated !== -1
+ */
+export function getNonModeratedStatementIds(statements: Array<{ statement_id: string | number; moderated: number }>): string[] {
+  return statements
+    .filter(statement => statement.moderated !== -1)
+    .map(statement => String(statement.statement_id));
 }
 
 /**
