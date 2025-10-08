@@ -399,7 +399,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", 0.7);
+      .attr("opacity", 0.9);
 
     // EXIT
     circles.exit().remove();
