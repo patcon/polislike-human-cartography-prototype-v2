@@ -71,13 +71,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const debugMode = useDebugMode();
 
   // Shift key temporary mode switching
-  const { isShiftPressed, effectiveMode } = useShiftKeyTempMode({
+  const { effectiveMode } = useShiftKeyTempMode({
     currentMode: action,
     onModeChange: setAction
   });
 
   // Layer mode cycling for painting in non-group modes
-  const { effectiveLayerMode, isCycling, cycleOpacity, startCycle, stopCycle } = useLayerModeCycling({
+  const { effectiveLayerMode, cycleOpacity, startCycle, stopCycle } = useLayerModeCycling({
     currentLayerMode: layerMode,
   });
 

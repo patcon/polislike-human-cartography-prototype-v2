@@ -135,7 +135,6 @@ export function MapOverlay({
           onStatementIdChange={onStatementIdChange}
           highlightPassVotes={highlightPassVotes}
           onHighlightPassVotesChange={onHighlightPassVotesChange}
-          onActionChange={handleActionChange}
         />
         <StatementExplorerDrawer
           statements={statements}
