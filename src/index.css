@@ -10,6 +10,12 @@ label[for] {
   cursor: pointer;
 }
 
+/* Loading cursor for blocking operations */
+.cursor-wait,
+.cursor-wait * {
+  cursor: wait !important;
+}
+
 @import "tailwindcss";
 @import "tw-animate-css";
 

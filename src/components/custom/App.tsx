@@ -495,7 +495,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
   return (
     <div
-      className="relative h-screen w-screen"
+      className={`relative h-screen w-screen ${isCalculatingRepStatements ? 'cursor-wait' : ''}`}
       /**
        * Prevent Google Translate from modifying DOM during animations
        * which causes React "removeChild" errors when animating SVG elements
