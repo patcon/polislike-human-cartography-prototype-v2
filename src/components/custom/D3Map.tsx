@@ -581,9 +581,6 @@ export const D3Map: React.FC<D3MapProps> = ({
           return;
         }
 
-        // Trigger layer mode cycling when lasso starts
-        onLassoStart?.();
-
         lassoStateRef.current.coords = [];
         if (lassoStateRef.current.path) lassoStateRef.current.path.remove();
         lassoStateRef.current.path = svg.append("path")
@@ -600,6 +597,12 @@ export const D3Map: React.FC<D3MapProps> = ({
           cleanupLasso(true); // End cycling on multi-touch
           return;
         }
+
+        // Trigger layer mode cycling when we get the first drag event (lasso is actually happening)
+        if (lassoStateRef.current.coords.length === 0) {
+          onLassoStart?.();
+        }
+
         lassoStateRef.current.coords.push([event.x, event.y]);
         if (lassoStateRef.current.path) {
           lassoStateRef.current.path.attr("d", d3.line()(lassoStateRef.current.coords));
