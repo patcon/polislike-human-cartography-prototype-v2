@@ -324,12 +324,20 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
 
-  // Handle lasso start - trigger cycling if in non-group mode and paint mode
+  // Detect if we're on a mobile device
+  const isMobile = React.useMemo(() => {
+    // Check for touch capability and mobile user agents
+    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return hasTouchScreen && (isMobileUserAgent || window.innerWidth <= 768);
+  }, []);
+
+  // Handle lasso start - trigger cycling if in non-group mode and paint mode (but not on mobile)
   const handleLassoStart = React.useCallback(() => {
-    if (effectiveMode === "paint-groups" && layerMode !== "groups") {
+    if (effectiveMode === "paint-groups" && layerMode !== "groups" && !isMobile) {
       startCycle();
     }
-  }, [effectiveMode, layerMode, startCycle]);
+  }, [effectiveMode, layerMode, startCycle, isMobile]);
 
   // Handle lasso end - stop cycling
   const handleLassoEnd = React.useCallback(() => {

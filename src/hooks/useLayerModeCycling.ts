@@ -135,7 +135,7 @@ export function useLayerModeCycling({
     setEffectiveLayerMode(currentLayerMode);
     setCycleOpacity(1);
     setIsCycling(false);
-  }, [currentLayerMode, isCycling]);
+  }, [currentLayerMode]);
 
   // Cleanup on unmount
   useEffect(() => {
