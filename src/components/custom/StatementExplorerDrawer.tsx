@@ -19,7 +19,7 @@ import { X } from "lucide-react";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import { useGoogleTranslateRefresh } from "@/hooks/useGoogleTranslateRefresh";
 import type { GroupVoteData } from "./GroupVoteComparisonWidget";
-import { calculateStatementVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
+import { calculateStatementVoteStats, type StatementVoteStats } from "@/lib/vote-stats";
 
 export type Statement = {
   statement_id: number;
@@ -69,6 +69,10 @@ type StatementExplorerDrawerProps = {
   // Debug mode props
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
+  
+  // Kedro configuration props
+  kedroBaseUrl?: string;
+  pipelineId?: string;
 };
 
 export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = ({
@@ -96,6 +100,10 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Debug mode props
   debugMode = false,
   dataset = [],
+  
+  // Kedro configuration props
+  kedroBaseUrl,
+  pipelineId,
 }) => {
   const [internalOpen, setInternalOpen] = React.useState<boolean>(defaultOpen);
   const [internalTab, setInternalTab] = React.useState<string>(defaultTab);
@@ -124,7 +132,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
 
   // Vote stats state - managed locally in StatementExplorerDrawer
   // Only calculated for statements in group tabs and consensus tab, not for "All" tab
-  const [voteStats, setVoteStats] = React.useState<Record<number, StatementDebugStats>>({});
+  const [voteStats, setVoteStats] = React.useState<Record<number, StatementVoteStats>>({});
   const [loadingVoteStats, setLoadingVoteStats] = React.useState<Set<number>>(new Set());
 
   // Calculate vote stats for specific statements when needed (lazy loading)
@@ -145,7 +153,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
         return;
       }
 
-      const newStats: Record<number, StatementDebugStats> = {};
+      const newStats: Record<number, StatementVoteStats> = {};
 
       // Calculate stats only for requested statements
       for (const statementId of statementIds) {
@@ -155,6 +163,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
             dataset,
             pointGroups,
             activeColors,
+            kedroBaseUrl,
+            pipelineId
           );
           newStats[statementId] = stats;
         } catch (error) {
@@ -323,7 +333,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   };
 
   // Convert vote stats to GroupVoteData format for widgets (only when needed)
-  const convertVoteStatsToGroupVoteData = React.useCallback((statsData: Record<number, StatementDebugStats>): Record<number, GroupVoteData[]> => {
+  const convertVoteStatsToGroupVoteData = React.useCallback((statsData: Record<number, StatementVoteStats>): Record<number, GroupVoteData[]> => {
     const groupVoteData: Record<number, GroupVoteData[]> = {};
 
     if (!statsData || !dataset.length || !pointGroups.length || sortedColors.length < 2) {

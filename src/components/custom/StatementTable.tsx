@@ -5,7 +5,7 @@ import type { Statement } from "./StatementExplorerDrawer";
 import { GroupVoteComparisonWidget, type GroupVoteData } from "./GroupVoteComparisonWidget";
 import { MissingVotesToggleButton } from "./MissingVotesToggleButton";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
-import { formatDebugVoteStats, type StatementDebugStats } from "@/lib/debug-vote-stats";
+import { formatVoteStats, type StatementVoteStats } from "@/lib/vote-stats";
 
 type StatementTableProps = {
   statements: Statement[];
@@ -28,7 +28,7 @@ type StatementTableProps = {
   activeColors?: number[];
 
   // Vote stats props (calculated at App level)
-  voteStats?: Record<number, StatementDebugStats>;
+  voteStats?: Record<number, StatementVoteStats>;
   loadingVoteStats?: Set<number>;
   setLoadingVoteStats?: React.Dispatch<React.SetStateAction<Set<number>>>;
   calculateVoteStatsForStatements?: (statementIds: number[]) => Promise<void>;
@@ -209,7 +209,7 @@ export const StatementTable: React.FC<StatementTableProps> = ({
                       <div className="space-y-1">
                         {Object.entries(voteStats[s.statement_id]).map(([groupIndex, stats]) => (
                           <div key={groupIndex} className="text-xs text-gray-500 opacity-60">
-                            Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatDebugVoteStats(stats)}
+                            Group {groupIndex === '-1' ? 'X' : String.fromCharCode(65 + parseInt(groupIndex))}: {formatVoteStats(stats)}
                           </div>
                         ))}
                       </div>

@@ -1,13 +1,13 @@
 import { getVotesForParticipants } from './duckdb';
 
-export type DebugVoteStats = {
+export type VoteStats = {
   agree: number;
   disagree: number;
   pass: number;
   total: number;
 };
 
-export type StatementDebugStats = Record<number, DebugVoteStats>; // groupIndex -> stats
+export type StatementVoteStats = Record<number, VoteStats>; // groupIndex -> stats
 
 /**
  * Calculate vote statistics for a statement across all groups
@@ -19,7 +19,7 @@ export async function calculateStatementVoteStats(
   activeColors: number[],
   kedroBaseUrl?: string,
   pipelineId?: string
-): Promise<StatementDebugStats> {
+): Promise<StatementVoteStats> {
   try {
     // Get all participant IDs from dataset
     const participantIds = dataset.map(([id]) => id);
@@ -33,7 +33,7 @@ export async function calculateStatementVoteStats(
     );
 
     // Initialize stats for each active group
-    const stats: StatementDebugStats = {};
+    const stats: StatementVoteStats = {};
     activeColors.forEach(groupIndex => {
       stats[groupIndex] = {
         agree: 0,
@@ -77,7 +77,7 @@ export async function calculateStatementVoteStats(
   } catch (error) {
     console.error(`Error calculating vote stats for statement ${statementId}:`, error);
     // Return empty stats on error
-    const emptyStats: StatementDebugStats = {};
+    const emptyStats: StatementVoteStats = {};
     activeColors.forEach(groupIndex => {
       emptyStats[groupIndex] = {
         agree: 0,
@@ -91,8 +91,8 @@ export async function calculateStatementVoteStats(
 }
 
 /**
- * Format debug vote stats for display
+ * Format vote stats for display
  */
-export function formatDebugVoteStats(stats: DebugVoteStats): string {
+export function formatVoteStats(stats: VoteStats): string {
   return `Agree: ${stats.agree}, Disagree: ${stats.disagree}, Pass: ${stats.pass}, Total: ${stats.total}`;
 }
