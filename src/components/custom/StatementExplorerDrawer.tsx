@@ -69,7 +69,7 @@ type StatementExplorerDrawerProps = {
   // Debug mode props
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
-  
+
   // Kedro configuration props
   kedroBaseUrl?: string;
   pipelineId?: string;
@@ -100,7 +100,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Debug mode props
   debugMode = false,
   dataset = [],
-  
+
   // Kedro configuration props
   kedroBaseUrl,
   pipelineId,

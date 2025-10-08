@@ -388,22 +388,32 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // update both selectedIds and pointGroups when selection changes (painting allowed in all modes)
   function handleSelectionChange(ids: (number | string)[]) {
     setSelectedIds(ids as number[]);
+
+    // Skip processing if no points are selected
+    if (ids.length === 0) {
+      return;
+    }
+
     // Always allow painting - the cycling will show the groups layer when needed
     setPointGroups((prev) => {
       const next = [...prev];
+      let hasChanges = false;
+
       ids.forEach((id) => {
         // find index of this id in dataset using helper function
         const idx = findDatasetIndex(dataset, id);
-        if (idx !== -1) {
+        if (idx !== -1 && next[idx] !== colorIndex) {
           next[idx] = colorIndex;
+          hasChanges = true;
         }
       });
 
-      // Always trigger representative statements calculation when groups change
-      // This ensures vote stats are recalculated even when painting in votes mode
-      setTimeout(() => {
-        calculateRepStatements(next);
-      }, 50);
+      // Only trigger representative statements calculation when actual changes were made
+      if (hasChanges) {
+        setTimeout(() => {
+          calculateRepStatements(next);
+        }, 50);
+      }
 
       return next;
     });
