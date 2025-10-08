@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { PALETTE_COLORS, UNPAINTED_COLOR } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import {
   Select,
@@ -237,8 +237,9 @@ export const D3Map: React.FC<D3MapProps> = ({
       points = [...points].sort((a, b) => {
         const aColorIndex = pointColors[a.originalIndex];
         const bColorIndex = pointColors[b.originalIndex];
-        const aIsColored = aColorIndex != null;
-        const bIsColored = bColorIndex != null;
+        // Handle both null (votes mode) and UNPAINTED_VALUE (groups mode) as unpainted
+        const aIsColored = aColorIndex != null && aColorIndex !== UNPAINTED_VALUE;
+        const bIsColored = bColorIndex != null && bColorIndex !== UNPAINTED_VALUE;
 
         // If both are colored or both are uncolored, maintain original order
         if (aIsColored === bIsColored) {
