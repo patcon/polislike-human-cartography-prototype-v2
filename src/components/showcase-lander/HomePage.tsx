@@ -12,6 +12,13 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { conversations, loading, error } = useConversations();
 
+  const scrollToConversations = () => {
+    const conversationSection = document.querySelector('.conversation-showcase-section');
+    if (conversationSection) {
+      conversationSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -61,16 +68,28 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   <span>Explore voting patterns</span>
                 </div>
               </div>
-              <Button
-                className="w-full group-hover:bg-blue-600 transition-colors mt-auto"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNavigate('perspective-explorer');
-                }}
-              >
-                Launch Explorer
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              <div className="space-y-2 mt-auto">
+                <Button
+                  className="w-full group-hover:bg-blue-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigate('perspective-explorer');
+                  }}
+                >
+                  Launch Explorer
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scrollToConversations();
+                  }}
+                >
+                  View More Conversations
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -123,7 +142,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Conversation Showcase Section */}
-        <div className="mt-20 max-w-6xl mx-auto">
+        <div className="mt-20 max-w-6xl mx-auto conversation-showcase-section">
           <ConversationListing
             conversations={conversations}
             loading={loading}
