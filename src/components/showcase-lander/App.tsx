@@ -40,6 +40,8 @@ const App: React.FC = () => {
 
   const handleBackToHome = () => {
     setCurrentPage('home');
+    // Clear the URL hash when returning to home
+    window.location.hash = '';
   };
 
   // Render the appropriate component based on current page
