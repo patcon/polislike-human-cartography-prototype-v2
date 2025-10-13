@@ -17,7 +17,7 @@ This guide provides comprehensive testing strategies for the D3Map component to 
 Basic rendering and prop handling tests that ensure the component doesn't crash:
 
 ```bash
-npm run test:run -- src/components/custom/D3Map.smoke.test.tsx
+npm run test:run -- src/components/convo-explorer/D3Map.smoke.test.tsx
 ```
 
 **What it tests:**
@@ -78,9 +78,9 @@ Must Perform each in BOTH mobile and desktop mode.
 1. Start in paint mode
 2. Click on an UNpainted point (quick select)
 3. Switch to move mode
-2. Click on an UNpainted point (quick select)
-3. Switch back to paint mode
-7. Try to paint (drag to create lasso selection)
+4. Click on an UNpainted point (quick select)
+5. Switch back to paint mode
+6. Try to paint (drag to create lasso selection)
 
 **Expected:** Paint tool works normally after quick select on unpainted group.
 

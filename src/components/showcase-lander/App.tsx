@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './HomePage';
-import ParameterExplorerApp from './ParameterExplorerApp';
-import { App as PerspectiveMapApp } from './components/custom/App';
+import ParameterExplorerApp from '@/components/param-explorer/ParameterExplorerApp';
+import { App as PerspectiveMapApp } from '@/components/convo-explorer/App';
 import { Button } from '@/components/ui/button';
 import { Home, ArrowLeft } from 'lucide-react';
 
