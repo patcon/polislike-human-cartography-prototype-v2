@@ -2,12 +2,16 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Settings, Map, ArrowRight } from 'lucide-react';
+import { ConversationListing } from './ConversationListing';
+import { useConversations } from './useConversations';
 
 interface HomePageProps {
   onNavigate: (page: 'parameter-explorer' | 'perspective-explorer') => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+  const { conversations, loading, error } = useConversations();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -118,10 +122,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           </Card>
         </div>
 
+        {/* Conversation Showcase Section */}
+        <div className="mt-20 max-w-6xl mx-auto">
+          <ConversationListing
+            conversations={conversations}
+            loading={loading}
+            error={error}
+          />
+        </div>
+
         {/* Footer */}
         <div className="text-center mt-16 pb-8">
           <p className="text-sm text-slate-500">
-            Choose a tool above to begin exploring your conversation data
+            Choose a tool above to begin exploring your conversation data, or browse the showcase below
           </p>
         </div>
       </div>
