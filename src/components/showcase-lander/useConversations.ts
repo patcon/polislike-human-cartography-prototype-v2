@@ -21,26 +21,13 @@ function parseCSV(csvText: string): Conversation[] {
   const headers = headerLine.split(',').map(header => header.trim().replace(/\r/g, ''));
 
   return lines.slice(1).map(line => {
-    // Since we know there are 9 columns, we'll split on comma but only take the first 8 splits
-    // The last field (advanced_explorer_url) gets everything remaining
-    const parts = line.split(',');
-    const values: string[] = [];
-
-    // Take the first 8 fields as-is
-    for (let i = 0; i < 8 && i < parts.length; i++) {
-      values.push(parts[i]);
-    }
-
-    // Join the remaining parts for the last field (advanced_explorer_url)
-    if (parts.length > 8) {
-      values.push(parts.slice(8).join(','));
-    } else {
-      values.push('');
-    }
+    // Simple comma-separated parsing - split by comma and map to headers
+    const values = line.split(',').map(value => value.trim().replace(/\r/g, ''));
 
     const conversation: any = {};
     headers.forEach((header, index) => {
-      conversation[header] = (values[index] || '').trim();
+      // Use the value at the corresponding index, or empty string if not present
+      conversation[header] = values[index] || '';
     });
 
     return conversation as Conversation;
