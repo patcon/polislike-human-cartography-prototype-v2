@@ -74,7 +74,7 @@ export const ConversationListing: React.FC<ConversationListingProps> = ({
               {/* Subtle overlay for better text readability if needed */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
-            
+
             <CardHeader className="pb-4">
               <div className="mb-2">
                 <CardTitle className="text-lg text-slate-800 leading-tight">
@@ -99,7 +99,7 @@ export const ConversationListing: React.FC<ConversationListingProps> = ({
                 </CardDescription>
               )}
             </CardHeader>
-            
+
             <CardContent className="flex flex-col flex-1">
               <div className="space-y-4 flex-1">
                 {/* Explorer Actions */}
