@@ -9,6 +9,7 @@ export interface Conversation {
   pipeline_viz_url: string;
   simple_explorer_url: string;
   advanced_explorer_url: string;
+  show_on_website?: string;
 }
 
 export interface ConversationListingProps {

@@ -53,7 +53,12 @@ export function useConversations() {
         const csvText = await response.text();
         const parsedConversations = parseCSV(csvText);
 
-        setConversations(parsedConversations);
+        // Filter conversations to only show those with a non-empty show_on_website value
+        const filteredConversations = parsedConversations.filter(conversation =>
+          conversation.show_on_website && conversation.show_on_website.trim() !== ''
+        );
+
+        setConversations(filteredConversations);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
       } finally {
