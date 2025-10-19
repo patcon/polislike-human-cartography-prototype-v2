@@ -16,14 +16,13 @@ type Point = {
   originalY: number;
 };
 
-type RoutingAlgorithm = "mst-path" | "greedy-neighbor" | "astar-mst";
+type RoutingAlgorithm = "bfs-path" | "dijkstra";
 
 type NetworkType = "mst" | "knn" | "delaunay" | "geometric";
 
 const ROUTING_ALGORITHMS = [
-  { id: "mst-path", name: "MST Path" },
-  { id: "greedy-neighbor", name: "Greedy Neighbor Hopping" },
-  { id: "astar-mst", name: "A* Optimal MST" }
+  { id: "bfs-path", name: "BFS Minimum Hops" },
+  { id: "dijkstra", name: "Dijkstra Shortest Path" }
 ] as const;
 
 const NETWORK_TYPES = [
@@ -224,161 +223,107 @@ const buildGraph = (edges: Edge[]): Map<string, Point[]> => {
   return graph;
 };
 
-// Legacy function for backward compatibility
-const buildMSTGraph = (edges: Edge[]): Map<string, Point[]> => {
-  return buildGraph(edges);
-};
 
-// Dijkstra's algorithm for shortest path through points
-const findDijkstraPath = (source: Point, destination: Point, allPoints: Point[]): Point[] => {
+
+// Dijkstra's algorithm that works with any network graph
+const findDijkstraNetworkPath = (source: Point, destination: Point, networkGraph: Map<string, Point[]>): Point[] => {
+  console.log(`🔍 Starting Dijkstra path from ${source.id} to ${destination.id}`);
+  console.log(`📊 Network graph has ${networkGraph.size} nodes`);
+
+  // Create a lookup map for all points by ID
+  const pointLookup = new Map<string, Point>();
+  pointLookup.set(source.id, source);
+  pointLookup.set(destination.id, destination);
+
+  for (const neighbors of networkGraph.values()) {
+    for (const point of neighbors) {
+      pointLookup.set(point.id, point);
+    }
+  }
+
   const distances = new Map<string, number>();
   const previous = new Map<string, Point | null>();
   const unvisited = new Set<string>();
 
-  // Initialize distances
-  allPoints.forEach(point => {
-    distances.set(point.id, point.id === source.id ? 0 : Infinity);
-    previous.set(point.id, null);
-    unvisited.add(point.id);
-  });
+  // Initialize distances - only for nodes that exist in the network graph
+  for (const nodeId of networkGraph.keys()) {
+    distances.set(nodeId, nodeId === source.id ? 0 : Infinity);
+    previous.set(nodeId, null);
+    unvisited.add(nodeId);
+  }
+
+  // If source or destination not in network, return direct path
+  if (!networkGraph.has(source.id) || !networkGraph.has(destination.id)) {
+    console.log(`❌ Source or destination not in network graph`);
+    return [source, destination];
+  }
 
   while (unvisited.size > 0) {
     // Find unvisited node with minimum distance
-    let current: Point | null = null;
+    let current: string | null = null;
     let minDistance = Infinity;
 
-    for (const pointId of unvisited) {
-      const distance = distances.get(pointId)!;
+    for (const nodeId of unvisited) {
+      const distance = distances.get(nodeId)!;
       if (distance < minDistance) {
         minDistance = distance;
-        current = allPoints.find(p => p.id === pointId)!;
+        current = nodeId;
       }
     }
 
-    if (!current || minDistance === Infinity) break;
+    if (!current || minDistance === Infinity) {
+      console.log(`❌ No path found - disconnected graph`);
+      break;
+    }
 
-    unvisited.delete(current.id);
+    unvisited.delete(current);
 
     // If we reached the destination, reconstruct path
-    if (current.id === destination.id) {
+    if (current === destination.id) {
+      console.log(`🎯 Found path to destination!`);
       const path: Point[] = [];
-      let node: Point | null = current;
-      while (node) {
-        path.unshift(node);
-        node = previous.get(node.id)!;
+      let nodeId: string | null = current;
+
+      while (nodeId) {
+        const point = pointLookup.get(nodeId);
+        if (point) path.unshift(point);
+
+        const prevPoint = previous.get(nodeId);
+        nodeId = prevPoint?.id || null;
       }
+
+      console.log(`🏁 Dijkstra path:`, path.map(p => p.id));
       return path;
     }
 
-    // Check neighbors (nearby points)
-    const neighbors = findKNearestNeighbors(current, allPoints, 8);
+    // Check all neighbors of current node
+    const neighbors = networkGraph.get(current) || [];
+    console.log(`🔄 Processing ${current} with ${neighbors.length} neighbors`);
+
+    const currentPoint = pointLookup.get(current);
+    if (!currentPoint) continue;
 
     for (const neighbor of neighbors) {
       if (!unvisited.has(neighbor.id)) continue;
 
-      const distance = distances.get(current.id)! + euclideanDistance(current, neighbor);
+      const edgeWeight = euclideanDistance(currentPoint, neighbor);
+      const newDistance = distances.get(current)! + edgeWeight;
 
-      if (distance < distances.get(neighbor.id)!) {
-        distances.set(neighbor.id, distance);
-        previous.set(neighbor.id, current);
+      if (newDistance < distances.get(neighbor.id)!) {
+        distances.set(neighbor.id, newDistance);
+        previous.set(neighbor.id, currentPoint);
       }
     }
   }
 
-  // If no path found, return direct path
+  // If no path found through network, return direct path
+  console.log(`❌ No network path found, using direct path`);
   return [source, destination];
 };
 
-// Greedy nearest neighbor path that respects the network graph
-const findGreedyPath = (source: Point, destination: Point, networkGraph: Map<string, Point[]>, maxHops: number = 5): Point[] => {
-  const path: Point[] = [source];
-  let current = source;
 
-  for (let hop = 0; hop < maxHops && current.id !== destination.id; hop++) {
-    // Get neighbors from the network graph instead of k-nearest neighbors
-    const neighbors = networkGraph.get(current.id) || [];
-
-    // Find the neighbor that gets us closest to destination
-    let bestNeighbor: Point | null = null;
-    let bestScore = Infinity;
-
-    for (const neighbor of neighbors) {
-      // Skip if already in path
-      if (path.some(p => p.id === neighbor.id)) continue;
-
-      const distToDestination = euclideanDistance(neighbor, destination);
-      const distFromCurrent = euclideanDistance(current, neighbor);
-
-      // Score combines distance to destination and distance from current
-      const score = distToDestination + distFromCurrent * 0.1;
-
-      if (score < bestScore) {
-        bestScore = score;
-        bestNeighbor = neighbor;
-      }
-    }
-
-    if (bestNeighbor) {
-      path.push(bestNeighbor);
-      current = bestNeighbor;
-    } else {
-      break;
-    }
-  }
-
-  // Always end with destination
-  if (current.id !== destination.id) {
-    path.push(destination);
-  }
-
-  return path;
-};
-
-// Random walk path
-const findRandomWalkPath = (source: Point, destination: Point, allPoints: Point[], steps: number = 4): Point[] => {
-  const path: Point[] = [source];
-  let current = source;
-
-  for (let i = 0; i < steps && current.id !== destination.id; i++) {
-    const neighbors = findKNearestNeighbors(current, allPoints, 6);
-
-    // Filter out points already in path
-    const availableNeighbors = neighbors.filter(n => !path.some(p => p.id === n.id));
-
-    if (availableNeighbors.length > 0) {
-      // Bias towards destination but add some randomness
-      const weights = availableNeighbors.map(neighbor => {
-        const distToDestination = euclideanDistance(neighbor, destination);
-        const maxDist = Math.max(...availableNeighbors.map(n => euclideanDistance(n, destination)));
-        return maxDist - distToDestination + Math.random() * maxDist * 0.3;
-      });
-
-      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-      let random = Math.random() * totalWeight;
-
-      for (let j = 0; j < availableNeighbors.length; j++) {
-        random -= weights[j];
-        if (random <= 0) {
-          current = availableNeighbors[j];
-          path.push(current);
-          break;
-        }
-      }
-    } else {
-      break;
-    }
-  }
-
-  // Always end with destination
-  if (current.id !== destination.id) {
-    path.push(destination);
-  }
-
-  return path;
-};
-
-// Find path along MST using BFS
-const findMSTPath = (source: Point, destination: Point, mstGraph: Map<string, Point[]>): Point[] => {
+// Find path with minimum hops using BFS (works with any network graph)
+const findBFSPath = (source: Point, destination: Point, networkGraph: Map<string, Point[]>): Point[] => {
   const queue: Point[] = [source];
   const visited = new Set<string>([source.id]);
   const parent = new Map<string, Point | null>();
@@ -398,7 +343,7 @@ const findMSTPath = (source: Point, destination: Point, mstGraph: Map<string, Po
       return path;
     }
 
-    const neighbors = mstGraph.get(current.id) || [];
+    const neighbors = networkGraph.get(current.id) || [];
     for (const neighbor of neighbors) {
       if (!visited.has(neighbor.id)) {
         visited.add(neighbor.id);
@@ -412,20 +357,12 @@ const findMSTPath = (source: Point, destination: Point, mstGraph: Map<string, Po
   return [source, destination];
 };
 
-// Simplified A* algorithm along MST edges (much faster)
-const findAStarMSTPath = (source: Point, destination: Point, mstGraph: Map<string, Point[]>): Point[] => {
-  // For now, just use BFS since A* was freezing - the MST is already optimal
-  // In a tree structure, there's only one path between any two nodes anyway
-  return findMSTPath(source, destination, mstGraph);
-};
 
 // Routing algorithm implementations
 const generatePath = (
   source: Point,
   destination: Point,
   algorithm: RoutingAlgorithm,
-  allPoints: Point[],
-  mstEdges: Edge[],
   networkGraph: Map<string, Point[]>,
   xScale: d3.ScaleLinear<number, number>,
   yScale: d3.ScaleLinear<number, number>,
@@ -434,21 +371,17 @@ const generatePath = (
   let pathPoints: Point[] = [];
 
   switch (algorithm) {
-    case "mst-path":
-      pathPoints = findMSTPath(source, destination, networkGraph);
+    case "bfs-path":
+      pathPoints = findBFSPath(source, destination, networkGraph);
       break;
 
-    case "greedy-neighbor":
-      // Greedy neighbor hopping that respects the selected network graph
-      pathPoints = findGreedyPath(source, destination, networkGraph, 4);
-      break;
-
-    case "astar-mst":
-      pathPoints = findAStarMSTPath(source, destination, networkGraph);
+    case "dijkstra":
+      // Dijkstra's algorithm that respects the selected network graph
+      pathPoints = findDijkstraNetworkPath(source, destination, networkGraph);
       break;
 
     default:
-      pathPoints = findMSTPath(source, destination, networkGraph);
+      pathPoints = findBFSPath(source, destination, networkGraph);
   }
 
   // Convert points to SVG path
@@ -506,7 +439,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [data, setData] = React.useState<Point[]>([]);
   const [sourcePoint, setSourcePoint] = React.useState<Point | null>(null);
   const [destinationPoint, setDestinationPoint] = React.useState<Point | null>(null);
-  const [selectedAlgorithm, setSelectedAlgorithm] = React.useState<RoutingAlgorithm>("mst-path");
+  const [selectedAlgorithm, setSelectedAlgorithm] = React.useState<RoutingAlgorithm>("bfs-path");
   const [selectedNetworkType, setSelectedNetworkType] = React.useState<NetworkType>("mst");
   const [knnK, setKnnK] = React.useState(6);
   const [geometricRadius, setGeometricRadius] = React.useState(0.1);
@@ -790,22 +723,19 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     let calculatedPathPoints: Point[] = [];
 
     switch (selectedAlgorithm) {
-      case "mst-path":
-        calculatedPathPoints = findMSTPath(sourcePoint, destinationPoint, networkGraph);
+      case "bfs-path":
+        calculatedPathPoints = findBFSPath(sourcePoint, destinationPoint, networkGraph);
         break;
-      case "greedy-neighbor":
-        calculatedPathPoints = findGreedyPath(sourcePoint, destinationPoint, networkGraph, 4);
-        break;
-      case "astar-mst":
-        calculatedPathPoints = findAStarMSTPath(sourcePoint, destinationPoint, networkGraph);
+      case "dijkstra":
+        calculatedPathPoints = findDijkstraNetworkPath(sourcePoint, destinationPoint, networkGraph);
         break;
       default:
-        calculatedPathPoints = findMSTPath(sourcePoint, destinationPoint, networkGraph);
+        calculatedPathPoints = findBFSPath(sourcePoint, destinationPoint, networkGraph);
     }
 
     setPathPoints(calculatedPathPoints);
 
-    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale, pathStyle);
+    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, xScale, yScale, pathStyle);
 
     if (path) {
       // Get current zoom transform
