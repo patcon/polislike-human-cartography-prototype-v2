@@ -687,7 +687,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       })
       .attr("stroke-width", 2 / currentTransform.k)
       .style("cursor", "pointer")
-      .on("click", (event, d) => {
+      .on("click", (_, d) => {
         if (!sourcePoint) {
           setSourcePoint(d);
           setDestinationPoint(null); // Clear destination when setting new source
@@ -1118,3 +1118,4 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     </div>
   );
 };
+
