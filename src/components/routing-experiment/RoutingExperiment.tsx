@@ -18,7 +18,7 @@ type Point = {
 
 type RoutingAlgorithm = "bfs-path" | "dijkstra";
 
-type NetworkType = "mst" | "knn" | "delaunay" | "geometric";
+type NetworkType = "mst" | "knn" | "delaunay" | "delaunay-knn" | "geometric";
 
 const ROUTING_ALGORITHMS = [
   { id: "bfs-path", name: "BFS Minimum Hops" },
@@ -29,6 +29,7 @@ const NETWORK_TYPES = [
   { id: "mst", name: "Minimum Spanning Tree" },
   { id: "knn", name: "K-Nearest Neighbors" },
   { id: "delaunay", name: "Delaunay Triangulation" },
+  { id: "delaunay-knn", name: "Delaunay + KNN Filter" },
   { id: "geometric", name: "Random Geometric Graph" }
 ] as const;
 
@@ -186,6 +187,61 @@ const generateDelaunayEdges = (points: Point[]): Edge[] => {
   }
 
   return edges;
+};
+
+// Generate Delaunay triangulation with KNN filter - combines geometric efficiency with cost awareness
+const generateDelaunayKNNEdges = (points: Point[], k: number = 6): Edge[] => {
+  if (points.length < 3) return [];
+
+  // First, generate the full Delaunay triangulation
+  const delaunayEdges = generateDelaunayEdges(points);
+
+  // Create a map to quickly find edges for each point
+  const pointEdges = new Map<string, Edge[]>();
+
+  for (const edge of delaunayEdges) {
+    if (!pointEdges.has(edge.source.id)) {
+      pointEdges.set(edge.source.id, []);
+    }
+    if (!pointEdges.has(edge.target.id)) {
+      pointEdges.set(edge.target.id, []);
+    }
+
+    pointEdges.get(edge.source.id)!.push(edge);
+    pointEdges.get(edge.target.id)!.push(edge);
+  }
+
+  // Filter edges: for each point, keep only the k shortest edges
+  const filteredEdges: Edge[] = [];
+  const edgeSet = new Set<string>();
+
+  for (const point of points) {
+    const edges = pointEdges.get(point.id) || [];
+
+    // Sort edges by distance (weight) and take the k shortest
+    const sortedEdges = edges
+      .map(edge => ({
+        edge,
+        // Calculate distance from current point to the other endpoint
+        distance: edge.source.id === point.id
+          ? euclideanDistance(point, edge.target)
+          : euclideanDistance(point, edge.source)
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, k);
+
+    // Add the k shortest edges to our filtered set
+    for (const { edge } of sortedEdges) {
+      const edgeId = [edge.source.id, edge.target.id].sort().join('-');
+
+      if (!edgeSet.has(edgeId)) {
+        edgeSet.add(edgeId);
+        filteredEdges.push(edge);
+      }
+    }
+  }
+
+  return filteredEdges;
 };
 
 // Generate Random Geometric Graph edges
@@ -521,6 +577,9 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         case "delaunay":
           edges = generateDelaunayEdges(data);
           break;
+        case "delaunay-knn":
+          edges = generateDelaunayKNNEdges(data, knnK);
+          break;
         case "geometric":
           edges = generateGeometricEdges(data, geometricRadius);
           break;
@@ -684,8 +743,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     // Choose color based on network type
     const edgeColor = selectedNetworkType === "mst" ? "#374151" :
                      selectedNetworkType === "knn" ? "#059669" :
-                     selectedNetworkType === "delaunay" ? "#dc2626" : "#8b5cf6";
+                     selectedNetworkType === "delaunay" ? "#dc2626" :
+                     selectedNetworkType === "delaunay-knn" ? "#7c3aed" : "#8b5cf6";
     const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 :
+                       selectedNetworkType === "delaunay-knn" ? 0.7 :
                        selectedNetworkType === "geometric" ? 0.6 : 0.8;
 
     // Draw filtered network edges
@@ -898,9 +959,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             </Select>
           </div>
 
-          {selectedNetworkType === "knn" && (
+          {(selectedNetworkType === "knn" || selectedNetworkType === "delaunay-knn") && (
             <div>
-              <label className="block text-sm font-medium mb-2">K (Neighbors): {knnK}</label>
+              <label className="block text-sm font-medium mb-2">
+                K ({selectedNetworkType === "delaunay-knn" ? "Max edges per node" : "Neighbors"}): {knnK}
+              </label>
               <input
                 type="range"
                 min="3"
@@ -1047,7 +1110,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           <p><strong>Data:</strong> {data.length} points from {kedroBaseUrl ? `${pipelineId} (Kedro API)` : 'projections.json'}</p>
           <p><strong>Routing Algorithm:</strong> {ROUTING_ALGORITHMS.find(a => a.id === selectedAlgorithm)?.name}</p>
           <p><strong>Network Type:</strong> {NETWORK_TYPES.find(n => n.id === selectedNetworkType)?.name}</p>
-          {selectedNetworkType === "knn" && <p><strong>K:</strong> {knnK}</p>}
+          {(selectedNetworkType === "knn" || selectedNetworkType === "delaunay-knn") && <p><strong>K:</strong> {knnK}</p>}
           {selectedNetworkType === "geometric" && <p><strong>Radius:</strong> {geometricRadius.toFixed(3)}</p>}
           {kedroBaseUrl && <p><strong>Pipeline:</strong> {pipelineId}</p>}
         </div>
