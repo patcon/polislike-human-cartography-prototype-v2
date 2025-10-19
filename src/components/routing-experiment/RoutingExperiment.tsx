@@ -37,11 +37,54 @@ type Edge = {
   source: Point;
   target: Point;
   weight: number;
+  originalWeight?: number; // Store original weight before density modification
 };
 
 // Distance calculation between two points
 const euclideanDistance = (p1: Point, p2: Point): number => {
   return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+};
+
+// Calculate local density for each point (number of neighbors within radius)
+const calculateLocalDensity = (points: Point[], radius: number): Map<string, number> => {
+  const densityMap = new Map<string, number>();
+
+  for (const point of points) {
+    const neighborsCount = points.filter(other =>
+      other.id !== point.id && euclideanDistance(point, other) < radius
+    ).length;
+    densityMap.set(point.id, neighborsCount);
+  }
+
+  return densityMap;
+};
+
+// Apply density-based cost modification to edges
+const applyDensityCosts = (
+  edges: Edge[],
+  densityMap: Map<string, number>,
+  alpha: number
+): Edge[] => {
+  return edges.map(edge => {
+    const sourceDensity = densityMap.get(edge.source.id) || 0;
+    const targetDensity = densityMap.get(edge.target.id) || 0;
+    const avgDensity = (sourceDensity + targetDensity) / 2;
+
+    // Store original weight if not already stored
+    const originalWeight = edge.originalWeight || edge.weight;
+
+    // Apply density cost: cost = distance * (1 + alpha * density)
+    // Positive alpha makes dense areas more expensive
+    // Negative alpha makes dense areas cheaper
+    const densityModifier = 1 + alpha * avgDensity;
+    const newWeight = originalWeight * Math.max(0.1, densityModifier); // Prevent negative weights
+
+    return {
+      ...edge,
+      originalWeight,
+      weight: newWeight
+    };
+  });
 };
 
 // Find k nearest neighbors to a point
@@ -279,10 +322,30 @@ const buildGraph = (edges: Edge[]): Map<string, Point[]> => {
   return graph;
 };
 
+// Build adjacency list with edge weights for Dijkstra
+const buildWeightedGraph = (edges: Edge[]): Map<string, Map<string, number>> => {
+  const graph = new Map<string, Map<string, number>>();
+
+  for (const edge of edges) {
+    if (!graph.has(edge.source.id)) graph.set(edge.source.id, new Map());
+    if (!graph.has(edge.target.id)) graph.set(edge.target.id, new Map());
+
+    graph.get(edge.source.id)!.set(edge.target.id, edge.weight);
+    graph.get(edge.target.id)!.set(edge.source.id, edge.weight);
+  }
+
+  return graph;
+};
 
 
-// Dijkstra's algorithm that works with any network graph
-const findDijkstraNetworkPath = (source: Point, destination: Point, networkGraph: Map<string, Point[]>): Point[] => {
+
+// Dijkstra's algorithm that works with weighted network graph
+const findDijkstraNetworkPath = (
+  source: Point,
+  destination: Point,
+  networkGraph: Map<string, Point[]>,
+  weightedGraph: Map<string, Map<string, number>>
+): Point[] => {
   console.log(`🔍 Starting Dijkstra path from ${source.id} to ${destination.id}`);
   console.log(`📊 Network graph has ${networkGraph.size} nodes`);
 
@@ -362,7 +425,8 @@ const findDijkstraNetworkPath = (source: Point, destination: Point, networkGraph
     for (const neighbor of neighbors) {
       if (!unvisited.has(neighbor.id)) continue;
 
-      const edgeWeight = euclideanDistance(currentPoint, neighbor);
+      // Use the precomputed edge weight from the weighted graph (includes density modifications)
+      const edgeWeight = weightedGraph.get(current)?.get(neighbor.id) || euclideanDistance(currentPoint, neighbor);
       const newDistance = distances.get(current)! + edgeWeight;
 
       if (newDistance < distances.get(neighbor.id)!) {
@@ -420,6 +484,7 @@ const generatePath = (
   destination: Point,
   algorithm: RoutingAlgorithm,
   networkGraph: Map<string, Point[]>,
+  weightedGraph: Map<string, Map<string, number>>,
   xScale: d3.ScaleLinear<number, number>,
   yScale: d3.ScaleLinear<number, number>,
   pathStyle: 'sharp' | 'smooth' = 'sharp'
@@ -433,7 +498,7 @@ const generatePath = (
 
     case "dijkstra":
       // Dijkstra's algorithm that respects the selected network graph
-      pathPoints = findDijkstraNetworkPath(source, destination, networkGraph);
+      pathPoints = findDijkstraNetworkPath(source, destination, networkGraph, weightedGraph);
       break;
 
     default:
@@ -503,6 +568,12 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [pathPoints, setPathPoints] = React.useState<Point[]>([]);
   const [networkEdges, setNetworkEdges] = React.useState<Edge[]>([]);
   const [networkGraph, setNetworkGraph] = React.useState<Map<string, Point[]>>(new Map());
+  const [weightedGraph, setWeightedGraph] = React.useState<Map<string, Map<string, number>>>(new Map());
+
+  // Density field parameters
+  const [densityRadius, setDensityRadius] = React.useState(0.15);
+  const [densityAlpha, setDensityAlpha] = React.useState(0.0);
+  const [densityMap, setDensityMap] = React.useState<Map<string, number>>(new Map());
 
   // Local state for display settings (used when not controlled by Storybook)
   const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>(initialShowEdges);
@@ -562,6 +633,14 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     loadData();
   }, [kedroBaseUrl, pipelineId]);
 
+  // Calculate density map when data or density parameters change
+  React.useEffect(() => {
+    if (data.length > 0) {
+      const newDensityMap = calculateLocalDensity(data, densityRadius);
+      setDensityMap(newDensityMap);
+    }
+  }, [data, densityRadius]);
+
   // Recalculate network when type or parameters change
   React.useEffect(() => {
     if (data.length > 0) {
@@ -585,11 +664,18 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           break;
       }
 
+      // Apply density costs if alpha is not zero
+      if (densityAlpha !== 0 && densityMap.size > 0) {
+        edges = applyDensityCosts(edges, densityMap, densityAlpha);
+      }
+
       const graph = buildGraph(edges);
+      const wGraph = buildWeightedGraph(edges);
       setNetworkEdges(edges);
       setNetworkGraph(graph);
+      setWeightedGraph(wGraph);
     }
-  }, [selectedNetworkType, knnK, geometricRadius, data]);
+  }, [selectedNetworkType, knnK, geometricRadius, data, densityAlpha, densityMap]);
 
   // Calculate scales and setup SVG
   const { xScale, yScale } = React.useMemo(() => {
@@ -677,6 +763,19 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
         if (destinationPoint && d.id === destinationPoint.id) return "#ef4444"; // red
         if (pathPoints.some(p => p.id === d.id)) return "#f59e0b"; // orange for path points
+
+        // Color by density if density alpha is not zero
+        if (densityAlpha !== 0 && densityMap.size > 0) {
+          const density = densityMap.get(d.id) || 0;
+          const maxDensity = Math.max(...Array.from(densityMap.values()));
+          if (maxDensity > 0) {
+            const normalizedDensity = density / maxDensity;
+            // Use a color scale from light blue (low density) to dark blue (high density)
+            const intensity = Math.floor(normalizedDensity * 200 + 55); // 55-255 range
+            return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
+          }
+        }
+
         return "#64748b"; // gray
       })
       .attr("stroke", d => {
@@ -702,7 +801,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         }
       });
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap]);
 
   // Draw network edges
   React.useEffect(() => {
@@ -788,7 +887,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         calculatedPathPoints = findBFSPath(sourcePoint, destinationPoint, networkGraph);
         break;
       case "dijkstra":
-        calculatedPathPoints = findDijkstraNetworkPath(sourcePoint, destinationPoint, networkGraph);
+        calculatedPathPoints = findDijkstraNetworkPath(sourcePoint, destinationPoint, networkGraph, weightedGraph);
         break;
       default:
         calculatedPathPoints = findBFSPath(sourcePoint, destinationPoint, networkGraph);
@@ -796,7 +895,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
     setPathPoints(calculatedPathPoints);
 
-    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, xScale, yScale, pathStyle);
+    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
 
     if (path) {
       // Get current zoom transform
@@ -813,7 +912,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .style("pointer-events", "none"); // Prevent path from capturing mouse events
     }
 
-  }, [sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale, pathStyle]);
+  }, [sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, weightedGraph, xScale, yScale, pathStyle]);
 
   // Add zoom behavior
   React.useEffect(() => {
@@ -990,6 +1089,48 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             </div>
           )}
 
+          <div className="space-y-3 border-t pt-3">
+            <h4 className="text-sm font-medium">Density Field</h4>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Density Radius: {densityRadius.toFixed(3)}
+              </label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.5"
+                step="0.01"
+                value={densityRadius}
+                onChange={(e) => setDensityRadius(parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Radius for counting nearby points
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Density Cost: {densityAlpha.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min="-1.0"
+                max="1.0"
+                step="0.05"
+                value={densityAlpha}
+                onChange={(e) => setDensityAlpha(parseFloat(e.target.value))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {densityAlpha > 0 ? "Positive: avoid dense areas" :
+                 densityAlpha < 0 ? "Negative: prefer dense areas" :
+                 "Zero: no density effect"}
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Display Settings</h4>
 
@@ -1112,6 +1253,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           <p><strong>Network Type:</strong> {NETWORK_TYPES.find(n => n.id === selectedNetworkType)?.name}</p>
           {(selectedNetworkType === "knn" || selectedNetworkType === "delaunay-knn") && <p><strong>K:</strong> {knnK}</p>}
           {selectedNetworkType === "geometric" && <p><strong>Radius:</strong> {geometricRadius.toFixed(3)}</p>}
+          <p><strong>Density Radius:</strong> {densityRadius.toFixed(3)}</p>
+          <p><strong>Density Cost:</strong> {densityAlpha.toFixed(2)} {densityAlpha > 0 ? "(avoid dense)" : densityAlpha < 0 ? "(prefer dense)" : "(disabled)"}</p>
+          {densityMap.size > 0 && (
+            <p><strong>Max Density:</strong> {Math.max(...Array.from(densityMap.values()))} neighbors</p>
+          )}
           {kedroBaseUrl && <p><strong>Pipeline:</strong> {pipelineId}</p>}
         </div>
       </div>
