@@ -4,6 +4,8 @@ import * as React from "react";
 import * as d3 from "d3";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 type Point = {
   id: string;
@@ -13,14 +15,13 @@ type Point = {
   originalY: number;
 };
 
-type RoutingAlgorithm = "mst-path" | "greedy-neighbor" | "mst-smooth" | "astar-mst";
+type RoutingAlgorithm = "mst-path" | "greedy-neighbor" | "astar-mst";
 
 type NetworkType = "mst" | "knn" | "delaunay";
 
 const ROUTING_ALGORITHMS = [
-  { id: "mst-path", name: "MST Path (Sharp)" },
+  { id: "mst-path", name: "MST Path" },
   { id: "greedy-neighbor", name: "Greedy Neighbor Hopping" },
-  { id: "mst-smooth", name: "MST Path (Smooth)" },
   { id: "astar-mst", name: "A* Optimal MST" }
 ] as const;
 
@@ -404,7 +405,8 @@ const generatePath = (
   mstEdges: Edge[],
   mstGraph: Map<string, Point[]>,
   xScale: d3.ScaleLinear<number, number>,
-  yScale: d3.ScaleLinear<number, number>
+  yScale: d3.ScaleLinear<number, number>,
+  pathStyle: 'sharp' | 'smooth' = 'sharp'
 ): string | null => {
   let pathPoints: Point[] = [];
 
@@ -416,11 +418,6 @@ const generatePath = (
     case "greedy-neighbor":
       // Pure greedy neighbor hopping (ignores MST, just hops to nearest points toward destination)
       pathPoints = findGreedyPath(source, destination, allPoints, 4);
-      break;
-
-    case "mst-smooth":
-      // Same as MST path but will be rendered with smooth curves
-      pathPoints = findMSTPath(source, destination, mstGraph);
       break;
 
     case "astar-mst":
@@ -439,7 +436,7 @@ const generatePath = (
     y: yScale(p.y)
   }));
 
-  if (algorithm === "mst-smooth" && scaledPoints.length >= 3) {
+  if (pathStyle === "smooth" && scaledPoints.length >= 3) {
     // Create smooth bezier curve through points
     let pathString = `M ${scaledPoints[0].x} ${scaledPoints[0].y}`;
     
@@ -465,7 +462,17 @@ const generatePath = (
   }
 };
 
-export const RoutingExperiment: React.FC = () => {
+type DisplaySettings = {
+  showEdges?: 'none' | 'all' | 'only path';
+  showNodes?: 'none' | 'all' | 'only path';
+  pathStyle?: 'sharp' | 'smooth';
+};
+
+export const RoutingExperiment: React.FC<DisplaySettings> = ({
+  showEdges: initialShowEdges = 'all',
+  showNodes: initialShowNodes = 'all',
+  pathStyle: initialPathStyle = 'sharp'
+}) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   
@@ -479,7 +486,16 @@ export const RoutingExperiment: React.FC = () => {
   const [pathPoints, setPathPoints] = React.useState<Point[]>([]);
   const [networkEdges, setNetworkEdges] = React.useState<Edge[]>([]);
   const [networkGraph, setNetworkGraph] = React.useState<Map<string, Point[]>>(new Map());
-  const [showNetwork, setShowNetwork] = React.useState(true);
+  
+  // Local state for display settings (used when not controlled by Storybook)
+  const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>(initialShowEdges);
+  const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>(initialShowNodes);
+  const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>(initialPathStyle);
+  
+  // Use props if provided (from Storybook), otherwise use local state
+  const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
+  const showNodes = initialShowNodes !== 'all' ? initialShowNodes : localShowNodes;
+  const pathStyle = initialPathStyle !== 'sharp' ? initialPathStyle : localPathStyle;
 
   // Load and process the localmap data
   React.useEffect(() => {
@@ -584,9 +600,21 @@ export const RoutingExperiment: React.FC = () => {
     // Clear existing points
     container.selectAll("circle").remove();
 
-    // Draw all points
+    // Filter points based on showNodes setting
+    let pointsToShow = data;
+    if (showNodes === 'none') {
+      pointsToShow = [];
+    } else if (showNodes === 'only path') {
+      pointsToShow = data.filter(d =>
+        (sourcePoint && d.id === sourcePoint.id) ||
+        (destinationPoint && d.id === destinationPoint.id) ||
+        pathPoints.some(p => p.id === d.id)
+      );
+    }
+
+    // Draw filtered points
     container.selectAll("circle")
-      .data(data)
+      .data(pointsToShow)
       .enter()
       .append("circle")
       .attr("cx", d => xScale(d.x))
@@ -629,11 +657,11 @@ export const RoutingExperiment: React.FC = () => {
         }
       });
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes]);
 
   // Draw network edges
   React.useEffect(() => {
-    if (!containerRef.current || !xScale || !yScale || !networkEdges.length || !showNetwork) {
+    if (!containerRef.current || !xScale || !yScale || !networkEdges.length) {
       containerRef.current?.selectAll(".network-edge").remove();
       return;
     }
@@ -646,14 +674,35 @@ export const RoutingExperiment: React.FC = () => {
     // Clear existing network edges
     container.selectAll(".network-edge").remove();
 
+    // Filter edges based on showEdges setting
+    let edgesToShow = networkEdges;
+    if (showEdges === 'none') {
+      edgesToShow = [];
+    } else if (showEdges === 'only path' && pathPoints.length > 1) {
+      // Only show edges that are part of the current path
+      const pathEdgeSet = new Set<string>();
+      for (let i = 0; i < pathPoints.length - 1; i++) {
+        const edgeId1 = `${pathPoints[i].id}-${pathPoints[i + 1].id}`;
+        const edgeId2 = `${pathPoints[i + 1].id}-${pathPoints[i].id}`;
+        pathEdgeSet.add(edgeId1);
+        pathEdgeSet.add(edgeId2);
+      }
+      
+      edgesToShow = networkEdges.filter(edge => {
+        const edgeId1 = `${edge.source.id}-${edge.target.id}`;
+        const edgeId2 = `${edge.target.id}-${edge.source.id}`;
+        return pathEdgeSet.has(edgeId1) || pathEdgeSet.has(edgeId2);
+      });
+    }
+
     // Choose color based on network type
     const edgeColor = selectedNetworkType === "mst" ? "#374151" :
                      selectedNetworkType === "knn" ? "#059669" : "#dc2626";
     const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 : 0.8;
 
-    // Draw network edges
+    // Draw filtered network edges
     container.selectAll(".network-edge")
-      .data(networkEdges)
+      .data(edgesToShow)
       .enter()
       .append("line")
       .attr("class", "network-edge")
@@ -665,7 +714,7 @@ export const RoutingExperiment: React.FC = () => {
       .attr("stroke-width", 2 / currentTransform.k)
       .attr("stroke-opacity", edgeOpacity);
 
-  }, [networkEdges, xScale, yScale, showNetwork, selectedNetworkType]);
+  }, [networkEdges, xScale, yScale, selectedNetworkType, showEdges, pathPoints]);
 
   // Generate and draw path
   React.useEffect(() => {
@@ -691,9 +740,6 @@ export const RoutingExperiment: React.FC = () => {
       case "greedy-neighbor":
         calculatedPathPoints = findGreedyPath(sourcePoint, destinationPoint, data, 4);
         break;
-      case "mst-smooth":
-        calculatedPathPoints = findMSTPath(sourcePoint, destinationPoint, networkGraph);
-        break;
       case "astar-mst":
         calculatedPathPoints = findAStarMSTPath(sourcePoint, destinationPoint, networkGraph);
         break;
@@ -703,7 +749,7 @@ export const RoutingExperiment: React.FC = () => {
 
     setPathPoints(calculatedPathPoints);
 
-    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale);
+    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale, pathStyle);
     
     if (path) {
       // Get current zoom transform
@@ -719,7 +765,7 @@ export const RoutingExperiment: React.FC = () => {
         .attr("marker-end", "url(#arrowhead)");
     }
 
-  }, [sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale]);
+  }, [sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, xScale, yScale, pathStyle]);
 
   // Add zoom behavior
   React.useEffect(() => {
@@ -879,17 +925,72 @@ export const RoutingExperiment: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="show-network"
-              checked={showNetwork}
-              onChange={(e) => setShowNetwork(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <label htmlFor="show-network" className="text-sm font-medium">
-              Show Network
-            </label>
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Display Settings</h4>
+            
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Edges</Label>
+                <RadioGroup
+                  value={showEdges}
+                  onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowEdges(value)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="none" id="edges-none" className="w-3 h-3" />
+                    <Label htmlFor="edges-none" className="text-xs">None</Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="all" id="edges-all" className="w-3 h-3" />
+                    <Label htmlFor="edges-all" className="text-xs">All</Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="only path" id="edges-path" className="w-3 h-3" />
+                    <Label htmlFor="edges-path" className="text-xs">Path</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Nodes</Label>
+                <RadioGroup
+                  value={showNodes}
+                  onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowNodes(value)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="none" id="nodes-none" className="w-3 h-3" />
+                    <Label htmlFor="nodes-none" className="text-xs">None</Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="all" id="nodes-all" className="w-3 h-3" />
+                    <Label htmlFor="nodes-all" className="text-xs">All</Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="only path" id="nodes-path" className="w-3 h-3" />
+                    <Label htmlFor="nodes-path" className="text-xs">Path</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Path</Label>
+                <RadioGroup
+                  value={pathStyle}
+                  onValueChange={(value: 'sharp' | 'smooth') => setLocalPathStyle(value)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="sharp" id="path-sharp" className="w-3 h-3" />
+                    <Label htmlFor="path-sharp" className="text-xs">Sharp</Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="smooth" id="path-smooth" className="w-3 h-3" />
+                    <Label htmlFor="path-smooth" className="text-xs">Smooth</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
           </div>
 
           <div className="text-sm text-gray-600">
