@@ -18,7 +18,7 @@ type Point = {
 
 type RoutingAlgorithm = "mst-path" | "greedy-neighbor" | "astar-mst";
 
-type NetworkType = "mst" | "knn" | "delaunay";
+type NetworkType = "mst" | "knn" | "delaunay" | "geometric";
 
 const ROUTING_ALGORITHMS = [
   { id: "mst-path", name: "MST Path" },
@@ -29,7 +29,8 @@ const ROUTING_ALGORITHMS = [
 const NETWORK_TYPES = [
   { id: "mst", name: "Minimum Spanning Tree" },
   { id: "knn", name: "K-Nearest Neighbors" },
-  { id: "delaunay", name: "Delaunay Triangulation" }
+  { id: "delaunay", name: "Delaunay Triangulation" },
+  { id: "geometric", name: "Random Geometric Graph" }
 ] as const;
 
 type Edge = {
@@ -188,6 +189,26 @@ const generateDelaunayEdges = (points: Point[]): Edge[] => {
   return edges;
 };
 
+// Generate Random Geometric Graph edges
+const generateGeometricEdges = (points: Point[], radius: number): Edge[] => {
+  const edges: Edge[] = [];
+
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const distance = euclideanDistance(points[i], points[j]);
+      if (distance < radius) {
+        edges.push({
+          source: points[i],
+          target: points[j],
+          weight: distance
+        });
+      }
+    }
+  }
+
+  return edges;
+};
+
 // Build adjacency list from edges
 const buildGraph = (edges: Edge[]): Map<string, Point[]> => {
   const graph = new Map<string, Point[]>();
@@ -268,13 +289,14 @@ const findDijkstraPath = (source: Point, destination: Point, allPoints: Point[])
   return [source, destination];
 };
 
-// Greedy nearest neighbor path
-const findGreedyPath = (source: Point, destination: Point, allPoints: Point[], maxHops: number = 5): Point[] => {
+// Greedy nearest neighbor path that respects the network graph
+const findGreedyPath = (source: Point, destination: Point, networkGraph: Map<string, Point[]>, maxHops: number = 5): Point[] => {
   const path: Point[] = [source];
   let current = source;
 
   for (let hop = 0; hop < maxHops && current.id !== destination.id; hop++) {
-    const neighbors = findKNearestNeighbors(current, allPoints, 10);
+    // Get neighbors from the network graph instead of k-nearest neighbors
+    const neighbors = networkGraph.get(current.id) || [];
 
     // Find the neighbor that gets us closest to destination
     let bestNeighbor: Point | null = null;
@@ -417,8 +439,8 @@ const generatePath = (
       break;
 
     case "greedy-neighbor":
-      // Pure greedy neighbor hopping (ignores MST, just hops to nearest points toward destination)
-      pathPoints = findGreedyPath(source, destination, allPoints, 4);
+      // Greedy neighbor hopping that respects the selected network graph
+      pathPoints = findGreedyPath(source, destination, networkGraph, 4);
       break;
 
     case "astar-mst":
@@ -487,6 +509,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [selectedAlgorithm, setSelectedAlgorithm] = React.useState<RoutingAlgorithm>("mst-path");
   const [selectedNetworkType, setSelectedNetworkType] = React.useState<NetworkType>("mst");
   const [knnK, setKnnK] = React.useState(6);
+  const [geometricRadius, setGeometricRadius] = React.useState(0.1);
   const [isLoading, setIsLoading] = React.useState(true);
   const [pathPoints, setPathPoints] = React.useState<Point[]>([]);
   const [networkEdges, setNetworkEdges] = React.useState<Edge[]>([]);
@@ -565,13 +588,16 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         case "delaunay":
           edges = generateDelaunayEdges(data);
           break;
+        case "geometric":
+          edges = generateGeometricEdges(data, geometricRadius);
+          break;
       }
 
       const graph = buildGraph(edges);
       setNetworkEdges(edges);
       setNetworkGraph(graph);
     }
-  }, [selectedNetworkType, knnK, data]);
+  }, [selectedNetworkType, knnK, geometricRadius, data]);
 
   // Calculate scales and setup SVG
   const { xScale, yScale } = React.useMemo(() => {
@@ -724,8 +750,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
     // Choose color based on network type
     const edgeColor = selectedNetworkType === "mst" ? "#374151" :
-                     selectedNetworkType === "knn" ? "#059669" : "#dc2626";
-    const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 : 0.8;
+                     selectedNetworkType === "knn" ? "#059669" :
+                     selectedNetworkType === "delaunay" ? "#dc2626" : "#8b5cf6";
+    const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 :
+                       selectedNetworkType === "geometric" ? 0.6 : 0.8;
 
     // Draw filtered network edges
     container.selectAll(".network-edge")
@@ -766,7 +794,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         calculatedPathPoints = findMSTPath(sourcePoint, destinationPoint, networkGraph);
         break;
       case "greedy-neighbor":
-        calculatedPathPoints = findGreedyPath(sourcePoint, destinationPoint, data, 4);
+        calculatedPathPoints = findGreedyPath(sourcePoint, destinationPoint, networkGraph, 4);
         break;
       case "astar-mst":
         calculatedPathPoints = findAStarMSTPath(sourcePoint, destinationPoint, networkGraph);
@@ -954,6 +982,21 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             </div>
           )}
 
+          {selectedNetworkType === "geometric" && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Radius: {geometricRadius.toFixed(3)}</label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.5"
+                step="0.01"
+                value={geometricRadius}
+                onChange={(e) => setGeometricRadius(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Display Settings</h4>
 
@@ -1075,6 +1118,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           <p><strong>Routing Algorithm:</strong> {ROUTING_ALGORITHMS.find(a => a.id === selectedAlgorithm)?.name}</p>
           <p><strong>Network Type:</strong> {NETWORK_TYPES.find(n => n.id === selectedNetworkType)?.name}</p>
           {selectedNetworkType === "knn" && <p><strong>K:</strong> {knnK}</p>}
+          {selectedNetworkType === "geometric" && <p><strong>Radius:</strong> {geometricRadius.toFixed(3)}</p>}
           {kedroBaseUrl && <p><strong>Pipeline:</strong> {pipelineId}</p>}
         </div>
       </div>
