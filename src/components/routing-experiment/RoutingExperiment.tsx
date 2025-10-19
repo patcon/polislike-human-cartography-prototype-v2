@@ -426,7 +426,7 @@ const generatePath = (
   algorithm: RoutingAlgorithm,
   allPoints: Point[],
   mstEdges: Edge[],
-  mstGraph: Map<string, Point[]>,
+  networkGraph: Map<string, Point[]>,
   xScale: d3.ScaleLinear<number, number>,
   yScale: d3.ScaleLinear<number, number>,
   pathStyle: 'sharp' | 'smooth' = 'sharp'
@@ -435,7 +435,7 @@ const generatePath = (
 
   switch (algorithm) {
     case "mst-path":
-      pathPoints = findMSTPath(source, destination, mstGraph);
+      pathPoints = findMSTPath(source, destination, networkGraph);
       break;
 
     case "greedy-neighbor":
@@ -444,11 +444,11 @@ const generatePath = (
       break;
 
     case "astar-mst":
-      pathPoints = findAStarMSTPath(source, destination, mstGraph);
+      pathPoints = findAStarMSTPath(source, destination, networkGraph);
       break;
 
     default:
-      pathPoints = findMSTPath(source, destination, mstGraph);
+      pathPoints = findMSTPath(source, destination, networkGraph);
   }
 
   // Convert points to SVG path
