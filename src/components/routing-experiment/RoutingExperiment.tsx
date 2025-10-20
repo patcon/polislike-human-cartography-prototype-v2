@@ -560,8 +560,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [data, setData] = React.useState<Point[]>([]);
   const [sourcePoint, setSourcePoint] = React.useState<Point | null>(null);
   const [destinationPoint, setDestinationPoint] = React.useState<Point | null>(null);
-  const [selectedAlgorithm, setSelectedAlgorithm] = React.useState<RoutingAlgorithm>("bfs-path");
-  const [selectedNetworkType, setSelectedNetworkType] = React.useState<NetworkType>("mst");
+  const [selectedAlgorithm, setSelectedAlgorithm] = React.useState<RoutingAlgorithm>("dijkstra");
+  const [selectedNetworkType, setSelectedNetworkType] = React.useState<NetworkType>("delaunay-knn");
   const [knnK, setKnnK] = React.useState(6);
   const [geometricRadius, setGeometricRadius] = React.useState(0.1);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -571,14 +571,14 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [weightedGraph, setWeightedGraph] = React.useState<Map<string, Map<string, number>>>(new Map());
 
   // Density field parameters
-  const [densityRadius, setDensityRadius] = React.useState(0.15);
-  const [densityAlpha, setDensityAlpha] = React.useState(0.0);
+  const [densityRadius, setDensityRadius] = React.useState(0.05);
+  const [densityAlpha, setDensityAlpha] = React.useState(1.00);
   const [densityMap, setDensityMap] = React.useState<Map<string, number>>(new Map());
 
   // Local state for display settings (used when not controlled by Storybook)
-  const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>(initialShowEdges);
-  const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>(initialShowNodes);
-  const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>(initialPathStyle);
+  const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>('none');
+  const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>('all');
+  const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>('smooth');
 
   // Use props if provided (from Storybook), otherwise use local state
   const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
