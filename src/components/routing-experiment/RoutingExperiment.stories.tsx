@@ -51,6 +51,29 @@ export const Default: Story = {
   },
 };
 
+export const WithRandomStartPoints: Story = {
+  args: {
+    showEdges: 'all',
+    showNodes: 'all',
+    pathStyle: 'smooth',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+This story demonstrates the RoutingExperiment component with automatic random point selection.
+When the data loads, two random points are automatically selected as source and destination,
+immediately showing a routing path. This provides a better initial user experience by
+demonstrating the functionality right away.
+
+Users can click "Random Points" to select new random points or manually click on points
+to set custom source and destination locations.
+        `,
+      },
+    },
+  },
+};
+
 export const MinimalDisplay: Story = {
   args: {
     showEdges: 'only path',

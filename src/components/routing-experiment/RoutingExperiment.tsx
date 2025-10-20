@@ -612,10 +612,21 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
         setData(points);
 
-        // Reset selected points when data changes
-        setSourcePoint(null);
-        setDestinationPoint(null);
-        setPathPoints([]);
+        // Select two random points to start with
+        if (points.length >= 2) {
+          const shuffled = [...points].sort(() => 0.5 - Math.random());
+          const randomSource = shuffled[0];
+          const randomDestination = shuffled[1];
+
+          setSourcePoint(randomSource);
+          setDestinationPoint(randomDestination);
+          setPathPoints([]);
+        } else {
+          // Reset selected points when data changes
+          setSourcePoint(null);
+          setDestinationPoint(null);
+          setPathPoints([]);
+        }
 
         // Calculate initial network (will be recalculated when network type changes)
         const mst = findMinimalSpanningTree(points);
@@ -1009,6 +1020,18 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     setPathPoints([]);
   };
 
+  const handleRandomPoints = () => {
+    if (data.length >= 2) {
+      const shuffled = [...data].sort(() => 0.5 - Math.random());
+      const randomSource = shuffled[0];
+      const randomDestination = shuffled[1];
+
+      setSourcePoint(randomSource);
+      setDestinationPoint(randomDestination);
+      setPathPoints([]);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center w-screen h-screen">
@@ -1202,11 +1225,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           <div className="text-sm text-gray-600">
             <p><strong>Instructions:</strong></p>
             <ol className="list-decimal list-inside space-y-1 mt-2">
-              <li>Click a point to set as <span className="text-green-600 font-medium">source</span></li>
-              <li>Click another point to set as <span className="text-red-600 font-medium">destination</span></li>
-              <li>Try different routing algorithms</li>
+              <li>Two random points are selected automatically on load</li>
+              <li>Click "Random Points" to select new random points</li>
+              <li>Click any point to manually set <span className="text-green-600 font-medium">source</span> and <span className="text-red-600 font-medium">destination</span></li>
+              <li>Try different routing algorithms and network types</li>
               <li>Use scroll wheel to zoom, double-click to reset zoom</li>
-              <li>Click any point to reset and start over</li>
             </ol>
             <div className="mt-2 text-xs">
               <p><span className="text-green-600">●</span> Source point</p>
@@ -1239,9 +1262,14 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             </div>
           )}
 
-          <Button onClick={handleReset} variant="outline" className="w-full">
-            Reset Points
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleReset} variant="outline" className="flex-1">
+              Reset Points
+            </Button>
+            <Button onClick={handleRandomPoints} variant="default" className="flex-1">
+              Random Points
+            </Button>
+          </div>
         </div>
       </div>
 
