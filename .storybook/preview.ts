@@ -100,6 +100,8 @@ const preview: Preview = {
        color: /(background|color)$/i,
        date: /Date$/i,
       },
+      // Disable the "save changes" prompt globally to prevent performance issues
+      disableSaveFromUI: true,
     },
 
     a11y: {
