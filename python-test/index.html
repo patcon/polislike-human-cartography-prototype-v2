@@ -1,108 +1,158 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<title>HDBSCAN Cluster Explorer</title>
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<style>
-  body { font-family: sans-serif; margin: 20px; }
-  svg { border: 1px solid #ccc; }
-  #controls { margin-bottom: 1em; }
-  .point { stroke: #333; stroke-width: 0.5; cursor: pointer; }
-  .selected { stroke: black; stroke-width: 2; }
-</style>
+  <meta charset="utf-8">
+  <title>HDBSCAN Cluster Explorer</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    svg {
+      border: 1px solid #ccc;
+    }
+
+    #controls {
+      margin-bottom: 1em;
+    }
+
+    .point {
+      stroke: #333;
+      cursor: pointer;
+    }
+
+    .selected {
+      stroke: black;
+    }
+  </style>
 </head>
+
 <body>
-<h2>HDBSCAN Cluster Explorer</h2>
+  <h2>HDBSCAN Cluster Explorer</h2>
 
-<div id="controls">
-  <label>Water Level (λ threshold): 
-    <input id="lambda" type="range" min="0" max="10" step="0.1" value="3">
-    <span id="lambdaVal">3</span>
-  </label>
-</div>
+  <div id="controls">
+    <label>Water Level (λ threshold):
+      <input id="lambda" type="range" min="0" max="10" step="0.1" value="3">
+      <span id="lambdaVal">3</span>
+    </label>
+  </div>
 
-<svg id="plot" width="600" height="400"></svg>
+  <svg id="plot" width="600" height="400"></svg>
 
-<script type="module">
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+  <script type="module">
+    import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-const svg = d3.select("#plot");
-const width = +svg.attr("width");
-const height = +svg.attr("height");
+    const svg = d3.select("#plot");
+    const width = +svg.attr("width");
+    const height = +svg.attr("height");
 
-const color = d3.scaleOrdinal(d3.schemeTableau10);
-const lambdaInput = document.getElementById("lambda");
-const lambdaVal = document.getElementById("lambdaVal");
+    // Create a group for zoomable content
+    const g = svg.append("g");
 
-let points = [];
-let labelsByThreshold = {};
-let currentLambda = parseFloat(lambdaInput.value);
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const lambdaInput = document.getElementById("lambda");
+    const lambdaVal = document.getElementById("lambdaVal");
 
-Promise.all([
-  d3.json("out/points_with_labels.json"),
-  d3.json("out/labels_by_threshold.json")
-]).then(([pts, lbls]) => {
-  points = pts;
-  labelsByThreshold = lbls;
+    let points = [];
+    let labelsByThreshold = {};
+    let currentLambda = parseFloat(lambdaInput.value);
 
-  const xExtent = d3.extent(points, d => d.x);
-  const yExtent = d3.extent(points, d => d.y);
+    // Set up zoom behavior
+    const zoom = d3.zoom()
+      .scaleExtent([0.1, 10])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
 
-  const xScale = d3.scaleLinear().domain(xExtent).range([40, width-40]);
-  const yScale = d3.scaleLinear().domain(yExtent).range([height-40, 40]);
+        // Keep dots and borders the same size by adjusting inversely to zoom scale
+        g.selectAll("circle")
+          .attr("r", 4 / event.transform.k)
+          .attr("stroke-width", function (d) {
+            // Use different stroke width for selected vs normal dots
+            return d3.select(this).classed("selected") ?
+              2 / event.transform.k :
+              1 / event.transform.k;
+          });
+      });
 
-  // Draw points
-  svg.selectAll("circle")
-    .data(points)
-    .enter()
-    .append("circle")
-    .attr("class", "point")
-    .attr("r", 4)
-    .attr("cx", d => xScale(d.x))
-    .attr("cy", d => yScale(d.y))
-    .attr("fill", d => color(d.label));
+    svg.call(zoom);
 
-  // Click handler
-  svg.on("click", function(event) {
-    const [mx, my] = d3.pointer(event);
-    const nearest = d3.least(points, d => 
-      Math.hypot(xScale(d.x) - mx, yScale(d.y) - my)
-    );
-    if (!nearest) return;
+    Promise.all([
+      d3.json("out/points_with_labels.json"),
+      d3.json("out/labels_by_threshold.json")
+    ]).then(([pts, lbls]) => {
+      points = pts;
+      labelsByThreshold = lbls;
 
-    // Find cluster at current lambda
-    const threshold = nearestThreshold(currentLambda);
-    const labels = labelsByThreshold[threshold];
-    const clusterId = labels[points.findIndex(p => p.id === nearest.id)];
-    const clusterIndices = labels
-      .map((lbl, i) => (lbl === clusterId ? i : -1))
-      .filter(i => i !== -1);
-    
-    svg.selectAll("circle").classed("selected", (d, i) => clusterIndices.includes(i));
-  });
+      const xExtent = d3.extent(points, d => d.x);
+      const yExtent = d3.extent(points, d => d.y);
 
-  lambdaInput.addEventListener("input", e => {
-    currentLambda = parseFloat(e.target.value);
-    lambdaVal.textContent = currentLambda.toFixed(1);
-    recolorPoints();
-  });
+      const xScale = d3.scaleLinear().domain(xExtent).range([40, width - 40]);
+      const yScale = d3.scaleLinear().domain(yExtent).range([height - 40, 40]);
 
-  function recolorPoints() {
-    const threshold = nearestThreshold(currentLambda);
-    const labels = labelsByThreshold[threshold];
-    svg.selectAll("circle")
-      .attr("fill", (d, i) => color(labels[i]));
-  }
+      // Draw points in the zoomable group
+      g.selectAll("circle")
+        .data(points)
+        .enter()
+        .append("circle")
+        .attr("class", "point")
+        .attr("r", 4)
+        .attr("stroke-width", 1)  // Set initial stroke width in JS (increased from 0.5)
+        .attr("cx", d => xScale(d.x))
+        .attr("cy", d => yScale(d.y))
+        .attr("fill", d => color(d.label));
 
-  function nearestThreshold(val) {
-    const keys = Object.keys(labelsByThreshold).map(parseFloat);
-    const closest = keys.reduce((a,b) => Math.abs(a-val)<Math.abs(b-val)?a:b);
-    return closest.toFixed(2);
-  }
+      // Click handler on the zoomable group
+      g.on("click", function (event) {
+        const [mx, my] = d3.pointer(event);
+        const nearest = d3.least(points, d =>
+          Math.hypot(xScale(d.x) - mx, yScale(d.y) - my)
+        );
+        if (!nearest) return;
 
-  recolorPoints();
-});
-</script>
+        // Find cluster at current lambda
+        const threshold = nearestThreshold(currentLambda);
+        const labels = labelsByThreshold[threshold];
+        const clusterId = labels[points.findIndex(p => p.id === nearest.id)];
+        const clusterIndices = labels
+          .map((lbl, i) => (lbl === clusterId ? i : -1))
+          .filter(i => i !== -1);
+
+        g.selectAll("circle")
+          .classed("selected", (d, i) => clusterIndices.includes(i))
+          .attr("stroke-width", function (d, i) {
+            // Apply proper stroke width based on selection and current zoom
+            const currentTransform = d3.zoomTransform(svg.node());
+            return clusterIndices.includes(i) ?
+              2 / currentTransform.k :
+              1 / currentTransform.k;
+          });
+      });
+
+      lambdaInput.addEventListener("input", e => {
+        currentLambda = parseFloat(e.target.value);
+        lambdaVal.textContent = currentLambda.toFixed(1);
+        recolorPoints();
+      });
+
+      function recolorPoints() {
+        const threshold = nearestThreshold(currentLambda);
+        const labels = labelsByThreshold[threshold];
+        g.selectAll("circle")
+          .attr("fill", (d, i) => color(labels[i]));
+      }
+
+      function nearestThreshold(val) {
+        const keys = Object.keys(labelsByThreshold).map(parseFloat);
+        const closest = keys.reduce((a, b) => Math.abs(a - val) < Math.abs(b - val) ? a : b);
+        return closest.toFixed(2);
+      }
+
+      recolorPoints();
+    });
+  </script>
 </body>
+
 </html>
