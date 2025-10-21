@@ -65,6 +65,7 @@
     let labelsByThreshold = {};
     let currentLambda = parseFloat(lambdaInput.value);
     let autoSelectMode = false;
+    let lastSelectedPoint = null; // Track the last selected point for progressive drilling
 
     // Set up zoom behavior
     const zoom = d3.zoom()
@@ -134,11 +135,27 @@
         let threshold, labels, clusterId;
 
         if (autoSelectMode) {
-          // Auto-select mode: find the highest lambda where this point is not noise
-          const optimalLambda = findOptimalLambda(pointIndex);
-          if (optimalLambda === null) {
-            console.log("Point is noise at all lambda levels");
-            return;
+          // Check if this point is already selected (progressive drilling)
+          const isAlreadySelected = lastSelectedPoint === pointIndex;
+
+          let optimalLambda;
+          if (isAlreadySelected) {
+            // Progressive drilling: find next deeper level
+            optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
+            if (optimalLambda === null) {
+              console.log("Already at deepest level for this point");
+              return;
+            }
+            console.log(`Drilling deeper: λ=${currentLambda.toFixed(2)} → λ=${optimalLambda.toFixed(2)}`);
+          } else {
+            // First selection or different point: find the highest lambda where this point is not noise
+            optimalLambda = findOptimalLambda(pointIndex);
+            if (optimalLambda === null) {
+              console.log("Point is noise at all lambda levels");
+              return;
+            }
+            // Reset tracking since we're selecting a different point
+            lastSelectedPoint = pointIndex;
           }
 
           // Update the slider and current lambda
@@ -153,6 +170,8 @@
           labels = labelsByThreshold[threshold];
           clusterId = labels[pointIndex];
         } else {
+          // Manual mode: reset tracking
+          lastSelectedPoint = null;
           // Manual mode: use current lambda
           threshold = nearestThreshold(currentLambda);
           labels = labelsByThreshold[threshold];
@@ -191,8 +210,11 @@
         autoSelectMode = e.target.checked;
         lambdaInput.disabled = autoSelectMode;
 
+        // Reset tracking when switching modes
+        lastSelectedPoint = null;
+
         if (autoSelectMode) {
-          console.log("Auto-select mode enabled - click points to find optimal λ");
+          console.log("Auto-select mode enabled - click points to find optimal λ, click again to drill deeper");
         } else {
           console.log("Manual mode - use slider to control λ");
         }
@@ -236,6 +258,51 @@
         }
 
         // Point is noise at all levels
+        return null;
+      }
+
+      function findNextDeeperLambda(pointIndex, currentLambda) {
+        // Find the next lower lambda where the cluster containing this point gets LARGER
+        // This creates a "growing cluster" effect as we lower the water level
+        const thresholds = Object.keys(labelsByThreshold)
+          .map(parseFloat)
+          .sort((a, b) => b - a); // Sort descending (highest first)
+
+        // Get current cluster size
+        const currentThreshold = nearestThreshold(currentLambda);
+        const currentLabels = labelsByThreshold[currentThreshold];
+        const currentClusterId = currentLabels[pointIndex];
+
+        if (currentClusterId === -1) {
+          console.log("Current point is noise, cannot expand cluster");
+          return null;
+        }
+
+        const currentClusterSize = currentLabels.filter(label => label === currentClusterId).length;
+        console.log(`Current cluster size: ${currentClusterSize} points`);
+
+        // Find thresholds lower than current lambda
+        const lowerThresholds = thresholds.filter(lambda => lambda < currentLambda);
+
+        for (const lambda of lowerThresholds) {
+          const threshold = lambda.toFixed(2);
+          const labels = labelsByThreshold[threshold];
+          const clusterId = labels[pointIndex];
+
+          if (clusterId !== -1) {
+            // Count points in this cluster
+            const clusterSize = labels.filter(label => label === clusterId).length;
+
+            // Only return if cluster is larger than current
+            if (clusterSize > currentClusterSize) {
+              console.log(`Found expanded cluster: λ=${lambda.toFixed(2)}, size ${currentClusterSize} → ${clusterSize} points`);
+              return lambda;
+            }
+          }
+        }
+
+        // No deeper level available where cluster expands
+        console.log("No larger cluster found at lower lambda levels");
         return null;
       }
 
