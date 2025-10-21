@@ -86,6 +86,64 @@
 
     svg.call(zoom);
 
+    // Add click handler to SVG for background clicks
+    svg.on("click", function (event) {
+      // Check if the click target is the SVG itself (background) or the zoomable group
+      if (event.target === this || event.target === g.node()) {
+        handleBackgroundClick();
+      }
+    });
+
+    function handleBackgroundClick() {
+      console.log("Clicked on background - resetting selection and going to lowest water level");
+
+      // Clear any current selection
+      g.selectAll("circle")
+        .classed("selected", false)
+        .attr("stroke-width", function () {
+          const currentTransform = d3.zoomTransform(svg.node());
+          return 1 / currentTransform.k;
+        });
+
+      // Reset tracking
+      lastSelectedPoint = null;
+
+      // Find the lowest lambda value available
+      if (Object.keys(labelsByThreshold).length > 0) {
+        const thresholds = Object.keys(labelsByThreshold).map(parseFloat);
+        const lowestLambda = Math.min(...thresholds);
+
+        // Update the slider and current lambda to lowest value
+        currentLambda = lowestLambda;
+        lambdaInput.value = currentLambda;
+        lambdaVal.textContent = currentLambda.toFixed(1);
+
+        // Manually recolor points since recolorPoints might not be defined yet
+        const threshold = nearestThreshold(currentLambda);
+        const labels = labelsByThreshold[threshold];
+        g.selectAll("circle")
+          .attr("fill", (d, i) => {
+            const label = labels[i];
+            // Make noise points (label -1) gray and semi-transparent
+            if (label === -1) {
+              return "#cccccc";
+            }
+            return color(label);
+          })
+          .attr("opacity", (d, i) => {
+            const label = labels[i];
+            // Make noise points more transparent
+            return label === -1 ? 0.4 : 1.0;
+          });
+      }
+    }
+
+    function nearestThreshold(val) {
+      const keys = Object.keys(labelsByThreshold).map(parseFloat);
+      const closest = keys.reduce((a, b) => Math.abs(a - val) < Math.abs(b - val) ? a : b);
+      return closest.toFixed(2);
+    }
+
     Promise.all([
       d3.json("out/points_with_labels.json"),
       d3.json("out/labels_by_threshold.json")
@@ -125,11 +183,24 @@
 
       // Click handler on the zoomable group
       g.on("click", function (event) {
+        // Stop propagation to prevent SVG background click handler from firing
+        event.stopPropagation();
+
         const [mx, my] = d3.pointer(event);
         const nearest = d3.least(points, d =>
           Math.hypot(xScale(d.x) - mx, yScale(d.y) - my)
         );
         if (!nearest) return;
+
+        // Calculate distance to nearest point to determine if we clicked on empty space
+        const distanceToNearest = Math.hypot(xScale(nearest.x) - mx, yScale(nearest.y) - my);
+        const clickRadius = 8; // Pixels - if click is further than this from nearest point, treat as empty space
+
+        // If clicked on empty space, handle as background click
+        if (distanceToNearest > clickRadius) {
+          handleBackgroundClick();
+          return;
+        }
 
         const pointIndex = points.findIndex(p => p.id === nearest.id);
         let threshold, labels, clusterId;
