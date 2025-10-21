@@ -3,7 +3,7 @@ import { RoutingExperiment } from './RoutingExperiment';
 import { decodeStorybookArgs, encodeStorybookParam } from '../../../.storybook/preview';
 
 const meta: Meta<typeof RoutingExperiment> = {
-  title: 'Routing Experiment/RoutingExperiment',
+  title: 'Experiments/RoutingExperiment',
   component: RoutingExperiment,
   parameters: {
     layout: 'fullscreen',
