@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Create HDBSCAN water level data for the MagicPaintExperiment component.
+Complete HDBSCAN clustering and water-level data generation script.
 
-This script creates proper water-level clustering data from HDBSCAN hierarchy.
+This script combines two steps:
+1. Run HDBSCAN clustering on input point data
+2. Generate water-level clustering data from the HDBSCAN hierarchy
+
+This creates proper water-level clustering data for the MagicPaintExperiment component.
 It extracts different cluster configurations at various lambda thresholds.
 
-Adapted from python-test/create_water_level_data_fixed.py with defaults
-that point to the right files and directories.
+Combined from python-test/hdbscan_export.py and python-test/create_water_level_data_fixed.py
 """
 
 import json
@@ -14,21 +17,114 @@ import numpy as np
 from pathlib import Path
 import argparse
 
+print("Loading scientific libraries (this may take a moment)...")
+
+try:
+    print("  - Loading numpy...")
+    import numpy as np
+
+    print("  - Loading pandas...")
+    import pandas as pd
+
+    print("  - Loading matplotlib...")
+    import matplotlib.pyplot as plt
+
+    print("  - Loading hdbscan (this is the slowest)...")
+    import hdbscan
+
+    print("All libraries loaded successfully!")
+except ImportError as e:
+    print(f"Error importing required library: {e}")
+    print("Make sure all dependencies are installed with: uv sync")
+    exit(1)
+
+
+def run_hdbscan_clustering(points_data, min_cluster_size=5, min_samples=3):
+    """
+    Run HDBSCAN clustering on point data and return the clusterer and processed data.
+
+    Args:
+        points_data: List of [id, [x, y]] pairs
+        min_cluster_size: Minimum cluster size for HDBSCAN
+        min_samples: Minimum samples for HDBSCAN
+
+    Returns:
+        dict: Contains clusterer, ids, coords, labels, probabilities
+    """
+    ids = [p[0] for p in points_data]
+    coords = np.array([p[1] for p in points_data])
+
+    print("Running HDBSCAN clustering...")
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        min_samples=min_samples,
+        gen_min_span_tree=True,  # Enable for better hierarchy extraction
+    )
+    clusterer.fit(coords)
+    cluster_labels = clusterer.labels_
+    probs = clusterer.probabilities_
+
+    n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    n_noise = list(cluster_labels).count(-1)
+    print(f"Found {n_clusters} clusters and {n_noise} noise points")
+
+    return {
+        "clusterer": clusterer,
+        "ids": ids,
+        "coords": coords,
+        "labels": cluster_labels,
+        "probabilities": probs,
+        "n_clusters": n_clusters,
+        "n_noise": n_noise,
+    }
+
+
+def extract_hierarchy_data(
+    clusterer, ids, coords, cluster_labels, probs, min_cluster_size, min_samples
+):
+    """
+    Extract hierarchy data from HDBSCAN clusterer.
+
+    Returns:
+        dict: Hierarchy data structure compatible with water-level processing
+    """
+    print("Extracting hierarchy tree...")
+    condensed = clusterer.condensed_tree_
+    tree = condensed._raw_tree
+
+    tree_data = {
+        "parent": tree["parent"].tolist(),
+        "child": tree["child"].tolist(),
+        "lambda_val": tree["lambda_val"].tolist(),
+        "child_size": tree["child_size"].tolist(),
+    }
+
+    # Create comprehensive hierarchy data structure
+    hierarchy_data = {
+        "points": [
+            {"id": int(id_), "x": float(coord[0]), "y": float(coord[1])}
+            for id_, coord in zip(ids, coords)
+        ],
+        "labels": cluster_labels.tolist(),
+        "probabilities": probs.tolist(),
+        "tree": tree_data,
+        "cluster_selection_epsilon": clusterer.cluster_selection_epsilon,
+        "min_cluster_size": min_cluster_size,
+        "min_samples": min_samples,
+    }
+
+    return hierarchy_data
+
 
 def create_water_level_clusters(
-    hierarchy_file, output_file, lambda_range=(0.1, 10.0), n_thresholds=50
+    hierarchy_data, lambda_range=(0.1, 10.0), n_thresholds=50
 ):
     """
     Create proper water-level clustering data from HDBSCAN hierarchy.
     This extracts different cluster configurations at various lambda thresholds.
     """
-
-    # Load the hierarchy data
-    with open(hierarchy_file, "r") as f:
-        data = json.load(f)
-
-    tree = data["tree"]
-    points = data["points"]
+    tree = hierarchy_data["tree"]
+    points = hierarchy_data["points"]
     n_points = len(points)
 
     # Convert tree data to numpy arrays for easier processing
@@ -64,11 +160,6 @@ def create_water_level_clusters(
             f"Lambda {lambda_threshold:.2f}: {n_clusters} clusters, {n_noise} noise points"
         )
 
-    # Save the results
-    with open(output_file, "w") as f:
-        json.dump(labels_by_threshold, f, indent=2)
-
-    print(f"✓ Water-level data saved to {output_file}")
     return labels_by_threshold
 
 
@@ -184,14 +275,47 @@ def extract_clusters_at_lambda_fixed(
     return labels
 
 
+def save_visualization_plots(coords, cluster_labels, clusterer, output_dir):
+    """Save visualization plots for debugging."""
+    print("Generating visualization plots...")
+
+    # Cluster scatter plot
+    plt.figure(figsize=(8, 6))
+    plt.title("HDBSCAN Cluster Result")
+    plt.scatter(coords[:, 0], coords[:, 1], c=cluster_labels, cmap="tab10", s=30)
+    plt.colorbar(label="Cluster ID")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.savefig(output_dir / "cluster_scatter.png", dpi=150)
+    plt.close()
+
+    # Condensed tree plot
+    plt.figure(figsize=(8, 6))
+    clusterer.condensed_tree_.plot(select_clusters=True)
+    plt.title("Condensed Tree (Hierarchical structure)")
+    plt.savefig(output_dir / "condensed_tree.png", dpi=150)
+    plt.close()
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Create water-level clustering data from HDBSCAN hierarchy"
+        description="Run HDBSCAN clustering and create water-level clustering data"
     )
     parser.add_argument(
-        "--hierarchy-file",
-        default="python-test/out/hdbscan_hierarchy.json",
-        help="Input hierarchy file (default: python-test/out/hdbscan_hierarchy.json)",
+        "input_file",
+        help="Path to the input JSON file containing point data (format: [[id, [x, y]], ...])",
+    )
+    parser.add_argument(
+        "--min-cluster-size",
+        type=int,
+        default=5,
+        help="Minimum cluster size for HDBSCAN (default: 5)",
+    )
+    parser.add_argument(
+        "--min-samples",
+        type=int,
+        default=3,
+        help="Minimum samples for HDBSCAN (default: 3)",
     )
     parser.add_argument(
         "--output-file",
@@ -202,45 +326,141 @@ def main():
         "--lambda-min",
         type=float,
         default=0.1,
-        help="Minimum lambda value (default: 0.1)",
+        help="Minimum lambda value for water-level (default: 0.1)",
     )
     parser.add_argument(
         "--lambda-max",
         type=float,
         default=10.0,
-        help="Maximum lambda value (default: 10.0)",
+        help="Maximum lambda value for water-level (default: 10.0)",
     )
     parser.add_argument(
         "--n-thresholds",
         type=int,
         default=50,
-        help="Number of lambda thresholds (default: 50)",
+        help="Number of lambda thresholds for water-level (default: 50)",
+    )
+    parser.add_argument(
+        "--save-hierarchy",
+        action="store_true",
+        help="Save intermediate hierarchy data file",
+    )
+    parser.add_argument(
+        "--save-points",
+        action="store_true",
+        help="Save points with labels file",
+    )
+    parser.add_argument(
+        "--save-plots",
+        action="store_true",
+        help="Save visualization plots",
     )
 
     args = parser.parse_args()
 
-    hierarchy_file = Path(args.hierarchy_file)
-    output_file = Path(args.output_file)
-
-    # Create output directory if it doesn't exist
-    output_file.parent.mkdir(exist_ok=True)
-
-    if not hierarchy_file.exists():
-        print(f"Error: {hierarchy_file} not found. Run hdbscan_export.py first.")
+    # Validate input file exists
+    input_path = Path(args.input_file)
+    if not input_path.exists():
+        print(f"Error: Input file '{args.input_file}' does not exist")
         return 1
 
+    # Load input data
     try:
-        create_water_level_clusters(
-            hierarchy_file,
-            output_file,
-            lambda_range=(args.lambda_min, args.lambda_max),
-            n_thresholds=args.n_thresholds,
-        )
-        print(f"\n🎯 Water-level data ready for MagicPaintExperiment component!")
-        return 0
-    except Exception as e:
-        print(f"❌ Error: {e}")
+        with open(input_path, "r") as f:
+            points_data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in file '{args.input_file}': {e}")
         return 1
+    except Exception as e:
+        print(f"Error reading file '{args.input_file}': {e}")
+        return 1
+
+    print(f"Loaded {len(points_data)} points from {input_path}")
+
+    # Step 1: Run HDBSCAN clustering
+    clustering_result = run_hdbscan_clustering(
+        points_data,
+        min_cluster_size=args.min_cluster_size,
+        min_samples=args.min_samples,
+    )
+
+    # Step 2: Extract hierarchy data
+    hierarchy_data = extract_hierarchy_data(
+        clustering_result["clusterer"],
+        clustering_result["ids"],
+        clustering_result["coords"],
+        clustering_result["labels"],
+        clustering_result["probabilities"],
+        args.min_cluster_size,
+        args.min_samples,
+    )
+
+    # Step 3: Create water-level clusters
+    print("\n" + "=" * 50)
+    print("CREATING WATER-LEVEL DATA")
+    print("=" * 50)
+
+    labels_by_threshold = create_water_level_clusters(
+        hierarchy_data,
+        lambda_range=(args.lambda_min, args.lambda_max),
+        n_thresholds=args.n_thresholds,
+    )
+
+    # Step 4: Save main output
+    output_file = Path(args.output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w") as f:
+        json.dump(labels_by_threshold, f, indent=2)
+
+    print(f"✓ Water-level data saved to {output_file}")
+
+    # Step 5: Save optional intermediate files if requested
+    output_dir = output_file.parent
+
+    if args.save_hierarchy:
+        hierarchy_file = output_dir / "hdbscan_hierarchy.json"
+        with open(hierarchy_file, "w") as f:
+            json.dump(hierarchy_data, f, indent=2)
+        print(f"✓ Hierarchy data saved to {hierarchy_file}")
+
+    if args.save_points:
+        points_out = [
+            {
+                "id": int(i),
+                "x": float(x),
+                "y": float(y),
+                "label": int(lbl),
+                "prob": float(prob),
+            }
+            for i, (x, y, lbl, prob) in zip(
+                clustering_result["ids"],
+                np.c_[
+                    clustering_result["coords"],
+                    clustering_result["labels"],
+                    clustering_result["probabilities"],
+                ],
+            )
+        ]
+        points_file = output_dir / "points_with_labels.json"
+        with open(points_file, "w") as f:
+            json.dump(points_out, f, indent=2)
+        print(f"✓ Points with labels saved to {points_file}")
+
+    if args.save_plots:
+        save_visualization_plots(
+            clustering_result["coords"],
+            clustering_result["labels"],
+            clustering_result["clusterer"],
+            output_dir,
+        )
+        print(f"✓ Visualization plots saved to {output_dir}")
+
+    print(
+        f"🎯 Complete! Processed {len(points_data)} points with {clustering_result['n_clusters']} clusters and {clustering_result['n_noise']} noise points"
+    )
+
+    return 0
 
 
 if __name__ == "__main__":
