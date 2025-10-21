@@ -261,86 +261,48 @@
           const isPointSelected = g.select(`circle:nth-child(${pointIndex + 1})`).classed("selected");
 
           if (isPointSelected) {
-            // Find next deeper lambda for any selected point
-            const optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
-            if (optimalLambda === null) {
-              console.log("Already at deepest level for this cluster");
-              return;
+            // Check if we're at the lowest water level (everything selected)
+            const selectedCount = g.selectAll("circle.selected").size();
+            const currentThreshold = nearestThreshold(currentLambda);
+            const currentLabels = labelsByThreshold[currentThreshold];
+            const totalNonNoisePoints = currentLabels.filter(label => label !== -1).length;
+
+            if (selectedCount >= totalNonNoisePoints) {
+              // At lowest water level - use original auto-select behavior
+              console.log("At lowest water level - using original selection mode");
+              handleAutoSelect(pointIndex, false); // false = not already selected
+            } else {
+              // Normal expand selection behavior
+              const optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
+              if (optimalLambda === null) {
+                console.log("Already at deepest level for this cluster");
+                return;
+              }
+
+              console.log(`Expanding selection: λ=${currentLambda.toFixed(2)} → λ=${optimalLambda.toFixed(2)}`);
+
+              // Update the slider and current lambda
+              currentLambda = optimalLambda;
+              lambdaInput.value = currentLambda;
+              lambdaVal.textContent = currentLambda.toFixed(1);
+
+              // Recolor all points at the new lambda level
+              recolorPoints();
+
+              threshold = nearestThreshold(currentLambda);
+              labels = labelsByThreshold[threshold];
+              clusterId = labels[pointIndex];
+
+              // Select the new cluster
+              selectCluster(clusterId, labels);
             }
-
-            console.log(`Expanding selection: λ=${currentLambda.toFixed(2)} → λ=${optimalLambda.toFixed(2)}`);
-
-            // Update the slider and current lambda
-            currentLambda = optimalLambda;
-            lambdaInput.value = currentLambda;
-            lambdaVal.textContent = currentLambda.toFixed(1);
-
-            // Recolor all points at the new lambda level
-            recolorPoints();
-
-            threshold = nearestThreshold(currentLambda);
-            labels = labelsByThreshold[threshold];
-            clusterId = labels[pointIndex];
-
-            // Select the new cluster
-            const clusterIndices = labels
-              .map((lbl, i) => (lbl === clusterId ? i : -1))
-              .filter(i => i !== -1);
-
-            g.selectAll("circle")
-              .classed("selected", (d, i) => clusterIndices.includes(i))
-              .attr("stroke-width", function (d, i) {
-                const currentTransform = d3.zoomTransform(svg.node());
-                const threshold = nearestThreshold(currentLambda);
-                const labels = labelsByThreshold[threshold];
-                const isNoise = labels && labels[i] === -1;
-
-                if (isNoise) return 0;
-                return clusterIndices.includes(i) ?
-                  2 / currentTransform.k :
-                  1 / currentTransform.k;
-              });
-
-            updateSelectionCount(clusterIndices.length);
             return;
           }
         }
 
         if (autoSelectMode) {
-          // Check if this point is already selected (progressive drilling)
-          const isAlreadySelected = lastSelectedPoint === pointIndex;
-
-          let optimalLambda;
-          if (isAlreadySelected) {
-            // Progressive drilling: find next deeper level
-            optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
-            if (optimalLambda === null) {
-              console.log("Already at deepest level for this point");
-              return;
-            }
-            console.log(`Drilling deeper: λ=${currentLambda.toFixed(2)} → λ=${optimalLambda.toFixed(2)}`);
-          } else {
-            // First selection or different point: find the highest lambda where this point is not noise
-            optimalLambda = findOptimalLambda(pointIndex);
-            if (optimalLambda === null) {
-              console.log("Point is noise at all lambda levels");
-              return;
-            }
-            // Reset tracking since we're selecting a different point
-            lastSelectedPoint = pointIndex;
-          }
-
-          // Update the slider and current lambda
-          currentLambda = optimalLambda;
-          lambdaInput.value = currentLambda;
-          lambdaVal.textContent = currentLambda.toFixed(1);
-
-          // Recolor all points at the new lambda level
-          recolorPoints();
-
-          threshold = nearestThreshold(currentLambda);
-          labels = labelsByThreshold[threshold];
-          clusterId = labels[pointIndex];
+          handleAutoSelect(pointIndex, lastSelectedPoint === pointIndex);
+          return;
         } else {
           // Manual mode: reset tracking
           lastSelectedPoint = null;
@@ -356,28 +318,7 @@
           }
         }
 
-        const clusterIndices = labels
-          .map((lbl, i) => (lbl === clusterId ? i : -1))
-          .filter(i => i !== -1);
-
-        g.selectAll("circle")
-          .classed("selected", (d, i) => clusterIndices.includes(i))
-          .attr("stroke-width", function (d, i) {
-            // Apply proper stroke width based on selection and current zoom
-            const currentTransform = d3.zoomTransform(svg.node());
-            const threshold = nearestThreshold(currentLambda);
-            const labels = labelsByThreshold[threshold];
-            const isNoise = labels && labels[i] === -1;
-
-            // No stroke for noise points
-            if (isNoise) return 0;
-            return clusterIndices.includes(i) ?
-              2 / currentTransform.k :
-              1 / currentTransform.k;
-          });
-
-        // Update selection count
-        updateSelectionCount(clusterIndices.length);
+        selectCluster(clusterId, labels);
       });
 
       lambdaInput.addEventListener("input", e => {
@@ -418,6 +359,67 @@
           console.log("Expand selection mode disabled");
         }
       });
+
+      function handleAutoSelect(pointIndex, isAlreadySelected) {
+        let optimalLambda;
+        if (isAlreadySelected) {
+          // Progressive drilling: find next deeper level
+          optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
+          if (optimalLambda === null) {
+            console.log("Already at deepest level for this point");
+            return;
+          }
+          console.log(`Drilling deeper: λ=${currentLambda.toFixed(2)} → λ=${optimalLambda.toFixed(2)}`);
+        } else {
+          // First selection or different point: find the highest lambda where this point is not noise
+          optimalLambda = findOptimalLambda(pointIndex);
+          if (optimalLambda === null) {
+            console.log("Point is noise at all lambda levels");
+            return;
+          }
+          // Reset tracking since we're selecting a different point
+          lastSelectedPoint = pointIndex;
+        }
+
+        // Update the slider and current lambda
+        currentLambda = optimalLambda;
+        lambdaInput.value = currentLambda;
+        lambdaVal.textContent = currentLambda.toFixed(1);
+
+        // Recolor all points at the new lambda level
+        recolorPoints();
+
+        const threshold = nearestThreshold(currentLambda);
+        const labels = labelsByThreshold[threshold];
+        const clusterId = labels[pointIndex];
+
+        selectCluster(clusterId, labels);
+      }
+
+      function selectCluster(clusterId, labels) {
+        const clusterIndices = labels
+          .map((lbl, i) => (lbl === clusterId ? i : -1))
+          .filter(i => i !== -1);
+
+        g.selectAll("circle")
+          .classed("selected", (d, i) => clusterIndices.includes(i))
+          .attr("stroke-width", function (d, i) {
+            // Apply proper stroke width based on selection and current zoom
+            const currentTransform = d3.zoomTransform(svg.node());
+            const threshold = nearestThreshold(currentLambda);
+            const labels = labelsByThreshold[threshold];
+            const isNoise = labels && labels[i] === -1;
+
+            // No stroke for noise points
+            if (isNoise) return 0;
+            return clusterIndices.includes(i) ?
+              2 / currentTransform.k :
+              1 / currentTransform.k;
+          });
+
+        // Update selection count
+        updateSelectionCount(clusterIndices.length);
+      }
 
       function recolorPoints() {
         const threshold = nearestThreshold(currentLambda);
