@@ -26,9 +26,9 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   const [points, setPoints] = React.useState<Point[]>([]);
   const [labelsByThreshold, setLabelsByThreshold] = React.useState<LabelsByThreshold>({});
   const [currentLambda, setCurrentLambda] = React.useState(3.0);
-  const [autoSelectMode, setAutoSelectMode] = React.useState(false);
-  const [expandSelectionMode, setExpandSelectionMode] = React.useState(false);
-  const [displayGroupColors, setDisplayGroupColors] = React.useState(true);
+  const [autoSelectMode, setAutoSelectMode] = React.useState(true);
+  const [expandSelectionMode, setExpandSelectionMode] = React.useState(true);
+  const [displayGroupColors, setDisplayGroupColors] = React.useState(false);
   const [selectedPoints, setSelectedPoints] = React.useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = React.useState(true);
   const [lastSelectedPoint, setLastSelectedPoint] = React.useState<string | null>(null);
@@ -504,7 +504,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                 checked={displayGroupColors}
                 onChange={(e) => setDisplayGroupColors(e.target.checked)}
               />
-              <span className="text-sm">Style by cluster label</span>
+              <span className="text-sm">Style by cluster label (debug)</span>
             </label>
           </div>
 
