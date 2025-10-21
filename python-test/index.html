@@ -42,6 +42,10 @@
     <label>
       <input id="autoSelect" type="checkbox"> Auto-select threshold (click finds optimal λ level)
     </label>
+    <br><br>
+    <div id="selectionInfo" style="font-weight: bold; color: #333;">
+      Selected points: <span id="selectedCount">0 / 0</span>
+    </div>
   </div>
 
   <svg id="plot" width="600" height="400"></svg>
@@ -76,8 +80,14 @@
         // Keep dots and borders the same size by adjusting inversely to zoom scale
         g.selectAll("circle")
           .attr("r", 4 / event.transform.k)
-          .attr("stroke-width", function (d) {
-            // Use different stroke width for selected vs normal dots
+          .attr("stroke-width", function (d, i) {
+            // Get current labels to check if point is noise
+            const threshold = nearestThreshold(currentLambda);
+            const labels = labelsByThreshold[threshold];
+            const isNoise = labels && labels[i] === -1;
+
+            // No stroke for noise points, different stroke width for selected vs normal dots
+            if (isNoise) return 0;
             return d3.select(this).classed("selected") ?
               2 / event.transform.k :
               1 / event.transform.k;
@@ -100,10 +110,19 @@
       // Clear any current selection
       g.selectAll("circle")
         .classed("selected", false)
-        .attr("stroke-width", function () {
+        .attr("stroke-width", function (d, i) {
           const currentTransform = d3.zoomTransform(svg.node());
-          return 1 / currentTransform.k;
+          // Get current labels to check if point is noise
+          const threshold = nearestThreshold(currentLambda);
+          const labels = labelsByThreshold[threshold];
+          const isNoise = labels && labels[i] === -1;
+
+          // No stroke for noise points
+          return isNoise ? 0 : 1 / currentTransform.k;
         });
+
+      // Update selection count
+      updateSelectionCount(0);
 
       // Reset tracking
       lastSelectedPoint = null;
@@ -134,6 +153,17 @@
             const label = labels[i];
             // Make noise points more transparent
             return label === -1 ? 0.4 : 1.0;
+          })
+          .attr("stroke-width", function (d, i) {
+            const currentTransform = d3.zoomTransform(svg.node());
+            const label = labels[i];
+            const isNoise = label === -1;
+
+            // No stroke for noise points
+            if (isNoise) return 0;
+            return d3.select(this).classed("selected") ?
+              2 / currentTransform.k :
+              1 / currentTransform.k;
           });
       }
     }
@@ -142,6 +172,15 @@
       const keys = Object.keys(labelsByThreshold).map(parseFloat);
       const closest = keys.reduce((a, b) => Math.abs(a - val) < Math.abs(b - val) ? a : b);
       return closest.toFixed(2);
+    }
+
+    function updateSelectionCount(count) {
+      const selectedCountElement = document.getElementById("selectedCount");
+      if (selectedCountElement) {
+        const total = points.length;
+        const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+        selectedCountElement.textContent = `${count} / ${total} (${percentage}%)`;
+      }
     }
 
     Promise.all([
@@ -164,7 +203,13 @@
         .append("circle")
         .attr("class", "point")
         .attr("r", 4)
-        .attr("stroke-width", 1)  // Set initial stroke width in JS (increased from 0.5)
+        .attr("stroke-width", function (d, i) {
+          // Initial stroke width - no stroke for noise points
+          const threshold = nearestThreshold(currentLambda);
+          const labels = labelsByThreshold[threshold];
+          const isNoise = labels && labels[i] === -1;
+          return isNoise ? 0 : 1;
+        })
         .attr("cx", d => xScale(d.x))
         .attr("cy", d => yScale(d.y))
         .attr("fill", d => color(d.label))
@@ -264,10 +309,19 @@
           .attr("stroke-width", function (d, i) {
             // Apply proper stroke width based on selection and current zoom
             const currentTransform = d3.zoomTransform(svg.node());
+            const threshold = nearestThreshold(currentLambda);
+            const labels = labelsByThreshold[threshold];
+            const isNoise = labels && labels[i] === -1;
+
+            // No stroke for noise points
+            if (isNoise) return 0;
             return clusterIndices.includes(i) ?
               2 / currentTransform.k :
               1 / currentTransform.k;
           });
+
+        // Update selection count
+        updateSelectionCount(clusterIndices.length);
       });
 
       lambdaInput.addEventListener("input", e => {
@@ -307,6 +361,17 @@
             const label = labels[i];
             // Make noise points more transparent
             return label === -1 ? 0.4 : 1.0;
+          })
+          .attr("stroke-width", function (d, i) {
+            const currentTransform = d3.zoomTransform(svg.node());
+            const label = labels[i];
+            const isNoise = label === -1;
+
+            // No stroke for noise points
+            if (isNoise) return 0;
+            return d3.select(this).classed("selected") ?
+              2 / currentTransform.k :
+              1 / currentTransform.k;
           });
       }
 
