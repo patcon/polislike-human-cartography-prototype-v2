@@ -47,6 +47,10 @@
       <input id="expandSelection" type="checkbox" disabled> Expand selection (click any selected point to drill deeper)
     </label>
     <br><br>
+    <label>
+      <input id="displayGroupColors" type="checkbox" checked> Style by cluster label
+    </label>
+    <br><br>
     <div id="selectionInfo" style="font-weight: bold; color: #333;">
       Selected points: <span id="selectedCount">0 / 0</span>
     </div>
@@ -69,12 +73,14 @@
     const lambdaVal = document.getElementById("lambdaVal");
     const autoSelectCheckbox = document.getElementById("autoSelect");
     const expandSelectionCheckbox = document.getElementById("expandSelection");
+    const displayGroupColorsCheckbox = document.getElementById("displayGroupColors");
 
     let points = [];
     let labelsByThreshold = {};
     let currentLambda = parseFloat(lambdaInput.value);
     let autoSelectMode = false;
     let expandSelectionMode = false;
+    let displayGroupColors = true;
     let lastSelectedPoint = null; // Track the last selected point for progressive drilling
 
     // Set up zoom behavior
@@ -92,12 +98,18 @@
             const labels = labelsByThreshold[threshold];
             const isNoise = labels && labels[i] === -1;
 
-            // No stroke for noise points, different stroke width for selected vs normal dots
-            if (isNoise) return 0;
+            if (displayGroupColors) {
+              // No stroke for noise points when showing cluster colors
+              if (isNoise) return 0;
+            }
+            // All points get stroke when not showing cluster colors, or non-noise when showing cluster colors
             return d3.select(this).classed("selected") ?
               2 / event.transform.k :
               1 / event.transform.k;
           });
+
+        // Maintain colors during zoom
+        recolorPoints();
       });
 
     svg.call(zoom);
@@ -147,26 +159,41 @@
         const threshold = nearestThreshold(currentLambda);
         const labels = labelsByThreshold[threshold];
         g.selectAll("circle")
-          .attr("fill", (d, i) => {
+          .attr("fill", function (d, i) {
             const label = labels[i];
-            // Make noise points (label -1) gray and semi-transparent
-            if (label === -1) {
-              return "#cccccc";
+            const isSelected = d3.select(this).classed("selected");
+
+            if (displayGroupColors) {
+              // Original behavior: group colors with gray noise points
+              if (label === -1) {
+                return "#cccccc";
+              }
+              return color(label);
+            } else {
+              // New behavior: light gray dots with orange selection
+              return isSelected ? "#ff8c00" : "#d3d3d3"; // Orange for selected, light gray for all others (including noise)
             }
-            return color(label);
           })
           .attr("opacity", (d, i) => {
             const label = labels[i];
-            // Make noise points more transparent
-            return label === -1 ? 0.4 : 1.0;
+            if (displayGroupColors) {
+              // Make noise points more transparent when showing cluster colors
+              return label === -1 ? 0.4 : 1.0;
+            } else {
+              // All points have same opacity when not showing cluster colors
+              return 1.0;
+            }
           })
           .attr("stroke-width", function (d, i) {
             const currentTransform = d3.zoomTransform(svg.node());
             const label = labels[i];
             const isNoise = label === -1;
 
-            // No stroke for noise points
-            if (isNoise) return 0;
+            if (displayGroupColors) {
+              // No stroke for noise points when showing cluster colors
+              if (isNoise) return 0;
+            }
+            // All points get stroke when not showing cluster colors, or non-noise when showing cluster colors
             return d3.select(this).classed("selected") ?
               2 / currentTransform.k :
               1 / currentTransform.k;
@@ -359,6 +386,17 @@
           console.log("Expand selection mode disabled");
         }
       });
+      // Display group colors checkbox event listener
+      displayGroupColorsCheckbox.addEventListener("change", e => {
+        displayGroupColors = e.target.checked;
+        recolorPoints();
+
+        if (displayGroupColors) {
+          console.log("Cluster label styling enabled");
+        } else {
+          console.log("Cluster label styling disabled - showing light gray dots with orange selection");
+        }
+      });
 
       function handleAutoSelect(pointIndex, isAlreadySelected) {
         let optimalLambda;
@@ -419,32 +457,52 @@
 
         // Update selection count
         updateSelectionCount(clusterIndices.length);
+
+        // Recolor points to update selection colors
+        if (!displayGroupColors) {
+          recolorPoints();
+        }
       }
 
       function recolorPoints() {
         const threshold = nearestThreshold(currentLambda);
         const labels = labelsByThreshold[threshold];
         g.selectAll("circle")
-          .attr("fill", (d, i) => {
+          .attr("fill", function (d, i) {
             const label = labels[i];
-            // Make noise points (label -1) gray and semi-transparent
-            if (label === -1) {
-              return "#cccccc";
+            const isSelected = d3.select(this).classed("selected");
+
+            if (displayGroupColors) {
+              // Original behavior: group colors with gray noise points
+              if (label === -1) {
+                return "#cccccc";
+              }
+              return color(label);
+            } else {
+              // New behavior: light gray dots with orange selection
+              return isSelected ? "#ff8c00" : "#d3d3d3"; // Orange for selected, light gray for all others (including noise)
             }
-            return color(label);
           })
           .attr("opacity", (d, i) => {
             const label = labels[i];
-            // Make noise points more transparent
-            return label === -1 ? 0.4 : 1.0;
+            if (displayGroupColors) {
+              // Make noise points more transparent when showing cluster colors
+              return label === -1 ? 0.4 : 1.0;
+            } else {
+              // All points have same opacity when not showing cluster colors
+              return 1.0;
+            }
           })
           .attr("stroke-width", function (d, i) {
             const currentTransform = d3.zoomTransform(svg.node());
             const label = labels[i];
             const isNoise = label === -1;
 
-            // No stroke for noise points
-            if (isNoise) return 0;
+            if (displayGroupColors) {
+              // No stroke for noise points when showing cluster colors
+              if (isNoise) return 0;
+            }
+            // All points get stroke when not showing cluster colors, or non-noise when showing cluster colors
             return d3.select(this).classed("selected") ?
               2 / currentTransform.k :
               1 / currentTransform.k;
