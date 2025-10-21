@@ -102,7 +102,19 @@
         .attr("stroke-width", 1)  // Set initial stroke width in JS (increased from 0.5)
         .attr("cx", d => xScale(d.x))
         .attr("cy", d => yScale(d.y))
-        .attr("fill", d => color(d.label));
+        .attr("fill", d => color(d.label))
+        .on("mouseover", function (event, d) {
+          // Change cursor based on whether point is selectable
+          const threshold = nearestThreshold(currentLambda);
+          const labels = labelsByThreshold[threshold];
+          const pointIndex = points.findIndex(p => p.id === d.id);
+          const clusterId = labels[pointIndex];
+
+          d3.select(this).style("cursor", clusterId === -1 ? "default" : "pointer");
+        })
+        .on("mouseout", function () {
+          d3.select(this).style("cursor", "pointer");
+        });
 
       // Click handler on the zoomable group
       g.on("click", function (event) {
@@ -116,6 +128,13 @@
         const threshold = nearestThreshold(currentLambda);
         const labels = labelsByThreshold[threshold];
         const clusterId = labels[points.findIndex(p => p.id === nearest.id)];
+
+        // Don't select noise points (cluster ID -1)
+        if (clusterId === -1) {
+          console.log("Clicked on noise point - not selectable");
+          return;
+        }
+
         const clusterIndices = labels
           .map((lbl, i) => (lbl === clusterId ? i : -1))
           .filter(i => i !== -1);
@@ -141,7 +160,19 @@
         const threshold = nearestThreshold(currentLambda);
         const labels = labelsByThreshold[threshold];
         g.selectAll("circle")
-          .attr("fill", (d, i) => color(labels[i]));
+          .attr("fill", (d, i) => {
+            const label = labels[i];
+            // Make noise points (label -1) gray and semi-transparent
+            if (label === -1) {
+              return "#cccccc";
+            }
+            return color(label);
+          })
+          .attr("opacity", (d, i) => {
+            const label = labels[i];
+            // Make noise points more transparent
+            return label === -1 ? 0.4 : 1.0;
+          });
       }
 
       function nearestThreshold(val) {
