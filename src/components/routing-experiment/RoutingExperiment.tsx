@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { fetchAndProcessKedroData } from "@/lib/kedro-api";
+import { ChevronRightIcon, SettingsIcon } from "lucide-react";
 
 type Point = {
   id: string;
@@ -1044,234 +1046,251 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     <div className="relative w-screen h-screen">
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-50" />
 
-      {/* Controls */}
-      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border max-w-sm">
-        <h3 className="text-lg font-semibold mb-4">Routing Experiment</h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Routing Algorithm</label>
-            <Select value={selectedAlgorithm} onValueChange={(value: RoutingAlgorithm) => setSelectedAlgorithm(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROUTING_ALGORITHMS.map((algo) => (
-                  <SelectItem key={algo.id} value={algo.id}>
-                    {algo.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Network Type</label>
-            <Select value={selectedNetworkType} onValueChange={(value: NetworkType) => setSelectedNetworkType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {NETWORK_TYPES.map((network) => (
-                  <SelectItem key={network.id} value={network.id}>
-                    {network.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {(selectedNetworkType === "knn" || selectedNetworkType === "delaunay-knn") && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                K ({selectedNetworkType === "delaunay-knn" ? "Max edges per node" : "Neighbors"}): {knnK}
-              </label>
-              <input
-                type="range"
-                min="3"
-                max="15"
-                value={knnK}
-                onChange={(e) => setKnnK(parseInt(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          )}
-
-          {selectedNetworkType === "geometric" && (
-            <div>
-              <label className="block text-sm font-medium mb-2">Radius: {geometricRadius.toFixed(3)}</label>
-              <input
-                type="range"
-                min="0.05"
-                max="0.5"
-                step="0.01"
-                value={geometricRadius}
-                onChange={(e) => setGeometricRadius(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          )}
-
-          <div className="space-y-3 border-t pt-3">
-            <h4 className="text-sm font-medium">Density Field</h4>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Density Radius: {densityRadius.toFixed(3)}
-              </label>
-              <input
-                type="range"
-                min="0.05"
-                max="0.5"
-                step="0.01"
-                value={densityRadius}
-                onChange={(e) => setDensityRadius(parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Radius for counting nearby points
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Density Cost: {densityAlpha.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="-1.0"
-                max="1.0"
-                step="0.05"
-                value={densityAlpha}
-                onChange={(e) => setDensityAlpha(parseFloat(e.target.value))}
-                className="w-full"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {densityAlpha > 0 ? "Positive: avoid dense areas" :
-                 densityAlpha < 0 ? "Negative: prefer dense areas" :
-                 "Zero: no density effect"}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Display Settings</h4>
-
-            <div className="space-y-2">
+      {/* Collapsible Controls Sheet */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button
+            variant="default"
+            size="sm"
+            className="absolute top-4 left-4 z-10 shadow-lg"
+          >
+            <SettingsIcon className="w-4 h-4 mr-2" />
+            Controls
+            <ChevronRightIcon className="w-4 h-4 ml-2" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-full sm:w-[540px] overflow-hidden p-6">
+          <SheetHeader className="pb-4">
+            <SheetTitle>Routing Experiment Controls</SheetTitle>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)]">
+            <div className="space-y-4 pb-6">
               <div>
-                <Label className="text-xs font-medium mb-1 block">Edges</Label>
-                <RadioGroup
-                  value={showEdges}
-                  onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowEdges(value)}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="none" id="edges-none" className="w-3 h-3" />
-                    <Label htmlFor="edges-none" className="text-xs">None</Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="all" id="edges-all" className="w-3 h-3" />
-                    <Label htmlFor="edges-all" className="text-xs">All</Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="only path" id="edges-path" className="w-3 h-3" />
-                    <Label htmlFor="edges-path" className="text-xs">Path</Label>
-                  </div>
-                </RadioGroup>
+                <label className="block text-sm font-medium mb-2">Routing Algorithm</label>
+                <Select value={selectedAlgorithm} onValueChange={(value: RoutingAlgorithm) => setSelectedAlgorithm(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUTING_ALGORITHMS.map((algo) => (
+                      <SelectItem key={algo.id} value={algo.id}>
+                        {algo.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <Label className="text-xs font-medium mb-1 block">Nodes</Label>
-                <RadioGroup
-                  value={showNodes}
-                  onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowNodes(value)}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="none" id="nodes-none" className="w-3 h-3" />
-                    <Label htmlFor="nodes-none" className="text-xs">None</Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="all" id="nodes-all" className="w-3 h-3" />
-                    <Label htmlFor="nodes-all" className="text-xs">All</Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="only path" id="nodes-path" className="w-3 h-3" />
-                    <Label htmlFor="nodes-path" className="text-xs">Path</Label>
-                  </div>
-                </RadioGroup>
+                <label className="block text-sm font-medium mb-2">Network Type</label>
+                <Select value={selectedNetworkType} onValueChange={(value: NetworkType) => setSelectedNetworkType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NETWORK_TYPES.map((network) => (
+                      <SelectItem key={network.id} value={network.id}>
+                        {network.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div>
-                <Label className="text-xs font-medium mb-1 block">Path</Label>
-                <RadioGroup
-                  value={pathStyle}
-                  onValueChange={(value: 'sharp' | 'smooth') => setLocalPathStyle(value)}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="sharp" id="path-sharp" className="w-3 h-3" />
-                    <Label htmlFor="path-sharp" className="text-xs">Sharp</Label>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <RadioGroupItem value="smooth" id="path-smooth" className="w-3 h-3" />
-                    <Label htmlFor="path-smooth" className="text-xs">Smooth</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-sm text-gray-600">
-            <p><strong>Instructions:</strong></p>
-            <ol className="list-decimal list-inside space-y-1 mt-2">
-              <li>Two random points are selected automatically on load</li>
-              <li>Click "Random Points" to select new random points</li>
-              <li>Click any point to manually set <span className="text-green-600 font-medium">source</span> and <span className="text-red-600 font-medium">destination</span></li>
-              <li>Try different routing algorithms and network types</li>
-              <li>Use scroll wheel to zoom, double-click to reset zoom</li>
-            </ol>
-            <div className="mt-2 text-xs">
-              <p><span className="text-green-600">●</span> Source point</p>
-              <p><span className="text-red-600">●</span> Destination point</p>
-              <p><span className="text-orange-500">●</span> Intermediate path points</p>
-            </div>
-          </div>
-
-          {sourcePoint && (
-            <div className="text-sm">
-              <p><span className="text-green-600 font-medium">Source:</span> Point {sourcePoint.id}</p>
-            </div>
-          )}
-
-          {destinationPoint && (
-            <div className="text-sm">
-              <p><span className="text-red-600 font-medium">Destination:</span> Point {destinationPoint.id}</p>
-            </div>
-          )}
-
-          {sourcePoint && destinationPoint && pathPoints.length > 0 && (
-            <div className="text-sm">
-              <p><span className="text-orange-500 font-medium">Path:</span> {pathPoints.length} points</p>
-              <p><span className="text-blue-600 font-medium">Hops:</span> {pathPoints.length - 1}</p>
-              {pathPoints.length > 2 && (
-                <p className="text-xs text-gray-500">
-                  Route: {pathPoints.slice(1, -1).map(p => p.id).join(' → ')}
-                </p>
+              {(selectedNetworkType === "knn" || selectedNetworkType === "delaunay-knn") && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    K ({selectedNetworkType === "delaunay-knn" ? "Max edges per node" : "Neighbors"}): {knnK}
+                  </label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="15"
+                    value={knnK}
+                    onChange={(e) => setKnnK(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
               )}
-            </div>
-          )}
 
-          <div className="flex gap-2">
-            <Button onClick={handleReset} variant="outline" className="flex-1">
-              Reset Points
-            </Button>
-            <Button onClick={handleRandomPoints} variant="default" className="flex-1">
-              Random Points
-            </Button>
+              {selectedNetworkType === "geometric" && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Radius: {geometricRadius.toFixed(3)}</label>
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="0.5"
+                    step="0.01"
+                    value={geometricRadius}
+                    onChange={(e) => setGeometricRadius(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-3 border-t pt-3">
+                <h4 className="text-sm font-medium">Density Field</h4>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Density Radius: {densityRadius.toFixed(3)}
+                  </label>
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="0.5"
+                    step="0.01"
+                    value={densityRadius}
+                    onChange={(e) => setDensityRadius(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Radius for counting nearby points
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Density Cost: {densityAlpha.toFixed(2)}
+                  </label>
+                  <input
+                    type="range"
+                    min="-1.0"
+                    max="1.0"
+                    step="0.05"
+                    value={densityAlpha}
+                    onChange={(e) => setDensityAlpha(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {densityAlpha > 0 ? "Positive: avoid dense areas" :
+                     densityAlpha < 0 ? "Negative: prefer dense areas" :
+                     "Zero: no density effect"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Display Settings</h4>
+
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">Edges</Label>
+                    <RadioGroup
+                      value={showEdges}
+                      onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowEdges(value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="none" id="edges-none" className="w-3 h-3" />
+                        <Label htmlFor="edges-none" className="text-xs">None</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="all" id="edges-all" className="w-3 h-3" />
+                        <Label htmlFor="edges-all" className="text-xs">All</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="only path" id="edges-path" className="w-3 h-3" />
+                        <Label htmlFor="edges-path" className="text-xs">Path</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">Nodes</Label>
+                    <RadioGroup
+                      value={showNodes}
+                      onValueChange={(value: 'none' | 'all' | 'only path') => setLocalShowNodes(value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="none" id="nodes-none" className="w-3 h-3" />
+                        <Label htmlFor="nodes-none" className="text-xs">None</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="all" id="nodes-all" className="w-3 h-3" />
+                        <Label htmlFor="nodes-all" className="text-xs">All</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="only path" id="nodes-path" className="w-3 h-3" />
+                        <Label htmlFor="nodes-path" className="text-xs">Path</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">Path</Label>
+                    <RadioGroup
+                      value={pathStyle}
+                      onValueChange={(value: 'sharp' | 'smooth') => setLocalPathStyle(value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="sharp" id="path-sharp" className="w-3 h-3" />
+                        <Label htmlFor="path-sharp" className="text-xs">Sharp</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="smooth" id="path-smooth" className="w-3 h-3" />
+                        <Label htmlFor="path-smooth" className="text-xs">Smooth</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-sm text-gray-600">
+                <p><strong>Instructions:</strong></p>
+                <ol className="list-decimal list-inside space-y-1 mt-2">
+                  <li>Two random points are selected automatically on load</li>
+                  <li>Click "Random Points" to select new random points</li>
+                  <li>Click any point to manually set <span className="text-green-600 font-medium">source</span> and <span className="text-red-600 font-medium">destination</span></li>
+                  <li>Try different routing algorithms and network types</li>
+                  <li>Use scroll wheel to zoom, double-click to reset zoom</li>
+                </ol>
+                <div className="mt-2 text-xs">
+                  <p><span className="text-green-600">●</span> Source point</p>
+                  <p><span className="text-red-600">●</span> Destination point</p>
+                  <p><span className="text-orange-500">●</span> Intermediate path points</p>
+                </div>
+              </div>
+
+              {sourcePoint && (
+                <div className="text-sm">
+                  <p><span className="text-green-600 font-medium">Source:</span> Point {sourcePoint.id}</p>
+                </div>
+              )}
+
+              {destinationPoint && (
+                <div className="text-sm">
+                  <p><span className="text-red-600 font-medium">Destination:</span> Point {destinationPoint.id}</p>
+                </div>
+              )}
+
+              {sourcePoint && destinationPoint && pathPoints.length > 0 && (
+                <div className="text-sm">
+                  <p><span className="text-orange-500 font-medium">Path:</span> {pathPoints.length} points</p>
+                  <p><span className="text-blue-600 font-medium">Hops:</span> {pathPoints.length - 1}</p>
+                  {pathPoints.length > 2 && (
+                    <p className="text-xs text-gray-500">
+                      Route: {pathPoints.slice(1, -1).map(p => p.id).join(' → ')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button onClick={handleReset} variant="outline" className="flex-1">
+                  Reset Points
+                </Button>
+                <Button onClick={handleRandomPoints} variant="default" className="flex-1">
+                  Random Points
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Info panel */}
       <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg border">
