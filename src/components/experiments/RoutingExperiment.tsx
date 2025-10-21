@@ -842,7 +842,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
     // Create drag behavior for source and destination points
     const dragBehavior = d3.drag<SVGCircleElement, Point>()
-      .on("start", function(event, d) {
+      .on("start", function(_, d) {
         // Only allow dragging of source and destination points
         if (!sourcePoint || !destinationPoint) return;
         if (d.id !== sourcePoint.id && d.id !== destinationPoint.id) return;
@@ -901,7 +901,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           setDestinationPoint({ ...nearestPoint });
         }
       })
-      .on("end", function(event, d) {
+      .on("end", function() {
         d3.select(this).style("cursor", "grab");
       });
 

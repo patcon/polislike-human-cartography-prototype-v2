@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 type Point = {
@@ -351,7 +350,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
           return isSelected ? "#ff8c00" : "#d3d3d3"; // Orange for selected, light gray for others
         }
       })
-      .attr("opacity", (d, i) => {
+      .attr("opacity", (_, i) => {
         const label = labels[i];
         if (displayGroupColors) {
           return label === -1 ? 0.4 : 1.0; // Make noise points more transparent
@@ -368,7 +367,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         if (displayGroupColors && isNoise) return 0;
         return (isSelected ? 2 : 1) / currentTransform.k;
       })
-      .style("cursor", (d, i) => {
+      .style("cursor", (_, i) => {
         const label = labels[i];
         return label === -1 ? "default" : "pointer";
       })
