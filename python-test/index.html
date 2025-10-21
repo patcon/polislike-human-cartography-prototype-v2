@@ -38,6 +38,10 @@
       <input id="lambda" type="range" min="0" max="10" step="0.1" value="3">
       <span id="lambdaVal">3</span>
     </label>
+    <br><br>
+    <label>
+      <input id="autoSelect" type="checkbox"> Auto-select threshold (click finds optimal λ level)
+    </label>
   </div>
 
   <svg id="plot" width="600" height="400"></svg>
@@ -55,10 +59,12 @@
     const color = d3.scaleOrdinal(d3.schemeTableau10);
     const lambdaInput = document.getElementById("lambda");
     const lambdaVal = document.getElementById("lambdaVal");
+    const autoSelectCheckbox = document.getElementById("autoSelect");
 
     let points = [];
     let labelsByThreshold = {};
     let currentLambda = parseFloat(lambdaInput.value);
+    let autoSelectMode = false;
 
     // Set up zoom behavior
     const zoom = d3.zoom()
@@ -124,15 +130,39 @@
         );
         if (!nearest) return;
 
-        // Find cluster at current lambda
-        const threshold = nearestThreshold(currentLambda);
-        const labels = labelsByThreshold[threshold];
-        const clusterId = labels[points.findIndex(p => p.id === nearest.id)];
+        const pointIndex = points.findIndex(p => p.id === nearest.id);
+        let threshold, labels, clusterId;
 
-        // Don't select noise points (cluster ID -1)
-        if (clusterId === -1) {
-          console.log("Clicked on noise point - not selectable");
-          return;
+        if (autoSelectMode) {
+          // Auto-select mode: find the highest lambda where this point is not noise
+          const optimalLambda = findOptimalLambda(pointIndex);
+          if (optimalLambda === null) {
+            console.log("Point is noise at all lambda levels");
+            return;
+          }
+
+          // Update the slider and current lambda
+          currentLambda = optimalLambda;
+          lambdaInput.value = currentLambda;
+          lambdaVal.textContent = currentLambda.toFixed(1);
+
+          // Recolor all points at the new lambda level
+          recolorPoints();
+
+          threshold = nearestThreshold(currentLambda);
+          labels = labelsByThreshold[threshold];
+          clusterId = labels[pointIndex];
+        } else {
+          // Manual mode: use current lambda
+          threshold = nearestThreshold(currentLambda);
+          labels = labelsByThreshold[threshold];
+          clusterId = labels[pointIndex];
+
+          // Don't select noise points (cluster ID -1)
+          if (clusterId === -1) {
+            console.log("Clicked on noise point - not selectable");
+            return;
+          }
         }
 
         const clusterIndices = labels
@@ -156,6 +186,18 @@
         recolorPoints();
       });
 
+      // Auto-select checkbox event listener
+      autoSelectCheckbox.addEventListener("change", e => {
+        autoSelectMode = e.target.checked;
+        lambdaInput.disabled = autoSelectMode;
+
+        if (autoSelectMode) {
+          console.log("Auto-select mode enabled - click points to find optimal λ");
+        } else {
+          console.log("Manual mode - use slider to control λ");
+        }
+      });
+
       function recolorPoints() {
         const threshold = nearestThreshold(currentLambda);
         const labels = labelsByThreshold[threshold];
@@ -173,6 +215,28 @@
             // Make noise points more transparent
             return label === -1 ? 0.4 : 1.0;
           });
+      }
+
+      function findOptimalLambda(pointIndex) {
+        // Find the highest lambda where this point is not noise (-1)
+        // Start from highest lambda and work down
+        const thresholds = Object.keys(labelsByThreshold)
+          .map(parseFloat)
+          .sort((a, b) => b - a); // Sort descending (highest first)
+
+        for (const lambda of thresholds) {
+          const threshold = lambda.toFixed(2);
+          const labels = labelsByThreshold[threshold];
+          const clusterId = labels[pointIndex];
+
+          if (clusterId !== -1) {
+            console.log(`Found optimal λ=${lambda.toFixed(2)} for point (cluster ${clusterId})`);
+            return lambda;
+          }
+        }
+
+        // Point is noise at all levels
+        return null;
       }
 
       function nearestThreshold(val) {
