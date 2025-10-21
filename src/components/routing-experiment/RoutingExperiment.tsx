@@ -756,8 +756,82 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       );
     }
 
+    // Create drag behavior for source and destination points
+    const dragBehavior = d3.drag<SVGCircleElement, Point>()
+      .on("start", function(event, d) {
+        // Only allow dragging of source and destination points
+        if (!sourcePoint || !destinationPoint) return;
+        if (d.id !== sourcePoint.id && d.id !== destinationPoint.id) return;
+
+        d3.select(this).style("cursor", "grabbing");
+      })
+      .on("drag", function(event, d) {
+        // Only allow dragging of source and destination points
+        if (!sourcePoint || !destinationPoint) return;
+        if (d.id !== sourcePoint.id && d.id !== destinationPoint.id) return;
+
+        // Get the current zoom transform
+        const transform = d3.zoomTransform(container.node()!);
+
+        // Use the mouse position directly from the event
+        // Convert screen coordinates to data coordinates accounting for zoom/pan
+        const mouseX = event.sourceEvent.clientX;
+        const mouseY = event.sourceEvent.clientY;
+
+        // Get SVG bounding rect to convert client coordinates to SVG coordinates
+        const svgRect = svgRef.current!.getBoundingClientRect();
+        const svgX = mouseX - svgRect.left;
+        const svgY = mouseY - svgRect.top;
+
+        // Convert SVG coordinates to data coordinates accounting for zoom/pan
+        const dataX = xScale.invert((svgX - transform.x) / transform.k);
+        const dataY = yScale.invert((svgY - transform.y) / transform.k);
+
+        // Find the nearest point to snap to
+        let nearestPoint = data[0];
+        let minDistance = euclideanDistance({ x: dataX, y: dataY, id: '', originalX: 0, originalY: 0 }, nearestPoint);
+
+        for (const point of data) {
+          const distance = euclideanDistance({ x: dataX, y: dataY, id: '', originalX: 0, originalY: 0 }, point);
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestPoint = point;
+          }
+        }
+
+        // Update the point position to the nearest point
+        d.x = nearestPoint.x;
+        d.y = nearestPoint.y;
+        d.id = nearestPoint.id;
+
+        // Update the circle position
+        d3.select(this)
+          .attr("cx", xScale(d.x))
+          .attr("cy", yScale(d.y));
+
+        // Update the corresponding state
+        if (sourcePoint && d.id === sourcePoint.id) {
+          // If we're dragging the source point, update it to the nearest point
+          setSourcePoint({ ...nearestPoint });
+        } else if (destinationPoint && d.id === destinationPoint.id) {
+          // If we're dragging the destination point, update it to the nearest point
+          setDestinationPoint({ ...nearestPoint });
+        } else {
+          // Handle case where we're dragging to a different point
+          const originalId = sourcePoint?.id === d.id ? sourcePoint.id : destinationPoint?.id;
+          if (originalId === sourcePoint?.id) {
+            setSourcePoint({ ...nearestPoint });
+          } else if (originalId === destinationPoint?.id) {
+            setDestinationPoint({ ...nearestPoint });
+          }
+        }
+      })
+      .on("end", function(event, d) {
+        d3.select(this).style("cursor", "grab");
+      });
+
     // Draw filtered points
-    container.selectAll("circle")
+    const circles = container.selectAll("circle")
       .data(pointsToShow)
       .enter()
       .append("circle")
@@ -798,7 +872,13 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         return "none";
       })
       .attr("stroke-width", 2 / currentTransform.k)
-      .style("cursor", "pointer")
+      .style("cursor", d => {
+        // Show different cursor for draggable points
+        if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) {
+          return "grab";
+        }
+        return "pointer";
+      })
       .on("click", (_, d) => {
         if (!sourcePoint) {
           setSourcePoint(d);
@@ -813,6 +893,14 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           setPathPoints([]);
         }
       });
+
+    // Apply drag behavior only to source and destination points
+    circles
+      .filter(d => {
+        if (!sourcePoint || !destinationPoint) return false;
+        return d.id === sourcePoint.id || d.id === destinationPoint.id;
+      })
+      .call(dragBehavior);
 
   }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap]);
 
@@ -1063,7 +1151,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           <SheetHeader className="pb-4">
             <SheetTitle>Routing Experiment Controls</SheetTitle>
           </SheetHeader>
-          
+
           <div className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)]">
             <div className="space-y-4 pb-6">
               <div>
@@ -1245,12 +1333,13 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                   <li>Two random points are selected automatically on load</li>
                   <li>Click "Random Points" to select new random points</li>
                   <li>Click any point to manually set <span className="text-green-600 font-medium">source</span> and <span className="text-red-600 font-medium">destination</span></li>
+                  <li><strong>Drag</strong> source and destination points to move them around</li>
                   <li>Try different routing algorithms and network types</li>
                   <li>Use scroll wheel to zoom, double-click to reset zoom</li>
                 </ol>
                 <div className="mt-2 text-xs">
-                  <p><span className="text-green-600">●</span> Source point</p>
-                  <p><span className="text-red-600">●</span> Destination point</p>
+                  <p><span className="text-green-600">●</span> Source point (draggable)</p>
+                  <p><span className="text-red-600">●</span> Destination point (draggable)</p>
                   <p><span className="text-orange-500">●</span> Intermediate path points</p>
                 </div>
               </div>
