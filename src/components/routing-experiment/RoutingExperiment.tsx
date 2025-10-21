@@ -732,7 +732,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
   }, [xScale, yScale]);
 
-  // Draw points
+  // Draw all SVG elements in proper z-order
   React.useEffect(() => {
     if (!containerRef.current || !xScale || !yScale || !data.length) return;
 
@@ -741,9 +741,75 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     // Get current zoom transform
     const currentTransform = d3.zoomTransform(container.node()!);
 
-    // Clear existing points
-    container.selectAll("circle").remove();
+    // Clear all existing elements
+    container.selectAll("*").remove();
 
+    // 1. Draw network edges first (bottom layer)
+    if (networkEdges.length > 0) {
+      // Filter edges based on showEdges setting
+      let edgesToShow = networkEdges;
+      if (showEdges === 'none') {
+        edgesToShow = [];
+      } else if (showEdges === 'only path' && pathPoints.length > 1) {
+        // Only show edges that are part of the current path
+        const pathEdgeSet = new Set<string>();
+        for (let i = 0; i < pathPoints.length - 1; i++) {
+          const edgeId1 = `${pathPoints[i].id}-${pathPoints[i + 1].id}`;
+          const edgeId2 = `${pathPoints[i + 1].id}-${pathPoints[i].id}`;
+          pathEdgeSet.add(edgeId1);
+          pathEdgeSet.add(edgeId2);
+        }
+
+        edgesToShow = networkEdges.filter(edge => {
+          const edgeId1 = `${edge.source.id}-${edge.target.id}`;
+          const edgeId2 = `${edge.target.id}-${edge.source.id}`;
+          return pathEdgeSet.has(edgeId1) || pathEdgeSet.has(edgeId2);
+        });
+      }
+
+      // Choose color based on network type
+      const edgeColor = selectedNetworkType === "mst" ? "#374151" :
+                       selectedNetworkType === "knn" ? "#059669" :
+                       selectedNetworkType === "delaunay" ? "#dc2626" :
+                       selectedNetworkType === "delaunay-knn" ? "#7c3aed" : "#8b5cf6";
+      const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 :
+                         selectedNetworkType === "delaunay-knn" ? 0.7 :
+                         selectedNetworkType === "geometric" ? 0.6 : 0.8;
+
+      // Draw filtered network edges
+      container.selectAll(".network-edge")
+        .data(edgesToShow)
+        .enter()
+        .append("line")
+        .attr("class", "network-edge")
+        .attr("x1", (d: Edge) => xScale(d.source.x))
+        .attr("y1", (d: Edge) => yScale(d.source.y))
+        .attr("x2", (d: Edge) => xScale(d.target.x))
+        .attr("y2", (d: Edge) => yScale(d.target.y))
+        .attr("stroke", edgeColor)
+        .attr("stroke-width", 1 / currentTransform.k)
+        .attr("stroke-opacity", edgeOpacity)
+        .style("pointer-events", "none"); // Prevent edges from capturing mouse events
+    }
+
+    // 2. Draw path (middle layer)
+    if (sourcePoint && destinationPoint && pathPoints.length > 0) {
+      const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
+
+      if (path) {
+        container.append("path")
+          .attr("class", "routing-path")
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke", "#3b82f6")
+          .attr("stroke-width", 3 / currentTransform.k)
+          .attr("stroke-opacity", 0.8)
+          .attr("marker-end", "url(#arrowhead)")
+          .style("pointer-events", "none"); // Prevent path from capturing mouse events
+      }
+    }
+
+    // 3. Draw nodes in proper order (top layer)
     // Filter points based on showNodes setting
     let pointsToShow = data;
     if (showNodes === 'none') {
@@ -755,6 +821,24 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         pathPoints.some(p => p.id === d.id)
       );
     }
+
+    // Separate points by type for proper z-order
+    const inactivePoints = pointsToShow.filter(d =>
+      (!sourcePoint || d.id !== sourcePoint.id) &&
+      (!destinationPoint || d.id !== destinationPoint.id) &&
+      !pathPoints.some(p => p.id === d.id)
+    );
+
+    const intermediatePoints = pointsToShow.filter(d =>
+      pathPoints.some(p => p.id === d.id) &&
+      (!sourcePoint || d.id !== sourcePoint.id) &&
+      (!destinationPoint || d.id !== destinationPoint.id)
+    );
+
+    const startEndPoints = pointsToShow.filter(d =>
+      (sourcePoint && d.id === sourcePoint.id) ||
+      (destinationPoint && d.id === destinationPoint.id)
+    );
 
     // Create drag behavior for source and destination points
     const dragBehavior = d3.drag<SVGCircleElement, Point>()
@@ -830,157 +914,97 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         d3.select(this).style("cursor", "grab");
       });
 
-    // Draw filtered points
-    const circles = container.selectAll("circle")
-      .data(pointsToShow)
-      .enter()
-      .append("circle")
-      .attr("cx", d => xScale(d.x))
-      .attr("cy", d => yScale(d.y))
-      .attr("r", d => {
-        const baseRadius = (() => {
-          if (sourcePoint && d.id === sourcePoint.id) return 8;
-          if (destinationPoint && d.id === destinationPoint.id) return 8;
-          if (pathPoints.some(p => p.id === d.id)) return 5; // intermediate points
-          return 3;
-        })();
-        return baseRadius / currentTransform.k;
-      })
-      .attr("fill", d => {
-        if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
-        if (destinationPoint && d.id === destinationPoint.id) return "#ef4444"; // red
-        if (pathPoints.some(p => p.id === d.id)) return "#f59e0b"; // orange for path points
+    // Helper function to draw circles
+    const drawCircles = (points: Point[], className: string) => {
+      const circles = container.selectAll(`.${className}`)
+        .data(points)
+        .enter()
+        .append("circle")
+        .attr("class", className)
+        .attr("cx", d => xScale(d.x))
+        .attr("cy", d => yScale(d.y))
+        .attr("r", d => {
+          const baseRadius = (() => {
+            if (sourcePoint && d.id === sourcePoint.id) return 8;
+            if (destinationPoint && d.id === destinationPoint.id) return 8;
+            if (pathPoints.some(p => p.id === d.id)) return 5; // intermediate points
+            return 3;
+          })();
+          return baseRadius / currentTransform.k;
+        })
+        .attr("fill", d => {
+          if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
+          if (destinationPoint && d.id === destinationPoint.id) return "#ef4444"; // red
+          if (pathPoints.some(p => p.id === d.id)) return "#f59e0b"; // orange for path points
 
-        // Color by density if density alpha is not zero
-        if (densityAlpha !== 0 && densityMap.size > 0) {
-          const density = densityMap.get(d.id) || 0;
-          const maxDensity = Math.max(...Array.from(densityMap.values()));
-          if (maxDensity > 0) {
-            const normalizedDensity = density / maxDensity;
-            // Use a color scale from light blue (low density) to dark blue (high density)
-            const intensity = Math.floor(normalizedDensity * 200 + 55); // 55-255 range
-            return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
+          // Color by density if density alpha is not zero
+          if (densityAlpha !== 0 && densityMap.size > 0) {
+            const density = densityMap.get(d.id) || 0;
+            const maxDensity = Math.max(...Array.from(densityMap.values()));
+            if (maxDensity > 0) {
+              const normalizedDensity = density / maxDensity;
+              // Use a color scale from light blue (low density) to dark blue (high density)
+              const intensity = Math.floor(normalizedDensity * 200 + 55); // 55-255 range
+              return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
+            }
           }
-        }
 
-        return "#64748b"; // gray
-      })
-      .attr("stroke", d => {
-        if (sourcePoint && d.id === sourcePoint.id) return "#16a34a";
-        if (destinationPoint && d.id === destinationPoint.id) return "#dc2626";
-        if (pathPoints.some(p => p.id === d.id)) return "#d97706";
-        return "none";
-      })
-      .attr("stroke-width", 2 / currentTransform.k)
-      .style("cursor", d => {
-        // Show different cursor for draggable points
-        if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) {
-          return "grab";
-        }
-        return "pointer";
-      })
-      .on("click", (_, d) => {
-        if (!sourcePoint) {
-          setSourcePoint(d);
-          setDestinationPoint(null); // Clear destination when setting new source
-          setPathPoints([]);
-        } else if (!destinationPoint) {
-          setDestinationPoint(d);
-        } else {
-          // Reset and start over
-          setSourcePoint(d);
-          setDestinationPoint(null);
-          setPathPoints([]);
-        }
-      });
+          return "#64748b"; // gray
+        })
+        .attr("stroke", d => {
+          if (sourcePoint && d.id === sourcePoint.id) return "#16a34a";
+          if (destinationPoint && d.id === destinationPoint.id) return "#dc2626";
+          if (pathPoints.some(p => p.id === d.id)) return "#d97706";
+          return "none";
+        })
+        .attr("stroke-width", 2 / currentTransform.k)
+        .style("cursor", d => {
+          // Show different cursor for draggable points
+          if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) {
+            return "grab";
+          }
+          return "pointer";
+        })
+        .on("click", (_, d) => {
+          if (!sourcePoint) {
+            setSourcePoint(d);
+            setDestinationPoint(null); // Clear destination when setting new source
+            setPathPoints([]);
+          } else if (!destinationPoint) {
+            setDestinationPoint(d);
+          } else {
+            // Reset and start over
+            setSourcePoint(d);
+            setDestinationPoint(null);
+            setPathPoints([]);
+          }
+        });
+
+      return circles;
+    };
+
+    // Draw nodes in proper z-order: inactive -> intermediate -> start/end
+    drawCircles(inactivePoints, "inactive-node");
+    drawCircles(intermediatePoints, "intermediate-node");
+    const startEndCircles = drawCircles(startEndPoints, "start-end-node");
 
     // Apply drag behavior only to source and destination points
-    circles
+    startEndCircles
       .filter(d => {
         if (!sourcePoint || !destinationPoint) return false;
         return d.id === sourcePoint.id || d.id === destinationPoint.id;
       })
       .call(dragBehavior);
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle]);
 
-  // Draw network edges
+  // Calculate path points separately to avoid infinite loops
   React.useEffect(() => {
-    if (!containerRef.current || !xScale || !yScale || !networkEdges.length) {
-      containerRef.current?.selectAll(".network-edge").remove();
-      return;
-    }
-
-    const container = containerRef.current;
-
-    // Get current zoom transform
-    const currentTransform = d3.zoomTransform(container.node()!);
-
-    // Clear existing network edges
-    container.selectAll(".network-edge").remove();
-
-    // Filter edges based on showEdges setting
-    let edgesToShow = networkEdges;
-    if (showEdges === 'none') {
-      edgesToShow = [];
-    } else if (showEdges === 'only path' && pathPoints.length > 1) {
-      // Only show edges that are part of the current path
-      const pathEdgeSet = new Set<string>();
-      for (let i = 0; i < pathPoints.length - 1; i++) {
-        const edgeId1 = `${pathPoints[i].id}-${pathPoints[i + 1].id}`;
-        const edgeId2 = `${pathPoints[i + 1].id}-${pathPoints[i].id}`;
-        pathEdgeSet.add(edgeId1);
-        pathEdgeSet.add(edgeId2);
-      }
-
-      edgesToShow = networkEdges.filter(edge => {
-        const edgeId1 = `${edge.source.id}-${edge.target.id}`;
-        const edgeId2 = `${edge.target.id}-${edge.source.id}`;
-        return pathEdgeSet.has(edgeId1) || pathEdgeSet.has(edgeId2);
-      });
-    }
-
-    // Choose color based on network type
-    const edgeColor = selectedNetworkType === "mst" ? "#374151" :
-                     selectedNetworkType === "knn" ? "#059669" :
-                     selectedNetworkType === "delaunay" ? "#dc2626" :
-                     selectedNetworkType === "delaunay-knn" ? "#7c3aed" : "#8b5cf6";
-    const edgeOpacity = selectedNetworkType === "delaunay" ? 0.4 :
-                       selectedNetworkType === "delaunay-knn" ? 0.7 :
-                       selectedNetworkType === "geometric" ? 0.6 : 0.8;
-
-    // Draw filtered network edges
-    container.selectAll(".network-edge")
-      .data(edgesToShow)
-      .enter()
-      .append("line")
-      .attr("class", "network-edge")
-      .attr("x1", (d: Edge) => xScale(d.source.x))
-      .attr("y1", (d: Edge) => yScale(d.source.y))
-      .attr("x2", (d: Edge) => xScale(d.target.x))
-      .attr("y2", (d: Edge) => yScale(d.target.y))
-      .attr("stroke", edgeColor)
-      .attr("stroke-width", 1 / currentTransform.k)
-      .attr("stroke-opacity", edgeOpacity)
-      .style("pointer-events", "none"); // Prevent edges from capturing mouse events
-
-  }, [networkEdges, xScale, yScale, selectedNetworkType, showEdges, pathPoints]);
-
-  // Generate and draw path
-  React.useEffect(() => {
-    if (!containerRef.current || !xScale || !yScale || !sourcePoint || !destinationPoint) {
-      // Clear any existing path
-      containerRef.current?.selectAll(".routing-path").remove();
+    if (!sourcePoint || !destinationPoint) {
       setPathPoints([]);
       return;
     }
 
-    const container = containerRef.current;
-
-    // Clear existing path
-    container.selectAll(".routing-path").remove();
-
-    // Calculate the path points first
     let calculatedPathPoints: Point[] = [];
 
     switch (selectedAlgorithm) {
@@ -995,25 +1019,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     }
 
     setPathPoints(calculatedPathPoints);
+  }, [sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph]);
 
-    const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
-
-    if (path) {
-      // Get current zoom transform
-      const currentTransform = d3.zoomTransform(container.node()!);
-
-      container.append("path")
-        .attr("class", "routing-path")
-        .attr("d", path)
-        .attr("fill", "none")
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3 / currentTransform.k)
-        .attr("stroke-opacity", 0.8)
-        .attr("marker-end", "url(#arrowhead)")
-        .style("pointer-events", "none"); // Prevent path from capturing mouse events
-    }
-
-  }, [sourcePoint, destinationPoint, selectedAlgorithm, data, networkEdges, networkGraph, weightedGraph, xScale, yScale, pathStyle]);
 
   // Add zoom behavior
   React.useEffect(() => {
