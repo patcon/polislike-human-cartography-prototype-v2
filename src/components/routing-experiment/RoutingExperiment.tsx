@@ -852,7 +852,13 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       .on("drag", function(event, d) {
         // Only allow dragging of source and destination points
         if (!sourcePoint || !destinationPoint) return;
-        if (d.id !== sourcePoint.id && d.id !== destinationPoint.id) return;
+
+        // Determine which point we're dragging based on the original point's ID
+        // Store the original ID to avoid confusion during dragging
+        const isDraggingSource = d.id === sourcePoint.id;
+        const isDraggingDestination = d.id === destinationPoint.id;
+
+        if (!isDraggingSource && !isDraggingDestination) return;
 
         // Get the current zoom transform
         const transform = d3.zoomTransform(container.node()!);
@@ -883,31 +889,16 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           }
         }
 
-        // Update the point position to the nearest point
-        d.x = nearestPoint.x;
-        d.y = nearestPoint.y;
-        d.id = nearestPoint.id;
-
-        // Update the circle position
+        // Update the circle position immediately for visual feedback
         d3.select(this)
-          .attr("cx", xScale(d.x))
-          .attr("cy", yScale(d.y));
+          .attr("cx", xScale(nearestPoint.x))
+          .attr("cy", yScale(nearestPoint.y));
 
-        // Update the corresponding state
-        if (sourcePoint && d.id === sourcePoint.id) {
-          // If we're dragging the source point, update it to the nearest point
+        // Update the corresponding state based on which point we're dragging
+        if (isDraggingSource) {
           setSourcePoint({ ...nearestPoint });
-        } else if (destinationPoint && d.id === destinationPoint.id) {
-          // If we're dragging the destination point, update it to the nearest point
+        } else if (isDraggingDestination) {
           setDestinationPoint({ ...nearestPoint });
-        } else {
-          // Handle case where we're dragging to a different point
-          const originalId = sourcePoint?.id === d.id ? sourcePoint.id : destinationPoint?.id;
-          if (originalId === sourcePoint?.id) {
-            setSourcePoint({ ...nearestPoint });
-          } else if (originalId === destinationPoint?.id) {
-            setDestinationPoint({ ...nearestPoint });
-          }
         }
       })
       .on("end", function(event, d) {
