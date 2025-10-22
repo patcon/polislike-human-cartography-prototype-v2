@@ -433,7 +433,13 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 10])
       .filter((event) => {
+        // Allow wheel events for zooming
         if (event.type === "wheel") return true;
+        // Allow touch events for multi-touch zoom and pan on mobile
+        if (event.type === "touchstart" || event.type === "touchmove" || event.type === "touchend") {
+          return true;
+        }
+        // Allow mouse events for panning (but not clicking on points)
         if (event.type === "mousedown") {
           const target = event.target as Element;
           return !target.closest("circle");
@@ -494,7 +500,11 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
 
   return (
     <div className="relative w-screen h-screen">
-      <svg ref={svgRef} className="w-screen h-screen block bg-gray-50" />
+      <svg
+        ref={svgRef}
+        className="w-screen h-screen block bg-gray-50"
+        style={{ touchAction: 'none' }}
+      />
 
       {/* Controls overlay - positioned on canvas */}
       <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border max-w-xs z-10">

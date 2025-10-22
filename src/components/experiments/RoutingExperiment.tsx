@@ -1025,6 +1025,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       .filter((event) => {
         // Allow wheel events for zooming
         if (event.type === "wheel") return true;
+        // Allow touch events for multi-touch zoom and pan on mobile
+        if (event.type === "touchstart" || event.type === "touchmove" || event.type === "touchend") {
+          return true;
+        }
         // Allow mouse events for panning (but not clicking on points)
         if (event.type === "mousedown") {
           const target = event.target as Element;
@@ -1130,7 +1134,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
   return (
     <div className="relative w-screen h-screen">
-      <svg ref={svgRef} className="w-screen h-screen block bg-gray-50" />
+      <svg
+        ref={svgRef}
+        className="w-screen h-screen block bg-gray-50"
+        style={{ touchAction: 'none' }}
+      />
 
       {/* Collapsible Controls Sheet */}
       <Sheet>
@@ -1333,7 +1341,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                   <li>Click any point to manually set <span className="text-green-600 font-medium">source</span> and <span className="text-red-600 font-medium">destination</span></li>
                   <li><strong>Drag</strong> source and destination points to move them around</li>
                   <li>Try different routing algorithms and network types</li>
-                  <li>Use scroll wheel to zoom, double-click to reset zoom</li>
+                  <li>Use scroll wheel to zoom (desktop) or pinch to zoom (mobile), double-click to reset zoom</li>
                 </ol>
                 <div className="mt-2 text-xs">
                   <p><span className="text-green-600">●</span> Source point (draggable)</p>
