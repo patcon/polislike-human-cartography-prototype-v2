@@ -41,7 +41,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       try {
         setIsLoading(true);
         console.log('🔄 Starting to load data...');
-        
+
         const [pointsResponse, labelsResponse] = await Promise.all([
           fetch('/projections.json'),
           fetch('/projection_labels_by_threshold.json')
@@ -142,7 +142,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   // Handle background click
   const handleBackgroundClick = React.useCallback(() => {
     console.log("Clicked on background - resetting selection and going to lowest water level");
-    
+
     // Clear selection
     setSelectedPoints(new Set());
     setLastSelectedPoint(null);
@@ -160,7 +160,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     const clusterIndices = labels
       .map((lbl, i) => (lbl === clusterId ? points[i]?.id : null))
       .filter((id): id is string => id !== null);
-    
+
     setSelectedPoints(new Set(clusterIndices));
   }, [points]);
 
@@ -230,7 +230,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   // Handle auto-select logic
   const handleAutoSelect = React.useCallback((pointIndex: number, isAlreadySelected: boolean) => {
     let optimalLambda: number | null;
-    
+
     if (isAlreadySelected) {
       // Progressive drilling: find next deeper level
       optimalLambda = findNextDeeperLambda(pointIndex, currentLambda);
@@ -328,18 +328,22 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     const labels = labelsByThreshold[threshold];
     if (!labels) return;
 
-    // Draw points
-    container.selectAll("circle")
-      .data(points)
+    // Separate points into selected and unselected for proper z-order
+    const unselectedPoints = points.filter(d => !selectedPoints.has(d.id));
+    const selectedPointsArray = points.filter(d => selectedPoints.has(d.id));
+
+    // Draw unselected points first (bottom layer)
+    container.selectAll(".unselected-point")
+      .data(unselectedPoints)
       .enter()
       .append("circle")
-      .attr("class", "point")
+      .attr("class", "unselected-point")
       .attr("r", 4 / currentTransform.k)
       .attr("cx", d => xScale(d.x))
       .attr("cy", d => yScale(d.y))
       .attr("fill", (d, i) => {
-        const label = labels[i];
-        const isSelected = selectedPoints.has(d.id);
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
 
         if (displayGroupColors) {
           if (label === -1) {
@@ -347,28 +351,66 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
           }
           return color(label.toString());
         } else {
-          return isSelected ? "#ff8c00" : "#d3d3d3"; // Orange for selected, light gray for others
+          return "#d3d3d3"; // Light gray for unselected
         }
       })
-      .attr("opacity", (_, i) => {
-        const label = labels[i];
+      .attr("opacity", (d, i) => {
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
         if (displayGroupColors) {
           return label === -1 ? 0.4 : 1.0; // Make noise points more transparent
         } else {
           return 1.0;
         }
       })
-      .attr("stroke", d => selectedPoints.has(d.id) ? "black" : "#333")
+      .attr("stroke", "#333")
       .attr("stroke-width", (d, i) => {
-        const label = labels[i];
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
         const isNoise = label === -1;
-        const isSelected = selectedPoints.has(d.id);
-        
+
         if (displayGroupColors && isNoise) return 0;
-        return (isSelected ? 2 : 1) / currentTransform.k;
+        return 1 / currentTransform.k;
       })
-      .style("cursor", (_, i) => {
-        const label = labels[i];
+      .style("cursor", (d, i) => {
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
+        return label === -1 ? "default" : "pointer";
+      })
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        handlePointClick(d.id, pointIndex);
+      });
+
+    // Draw selected points on top (top layer)
+    container.selectAll(".selected-point")
+      .data(selectedPointsArray)
+      .enter()
+      .append("circle")
+      .attr("class", "selected-point")
+      .attr("r", 4 / currentTransform.k)
+      .attr("cx", d => xScale(d.x))
+      .attr("cy", d => yScale(d.y))
+      .attr("fill", (d, i) => {
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
+
+        if (displayGroupColors) {
+          if (label === -1) {
+            return "#cccccc"; // Gray for noise
+          }
+          return color(label.toString());
+        } else {
+          return "#ff8c00"; // Orange for selected
+        }
+      })
+      .attr("opacity", 1.0)
+      .attr("stroke", "black")
+      .attr("stroke-width", 2 / currentTransform.k)
+      .style("cursor", (d, i) => {
+        const pointIndex = points.findIndex(p => p.id === d.id);
+        const label = labels[pointIndex];
         return label === -1 ? "default" : "pointer";
       })
       .on("click", (event, d) => {
@@ -402,22 +444,25 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         const transform = event.transform;
         container.attr("transform", transform);
 
-        // Update circle sizes and stroke widths
-        container.selectAll("circle")
+        // Update circle sizes and stroke widths for both selected and unselected
+        container.selectAll(".unselected-point")
           .attr("r", 4 / transform.k)
           .attr("stroke-width", function(d: any) {
             const pointIndex = points.findIndex(p => p.id === d.id);
             const threshold = nearestThreshold(currentLambda);
             const labels = labelsByThreshold[threshold];
             if (!labels) return 1 / transform.k;
-            
+
             const label = labels[pointIndex];
             const isNoise = label === -1;
-            const isSelected = selectedPoints.has(d.id);
-            
+
             if (displayGroupColors && isNoise) return 0;
-            return (isSelected ? 2 : 1) / transform.k;
+            return 1 / transform.k;
           });
+
+        container.selectAll(".selected-point")
+          .attr("r", 4 / transform.k)
+          .attr("stroke-width", 2 / transform.k);
       });
 
     svg.call(zoom);
@@ -450,11 +495,11 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   return (
     <div className="relative w-screen h-screen">
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-50" />
-      
+
       {/* Controls overlay - positioned on canvas */}
       <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border max-w-xs z-10">
         <h3 className="text-lg font-semibold mb-3">HDBSCAN Cluster Explorer</h3>
-        
+
         <div className="space-y-3">
           <div>
             <Label className="block text-sm font-medium mb-1">
