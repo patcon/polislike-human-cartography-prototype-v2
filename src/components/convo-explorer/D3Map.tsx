@@ -8,7 +8,6 @@ import { PipelineSelector } from "./PipelineSelector";
 
 type ProjectionData = [string, [number, number]][];
 
-type ProjectionType = "localmap" | "pacmap" | "umap";
 
 const FEATURE_SCALE_RADIUS_ON_ZOOM = true;
 
@@ -43,6 +42,8 @@ type D3MapProps = {
   availablePipelines?: Array<{id: string, name: string}>;
 };
 
+const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
+
 export const D3Map: React.FC<D3MapProps> = ({
   data,
   mode = "move",
@@ -72,25 +73,35 @@ export const D3Map: React.FC<D3MapProps> = ({
   }>({ path: null, coords: [], cleanup: null });
   React.useEffect(() => { modeRef.current = mode; }, [mode]);
 
+  // Mode helpers - Kedro is default unless kedroBaseUrl isn't set
+  const isStaticMode = !kedroBaseUrl;
+  const isKedroMode = !isStaticMode;
+
   // Animation state
-  const [selectedProjection, setSelectedProjection] = React.useState<ProjectionType>("localmap");
-  const [projectionData, setProjectionData] = React.useState<Record<ProjectionType, ProjectionData | null>>({
-    localmap: null,
-    pacmap: null,
-    umap: null
-  });
   const [isAnimating, setIsAnimating] = React.useState(false);
 
-  // Pipeline switching state - use internal pipeline fetching if availablePipelines not provided
-  const shouldFetchPipelines = kedroBaseUrl && testAnimation && !availablePipelines?.length;
-  const { pipelines: fetchedPipelines } = usePipelineOptions(
-    shouldFetchPipelines ? kedroBaseUrl : undefined,
-    pipelineFilter || 'bestkmeans' // Use provided filter or default to bestkmeans
-  );
-  const effectivePipelines = availablePipelines?.length ? availablePipelines : fetchedPipelines;
+  // Unified pipeline data state - works for both Kedro and static projections
+  const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
   const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
   const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
-  const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
+
+  // Static projections as pipeline options
+  const staticPipelines = React.useMemo(() => [
+    { id: 'localmap', name: 'LocalMAP' },
+    { id: 'pacmap', name: 'PaCMAP' },
+    { id: 'umap', name: 'UMAP' }
+  ], []);
+
+  // Kedro pipeline options - use internal pipeline fetching if availablePipelines not provided
+  const shouldFetchKedroOptions = isKedroMode && testAnimation && !availablePipelines?.length;
+  const { pipelines: fetchedKedroOptions } = usePipelineOptions(
+    shouldFetchKedroOptions ? kedroBaseUrl : undefined,
+    pipelineFilter || 'bestkmeans'
+  );
+  const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
+
+  // Current pipeline options based on mode
+  const currentPipelineOptions = isKedroMode ? kedroOptions : staticPipelines;
 
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
@@ -98,15 +109,20 @@ export const D3Map: React.FC<D3MapProps> = ({
   // State to trigger re-calculation of radius on resize
   const [resizeCounter, forceUpdate] = React.useReducer(x => x + 1, 0);
 
-  // Initialize selectedPipeline when effectivePipelines becomes available
+  // Initialize selectedPipeline when pipeline options become available
   React.useEffect(() => {
-    if (effectivePipelines.length > 0 && !selectedPipeline) {
-      // Prioritize 'mean_localmap_bestkmeans' if available, otherwise use first pipeline
-      const preferredPipeline = effectivePipelines.find(p => p.id === 'mean_localmap_bestkmeans');
-      const defaultPipeline = preferredPipeline || effectivePipelines[0];
-      setSelectedPipeline(defaultPipeline.id);
+    if (currentPipelineOptions.length > 0 && !selectedPipeline) {
+      if (isKedroMode) {
+        // Prioritize preferred Kedro pipeline if available, otherwise use first
+        const preferredPipeline = currentPipelineOptions.find(p => p.id === PREFERRED_KEDRO_PIPELINE);
+        const defaultPipeline = preferredPipeline || currentPipelineOptions[0];
+        setSelectedPipeline(defaultPipeline.id);
+      } else if (testAnimation) {
+        // For static projections, default to localmap
+        setSelectedPipeline('localmap');
+      }
     }
-  }, [effectivePipelines, selectedPipeline]);
+  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation]);
 
   // Handle window resize to update radius (with throttling)
   React.useEffect(() => {
@@ -132,30 +148,24 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     const loadProjections = async () => {
       try {
-        if (kedroBaseUrl && effectivePipelines.length > 0) {
+        if (isKedroMode && kedroOptions.length > 0) {
           // Load pipeline data from Kedro API
           const { fetchAndProcessKedroData } = await import('../../lib/kedro-api');
-          const pipelineDataMap: Record<string, ProjectionData | null> = {};
+          const dataMap: Record<string, ProjectionData | null> = {};
 
-          for (const pipeline of effectivePipelines) {
+          for (const pipeline of kedroOptions) {
             try {
-              const data = await fetchAndProcessKedroData(kedroBaseUrl, pipeline.id);
-              pipelineDataMap[pipeline.id] = data;
+              const data = await fetchAndProcessKedroData(kedroBaseUrl!, pipeline.id);
+              dataMap[pipeline.id] = data;
             } catch (error) {
               console.error(`Failed to load pipeline ${pipeline.id}:`, error);
-              pipelineDataMap[pipeline.id] = null;
+              dataMap[pipeline.id] = null;
             }
           }
 
-          setPipelineData(pipelineDataMap);
-          if (!selectedPipeline && effectivePipelines.length > 0) {
-            // Prioritize 'mean_localmap_bestkmeans' if available, otherwise use first pipeline
-            const preferredPipeline = effectivePipelines.find(p => p.id === 'mean_localmap_bestkmeans');
-            const defaultPipeline = preferredPipeline || effectivePipelines[0];
-            setSelectedPipeline(defaultPipeline.id);
-          }
-        } else {
-          // Load local projection files (original behavior)
+          setPipelineData(dataMap);
+        } else if (isStaticMode) {
+          // Load static projection files
           const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
             fetch('/projections.json'),
             fetch('/projections.mean-pacmap.json'),
@@ -172,7 +182,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           const sortByParticipantId = (data: [string, [number, number]][]) =>
             data.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
-          setProjectionData({
+          setPipelineData({
             localmap: sortByParticipantId([...localmapData]),
             pacmap: sortByParticipantId([...pacmapData]),
             umap: sortByParticipantId([...umapData]),
@@ -184,7 +194,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
 
     loadProjections();
-  }, [testAnimation, kedroBaseUrl, effectivePipelines]);
+  }, [testAnimation, isKedroMode, kedroOptions]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {
@@ -255,15 +265,9 @@ export const D3Map: React.FC<D3MapProps> = ({
     // Use projection data if testAnimation is enabled and data is available, otherwise fall back to original data
     let currentData = data;
 
-    if (testAnimation) {
-      if (kedroBaseUrl && selectedPipeline && pipelineData[selectedPipeline]) {
-        // Use pipeline data from Kedro API
-        currentData = pipelineData[selectedPipeline]!;
-      } else if (projectionData[selectedProjection]) {
-        // Use local projection data
-        const activeProjections = projectionData[selectedProjection]!;
-        currentData = activeProjections;
-      }
+    if (testAnimation && selectedPipeline && pipelineData[selectedPipeline]) {
+      // Use pipeline data (works for both Kedro and static)
+      currentData = pipelineData[selectedPipeline]!;
     }
 
     const xExtent = d3.extent(currentData, ([, [x]]) => x)! as [number, number];
@@ -323,7 +327,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     const yScale = d3.scaleLinear().domain(yExtent).range(yRange);
 
     return { points, xScale, yScale };
-  }, [data, flipX, flipY, colorsToFront, pointColors, testAnimation, projectionData, selectedProjection, pipelineData, selectedPipeline, kedroBaseUrl]);
+  }, [data, flipX, flipY, colorsToFront, pointColors, testAnimation, pipelineData, selectedPipeline]);
 
   const quadtree = React.useMemo(
     () => d3.quadtree(points, d => d.x, d => d.y),
@@ -423,14 +427,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("r", BASE_RADIUS / transformK);
   }, [BASE_RADIUS]);
 
-  // Handle projection change with animation
-  const handleProjectionChange = React.useCallback((newProjection: ProjectionType) => {
-    if (!testAnimation || !projectionData[newProjection] || isAnimating || newProjection === selectedProjection) return;
-    setIsAnimating(true);
-    setSelectedProjection(newProjection);
-  }, [testAnimation, projectionData, isAnimating, selectedProjection]);
-
-  // Handle pipeline change with animation
+  // Handle pipeline change with animation (works for both Kedro and static)
   const handlePipelineChange = React.useCallback((newPipeline: string) => {
     if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
     setIsAnimating(true);
@@ -726,10 +723,10 @@ export const D3Map: React.FC<D3MapProps> = ({
     <div className="relative w-screen h-screen">
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
-      {/* Pipeline Selector - only show when testAnimation is enabled and we have Kedro pipelines */}
-      {kedroBaseUrl && effectivePipelines.length > 0 && (
+      {/* Pipeline Selector - unified for both Kedro and static projections */}
+      {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) && (
         <PipelineSelector
-          availablePipelines={effectivePipelines}
+          availablePipelines={currentPipelineOptions}
           selectedPipeline={selectedPipeline}
           onPipelineChange={handlePipelineChange}
           enableAnimation={testAnimation}
@@ -739,46 +736,11 @@ export const D3Map: React.FC<D3MapProps> = ({
           onToggleAutoCycle={handleAutoCycleToggle}
           isAnimating={isAnimating}
           pipelineLoadingStates={Object.fromEntries(
-            effectivePipelines.map(p => [p.id, !pipelineData[p.id]])
+            currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
           top="1rem"
           left="1rem"
         />
-      )}
-
-      {/* Debug Controls - only show when testAnimation is enabled and using local projections */}
-      {testAnimation && !kedroBaseUrl && Object.values(projectionData).some(data => data !== null) && (
-        <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border">
-          <div className="mb-2">
-            <h3 className="text-sm font-medium mb-2">
-              Projection Type {isAnimating && "(Animating...)"}
-            </h3>
-            <div className="space-y-2">
-              {(["localmap", "pacmap", "umap"] as ProjectionType[]).map((projType) => (
-                <label key={projType} className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="projection-type"
-                    value={projType}
-                    checked={selectedProjection === projType}
-                    onChange={() => handleProjectionChange(projType)}
-                    disabled={isAnimating || !projectionData[projType]}
-                    className="w-4 h-4"
-                  />
-                  <span className={`text-sm ${!projectionData[projType] ? 'text-gray-400' : ''}`}>
-                    {projType === "localmap" ? "LocalMAP" :
-                     projType === "pacmap" ? "PaCMAP" : "UMAP"}
-                    {!projectionData[projType] && " (Loading...)"}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              Current: {selectedProjection === "localmap" ? "LocalMAP" :
-                       selectedProjection === "pacmap" ? "PaCMAP" : "UMAP"}
-            </div>
-          </div>
-        </div>
       )}
 
     </div>
