@@ -5,14 +5,11 @@ interface PipelineOption {
   name: string;
 }
 
-interface PipelineApiResponse {
-  pipelines: PipelineOption[];
-}
-
 /**
  * Custom hook for fetching available pipeline options from Kedro API
+ * Automatically detects v1 vs v2 format and returns appropriate pipeline options
  */
-export function usePipelineOptions(kedroBaseUrl?: string) {
+export function usePipelineOptions(kedroBaseUrl?: string, pipelineFilter?: string) {
   const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +27,14 @@ export function usePipelineOptions(kedroBaseUrl?: string) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${kedroBaseUrl}/api/main`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch pipelines: ${response.status} ${response.statusText}`);
-        }
+        console.log('🔍 usePipelineOptions: Starting fetch for', kedroBaseUrl);
 
-        const data: PipelineApiResponse = await response.json();
-        // Filter out polis_classic as it has a different structure and won't work with our expectations
-        const filteredPipelines = (data.pipelines || []).filter(pipeline => pipeline.id !== 'polis_classic');
-        setPipelines(filteredPipelines);
+        // Use the new getAvailablePipelineIds function that handles both v1 and v2
+        const { getAvailablePipelineIds } = await import('../../src/lib/kedro-api');
+        const availablePipelines = await getAvailablePipelineIds(kedroBaseUrl, pipelineFilter);
+
+        console.log('🔍 usePipelineOptions: Received pipelines:', availablePipelines.map(p => p.id));
+        setPipelines(availablePipelines);
       } catch (err) {
         console.error('Error fetching pipeline options:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch pipeline options');
@@ -49,7 +45,7 @@ export function usePipelineOptions(kedroBaseUrl?: string) {
     };
 
     fetchPipelines();
-  }, [kedroBaseUrl]);
+  }, [kedroBaseUrl, pipelineFilter]);
 
   return { pipelines, loading, error };
 }

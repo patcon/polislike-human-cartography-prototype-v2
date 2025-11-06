@@ -46,7 +46,7 @@ export const MoveMode: Story = {
   render: (args) => {
     const decodedArgs = decodeStorybookArgs(args);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
@@ -70,7 +70,7 @@ export const PaintMode: Story = {
   render: (args) => {
     const decodedArgs = decodeStorybookArgs(args);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
@@ -94,7 +94,7 @@ export const PaintModeWithSelection: Story = {
   render: (args) => {
     const decodedArgs = decodeStorybookArgs(args);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
 
@@ -137,7 +137,7 @@ export const QuickSelectDemo: Story = {
   render: (args) => {
     const decodedArgs = decodeStorybookArgs(args);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
     const [quickId, setQuickId] = React.useState<string | null>(null);
@@ -198,7 +198,7 @@ export const KedroMode: Story = {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
     const decodedArgs = decodeStorybookArgs(args as any);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging
@@ -237,7 +237,7 @@ export const LocalKedroMode: Story = {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
     const decodedArgs = decodeStorybookArgs(args as any);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
-    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl);
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
 
     // Show pipeline options in console for debugging

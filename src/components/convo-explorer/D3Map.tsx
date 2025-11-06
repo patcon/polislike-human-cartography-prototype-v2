@@ -45,6 +45,8 @@ type D3MapProps = {
   testAnimation?: boolean;
   /** Kedro base URL for fetching pipeline data */
   kedroBaseUrl?: string;
+  /** Filter for pipeline options (e.g., "bestkmeans") */
+  pipelineFilter?: string;
   /** Available pipelines for switching */
   availablePipelines?: Array<{id: string, name: string}>;
 };
@@ -64,6 +66,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   colorsToFront = false,
   testAnimation = false,
   kedroBaseUrl,
+  pipelineFilter,
   availablePipelines = [],
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
@@ -88,7 +91,10 @@ export const D3Map: React.FC<D3MapProps> = ({
 
   // Pipeline switching state - use internal pipeline fetching if availablePipelines not provided
   const shouldFetchPipelines = kedroBaseUrl && testAnimation && !availablePipelines?.length;
-  const { pipelines: fetchedPipelines } = usePipelineOptions(shouldFetchPipelines ? kedroBaseUrl : undefined);
+  const { pipelines: fetchedPipelines } = usePipelineOptions(
+    shouldFetchPipelines ? kedroBaseUrl : undefined,
+    pipelineFilter || 'bestkmeans' // Use provided filter or default to bestkmeans
+  );
   const effectivePipelines = availablePipelines?.length ? availablePipelines : fetchedPipelines;
   const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
   const [previousPipeline, setPreviousPipeline] = React.useState<string>('');

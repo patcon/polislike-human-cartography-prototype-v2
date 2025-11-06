@@ -26,6 +26,10 @@ const meta: Meta<typeof App> = {
       control: 'boolean',
       description: 'Enable animation testing between projection sets',
     },
+    pipelineFilter: {
+      control: 'text',
+      description: 'Filter pipelines in animation dropdown (e.g., "bestkmeans" to show only bestkmeans pipelines)',
+    },
   },
 };
 
@@ -125,6 +129,7 @@ export const KedroModeWithAnimation: Story = {
         kedroBaseUrl={decodedArgs.kedroBaseUrl}
         pipelineId={decodedArgs.pipelineId}
         testAnimation={decodedArgs.testAnimation}
+        pipelineFilter={decodedArgs.pipelineFilter}
       />
     );
   },
@@ -132,6 +137,7 @@ export const KedroModeWithAnimation: Story = {
     kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
     pipelineId: 'mean_localmap_bestkmeans',
     testAnimation: true,
+    pipelineFilter: 'bestkmeans',
   },
   parameters: {
     docs: {

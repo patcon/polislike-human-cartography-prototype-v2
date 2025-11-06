@@ -34,9 +34,10 @@ type AppProps = {
   testAnimation?: boolean;
   kedroBaseUrl?: string;
   pipelineId?: string;
+  pipelineFilter?: string;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, pipelineId }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, pipelineId, pipelineFilter }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -545,6 +546,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
             colorsToFront={colorsToFront}
             testAnimation={testAnimation}
             kedroBaseUrl={kedroBaseUrl}
+            pipelineFilter={pipelineFilter}
             availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
           />
         </div>

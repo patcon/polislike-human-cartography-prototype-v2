@@ -67,21 +67,56 @@ function decodePlotlyTypedArray({ bdata, dtype }: PlotlyTypedArray): number[] {
 }
 
 /**
+ * Check if v2 branching pipeline exists
+ */
+async function checkForV2BranchingPipeline(kedroBaseUrl: string): Promise<boolean> {
+  try {
+    const branchingUrl = `${kedroBaseUrl}/api/pipelines/branching`;
+    const response = await fetch(branchingUrl);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch pipeline data from Kedro API
+ * Automatically detects v1 vs v2 format:
+ * - v1: Individual pipelines with their own nodes
+ * - v2: "branching" pipeline containing all pipeline nodes
  */
 export async function fetchKedroApiData(kedroBaseUrl: string, pipelineId: string = 'mean_localmap_bestkmeans'): Promise<KedroApiResponse> {
-  const pipelineUrl = `${kedroBaseUrl}/api/pipelines/${pipelineId}`;
+  // First, check if v2 branching pipeline exists
+  const hasV2 = await checkForV2BranchingPipeline(kedroBaseUrl);
 
-  const response = await fetch(pipelineUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch pipeline data: ${response.status} ${response.statusText}`);
+  if (hasV2) {
+    console.log('🔄 Detected v2 format - using branching pipeline');
+    const pipelineUrl = `${kedroBaseUrl}/api/pipelines/branching`;
+
+    const response = await fetch(pipelineUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch v2 branching pipeline data: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  } else {
+    console.log('🔄 Using v1 format - individual pipeline');
+    const pipelineUrl = `${kedroBaseUrl}/api/pipelines/${pipelineId}`;
+
+    const response = await fetch(pipelineUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch v1 pipeline data: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
   }
-
-  return response.json();
 }
 
 /**
  * Find the scatter plot node in the pipeline data
+ * Supports both v1 and v2 formats:
+ * - v1: looks for `${pipelineId}__scatter_plot` in individual pipeline
+ * - v2: looks for `${pipelineId}__scatter_plot` in branching pipeline
  */
 export function findScatterPlotNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
   return apiResponse.nodes.find(node =>
@@ -91,19 +126,45 @@ export function findScatterPlotNode(apiResponse: KedroApiResponse, pipelineId: s
 
 /**
  * Find the votes parquet node in the pipeline data
+ * Supports both v1 and v2 formats:
+ * - v1: looks for `${pipelineId}__votes_parquet` in individual pipeline
+ * - v2: looks for shared `votes_parquet` node (without pipeline prefix) in branching pipeline
  */
 export function findVotesParquetNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
-  return apiResponse.nodes.find(node =>
+  // First try v1 format (with pipeline prefix)
+  const v1Node = apiResponse.nodes.find(node =>
     node.name === `${pipelineId}__votes_parquet`
+  );
+
+  if (v1Node) {
+    return v1Node;
+  }
+
+  // Then try v2 format (shared node without prefix)
+  return apiResponse.nodes.find(node =>
+    node.name === 'votes_parquet'
   ) || null;
 }
 
 /**
  * Find the statements JSON node in the pipeline data
+ * Supports both v1 and v2 formats:
+ * - v1: looks for `${pipelineId}__statements_json` in individual pipeline
+ * - v2: looks for shared `statements_json` node (without pipeline prefix) in branching pipeline
  */
 export function findStatementsJsonNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_localmap_bestkmeans'): KedroNode | null {
-  return apiResponse.nodes.find(node =>
+  // First try v1 format (with pipeline prefix)
+  const v1Node = apiResponse.nodes.find(node =>
     node.name === `${pipelineId}__statements_json`
+  );
+
+  if (v1Node) {
+    return v1Node;
+  }
+
+  // Then try v2 format (shared node without prefix)
+  return apiResponse.nodes.find(node =>
+    node.name === 'statements_json'
   ) || null;
 }
 
@@ -292,6 +353,78 @@ export async function getStatementsJsonPath(kedroBaseUrl: string, pipelineId: st
   } catch (error) {
     console.error('Error getting statements JSON path:', error);
     throw error;
+  }
+}
+
+/**
+ * Get available pipeline IDs from the branching pipeline (v2 format)
+ * Extracts pipeline IDs from scatter plot node names like "mean_localmap_bestkmeans__scatter_plot"
+ * When v2 is available, only returns v2 pipeline IDs and ignores v1 pipeline names
+ */
+export async function getAvailablePipelineIds(kedroBaseUrl: string, pipelineFilter?: string): Promise<Array<{id: string, name: string}>> {
+  try {
+    console.log('🔍 getAvailablePipelineIds: Starting for', kedroBaseUrl);
+    const hasV2 = await checkForV2BranchingPipeline(kedroBaseUrl);
+    console.log('🔍 getAvailablePipelineIds: hasV2 =', hasV2);
+
+    if (hasV2) {
+      console.log('🔄 Detected v2 format - fetching pipeline IDs from branching pipeline only...');
+      const branchingUrl = `${kedroBaseUrl}/api/pipelines/branching`;
+      const response = await fetch(branchingUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch v2 branching pipeline data: ${response.status} ${response.statusText}`);
+      }
+
+      const apiResponse = await response.json();
+
+      // Find all scatter plot nodes and extract pipeline IDs
+      const scatterPlotNodes = apiResponse.nodes.filter((node: any) =>
+        node.name.endsWith('__scatter_plot')
+      );
+
+      const pipelineIds = scatterPlotNodes.map((node: any) => {
+        const pipelineId = node.name.replace('__scatter_plot', '');
+        return {
+          id: pipelineId,
+          name: pipelineId // Keep the same format as v1 (with underscores)
+        };
+      });
+
+      // Apply filter if provided
+      const filteredPipelineIds = pipelineFilter
+        ? pipelineIds.filter((p: {id: string, name: string}) => p.id.includes(pipelineFilter))
+        : pipelineIds;
+
+      console.log('✅ Found pipeline IDs in v2 branching pipeline (ignoring v1):', filteredPipelineIds.map((p: {id: string, name: string}) => p.id));
+      if (pipelineFilter) {
+        console.log(`🔍 Applied filter "${pipelineFilter}": ${filteredPipelineIds.length}/${pipelineIds.length} pipelines`);
+      }
+      return filteredPipelineIds;
+    } else {
+      // Only use v1 format when v2 is not available
+      console.log('🔄 No v2 detected - using v1 format from /api/main...');
+      const response = await fetch(`${kedroBaseUrl}/api/main`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch pipelines: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // Filter out polis_classic as it has a different structure
+      let filteredPipelines = (data.pipelines || []).filter((pipeline: any) => pipeline.id !== 'polis_classic');
+
+      // Apply additional filter if provided
+      if (pipelineFilter) {
+        filteredPipelines = filteredPipelines.filter((pipeline: any) => pipeline.id.includes(pipelineFilter));
+        console.log(`🔍 Applied filter "${pipelineFilter}": ${filteredPipelines.length} pipelines`);
+      }
+
+      console.log('✅ Found pipelines in v1 format:', filteredPipelines.map((p: any) => p.id));
+      return filteredPipelines;
+    }
+  } catch (error) {
+    console.error('❌ Error fetching available pipeline IDs:', error);
+    return [];
   }
 }
 
