@@ -4,15 +4,7 @@ import * as React from "react";
 import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Repeat1, Repeat } from "lucide-react";
+import { PipelineSelector } from "./PipelineSelector";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -734,94 +726,58 @@ export const D3Map: React.FC<D3MapProps> = ({
     <div className="relative w-screen h-screen">
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
-      {/* Debug Controls - only show when testAnimation is enabled */}
-      {testAnimation && (
-        <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border">
-          {kedroBaseUrl && effectivePipelines.length > 0 ? (
-            // Pipeline switching controls
-            <div className="mb-2">
-              <h3 className="text-sm font-medium mb-2">
-                Pipeline {isAnimating && "(Animating...)"}
-              </h3>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selectedPipeline}
-                  onValueChange={handlePipelineChange}
-                  disabled={isAnimating}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select pipeline..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {effectivePipelines.map((pipeline) => (
-                      <SelectItem
-                        key={pipeline.id}
-                        value={pipeline.id}
-                        disabled={!pipelineData[pipeline.id]}
-                      >
-                        <span className={!pipelineData[pipeline.id] ? 'text-gray-400' : ''}>
-                          {pipeline.name}
-                          {!pipelineData[pipeline.id] && " (Loading...)"}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTogglePipeline}
-                  disabled={isAnimating || !previousPipeline || !pipelineData[previousPipeline]}
-                  title={previousPipeline ? `Toggle to ${effectivePipelines.find(p => p.id === previousPipeline)?.name || previousPipeline}` : 'No previous pipeline'}
-                >
-                  <Repeat1 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={isAutoCycling ? "default" : "outline"}
-                  size="sm"
-                  onClick={handleAutoCycleToggle}
-                  disabled={!previousPipeline || !pipelineData[previousPipeline]}
-                  title={isAutoCycling ? 'Stop auto-cycling' : 'Start auto-cycling between last two pipelines'}
-                  className={isAutoCycling ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                >
-                  <Repeat className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ) : (
-            // Original projection switching controls
-            Object.values(projectionData).some(data => data !== null) && (
-              <div className="mb-2">
-                <h3 className="text-sm font-medium mb-2">
-                  Projection Type {isAnimating && "(Animating...)"}
-                </h3>
-                <div className="space-y-2">
-                  {(["localmap", "pacmap", "umap"] as ProjectionType[]).map((projType) => (
-                    <label key={projType} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="projection-type"
-                        value={projType}
-                        checked={selectedProjection === projType}
-                        onChange={() => handleProjectionChange(projType)}
-                        disabled={isAnimating || !projectionData[projType]}
-                        className="w-4 h-4"
-                      />
-                      <span className={`text-sm ${!projectionData[projType] ? 'text-gray-400' : ''}`}>
-                        {projType === "localmap" ? "LocalMAP" :
-                         projType === "pacmap" ? "PaCMAP" : "UMAP"}
-                        {!projectionData[projType] && " (Loading...)"}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div className="text-xs text-gray-500 mt-2">
-                  Current: {selectedProjection === "localmap" ? "LocalMAP" :
-                           selectedProjection === "pacmap" ? "PaCMAP" : "UMAP"}
-                </div>
-              </div>
-            )
+      {/* Pipeline Selector - only show when testAnimation is enabled and we have Kedro pipelines */}
+      {kedroBaseUrl && effectivePipelines.length > 0 && (
+        <PipelineSelector
+          availablePipelines={effectivePipelines}
+          selectedPipeline={selectedPipeline}
+          onPipelineChange={handlePipelineChange}
+          enableAnimation={testAnimation}
+          previousPipeline={previousPipeline}
+          onTogglePipeline={handleTogglePipeline}
+          isAutoCycling={isAutoCycling}
+          onToggleAutoCycle={handleAutoCycleToggle}
+          isAnimating={isAnimating}
+          pipelineLoadingStates={Object.fromEntries(
+            effectivePipelines.map(p => [p.id, !pipelineData[p.id]])
           )}
+          top="1rem"
+          left="1rem"
+        />
+      )}
+
+      {/* Debug Controls - only show when testAnimation is enabled and using local projections */}
+      {testAnimation && !kedroBaseUrl && Object.values(projectionData).some(data => data !== null) && (
+        <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border">
+          <div className="mb-2">
+            <h3 className="text-sm font-medium mb-2">
+              Projection Type {isAnimating && "(Animating...)"}
+            </h3>
+            <div className="space-y-2">
+              {(["localmap", "pacmap", "umap"] as ProjectionType[]).map((projType) => (
+                <label key={projType} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="projection-type"
+                    value={projType}
+                    checked={selectedProjection === projType}
+                    onChange={() => handleProjectionChange(projType)}
+                    disabled={isAnimating || !projectionData[projType]}
+                    className="w-4 h-4"
+                  />
+                  <span className={`text-sm ${!projectionData[projType] ? 'text-gray-400' : ''}`}>
+                    {projType === "localmap" ? "LocalMAP" :
+                     projType === "pacmap" ? "PaCMAP" : "UMAP"}
+                    {!projectionData[projType] && " (Loading...)"}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              Current: {selectedProjection === "localmap" ? "LocalMAP" :
+                       selectedProjection === "pacmap" ? "PaCMAP" : "UMAP"}
+            </div>
+          </div>
         </div>
       )}
 
