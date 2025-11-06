@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Combobox, type ComboboxOption } from "../ui/combobox";
 import { Button } from "../ui/button";
 import { Repeat1, Repeat } from "lucide-react";
 
@@ -73,29 +73,20 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           Pipeline {isAnimating && "(Animating...)"}
         </h3>
         <div className="flex items-center gap-2">
-          <Select
+          <Combobox
             value={selectedPipeline}
             onValueChange={onPipelineChange}
             disabled={isAnimating}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select pipeline..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availablePipelines.map((pipeline) => (
-                <SelectItem
-                  key={pipeline.id}
-                  value={pipeline.id}
-                  disabled={pipelineLoadingStates[pipeline.id]}
-                >
-                  <span className={pipelineLoadingStates[pipeline.id] ? 'text-gray-400' : ''}>
-                    {pipeline.name}
-                    {pipelineLoadingStates[pipeline.id] && " (Loading...)"}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={availablePipelines.map((pipeline): ComboboxOption => ({
+              value: pipeline.id,
+              label: `${pipeline.name}${pipelineLoadingStates[pipeline.id] ? " (Loading...)" : ""}`,
+              disabled: pipelineLoadingStates[pipeline.id]
+            }))}
+            placeholder="Select pipeline..."
+            searchPlaceholder="Search pipelines..."
+            emptyMessage="No pipeline found."
+            className="flex-1 min-w-0"
+          />
           <Button
             variant="outline"
             size="sm"
