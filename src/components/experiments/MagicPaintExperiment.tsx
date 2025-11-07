@@ -341,7 +341,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       .attr("r", 4 / currentTransform.k)
       .attr("cx", d => xScale(d.x))
       .attr("cy", d => yScale(d.y))
-      .attr("fill", (d, i) => {
+      .attr("fill", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
 
@@ -354,7 +354,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
           return "#d3d3d3"; // Light gray for unselected
         }
       })
-      .attr("opacity", (d, i) => {
+      .attr("opacity", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
         if (displayGroupColors) {
@@ -364,7 +364,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         }
       })
       .attr("stroke", "#333")
-      .attr("stroke-width", (d, i) => {
+      .attr("stroke-width", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
         const isNoise = label === -1;
@@ -372,7 +372,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         if (displayGroupColors && isNoise) return 0;
         return 1 / currentTransform.k;
       })
-      .style("cursor", (d, i) => {
+      .style("cursor", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
         return label === -1 ? "default" : "pointer";
@@ -392,7 +392,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       .attr("r", 4 / currentTransform.k)
       .attr("cx", d => xScale(d.x))
       .attr("cy", d => yScale(d.y))
-      .attr("fill", (d, i) => {
+      .attr("fill", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
 
@@ -408,7 +408,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       .attr("opacity", 1.0)
       .attr("stroke", "black")
       .attr("stroke-width", 2 / currentTransform.k)
-      .style("cursor", (d, i) => {
+      .style("cursor", (d) => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         const label = labels[pointIndex];
         return label === -1 ? "default" : "pointer";
