@@ -18,9 +18,9 @@ const meta: Meta<typeof App> = {
       control: 'text',
       description: 'Base URL for Kedro API endpoints',
     },
-    pipelineId: {
+    initialPipelineId: {
       control: 'text',
-      description: 'Pipeline ID to load data from (e.g., mean_localmap_bestkmeans, mean_pca_bestkmeans)',
+      description: 'Initial pipeline ID to load data from (e.g., mean_localmap_bestkmeans, mean_pca_bestkmeans)',
     },
     testAnimation: {
       control: 'boolean',
@@ -42,14 +42,14 @@ export const KedroMode: Story = {
     return (
       <App
         kedroBaseUrl={decodedArgs.kedroBaseUrl}
-        pipelineId={decodedArgs.pipelineId}
+        initialPipelineId={decodedArgs.initialPipelineId}
         testAnimation={decodedArgs.testAnimation}
       />
     );
   },
   args: {
     kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
-    pipelineId: 'mean_localmap_bestkmeans',
+    initialPipelineId: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
   parameters: {
@@ -99,14 +99,14 @@ export const LocalKedroMode: Story = {
     return (
       <App
         kedroBaseUrl={decodedArgs.kedroBaseUrl}
-        pipelineId={decodedArgs.pipelineId}
+        initialPipelineId={decodedArgs.initialPipelineId}
         testAnimation={decodedArgs.testAnimation}
       />
     );
   },
   args: {
     kedroBaseUrl: encodeStorybookParam('http://localhost:4141'),
-    pipelineId: 'mean_localmap_bestkmeans',
+    initialPipelineId: 'mean_localmap_bestkmeans',
     testAnimation: false,
   },
   parameters: {
@@ -127,7 +127,7 @@ export const KedroModeWithAnimation: Story = {
     return (
       <App
         kedroBaseUrl={decodedArgs.kedroBaseUrl}
-        pipelineId={decodedArgs.pipelineId}
+        initialPipelineId={decodedArgs.initialPipelineId}
         testAnimation={decodedArgs.testAnimation}
         pipelineFilter={decodedArgs.pipelineFilter}
       />
@@ -135,7 +135,7 @@ export const KedroModeWithAnimation: Story = {
   },
   args: {
     kedroBaseUrl: encodeStorybookParam('https://patcon.github.io/kedro-polislike-pipelines'),
-    pipelineId: 'mean_localmap_bestkmeans',
+    initialPipelineId: 'mean_localmap_bestkmeans',
     testAnimation: true,
     pipelineFilter: 'bestkmeans',
   },

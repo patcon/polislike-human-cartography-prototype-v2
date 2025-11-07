@@ -33,11 +33,11 @@ function findDatasetIndex(dataset: [string, [number, number]][], targetId: numbe
 type AppProps = {
   testAnimation?: boolean;
   kedroBaseUrl?: string;
-  pipelineId?: string;
+  initialPipelineId?: string;
   pipelineFilter?: string;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, pipelineId, pipelineFilter }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -49,6 +49,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   const [colorIndex, setColorIndex] = React.useState(1);
 
   const [toggles, setToggles] = React.useState<string[]>([]);
+
+  // Pipeline-specific display state - stores flipX and flipY for each pipeline
+  const [pipelineDisplayState, setPipelineDisplayState] = React.useState<Record<string, { flipX: boolean; flipY: boolean }>>({});
+
+  // Current pipeline ID state - can be updated by D3Map pipeline selector
+  const [currentPipelineId, setCurrentPipelineId] = React.useState<string>(initialPipelineId || 'default');
 
   // Colors to front toggle state
   const colorsToFront = toggles.includes("colors-to-front");
@@ -101,6 +107,50 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
   // Clear colors dialog state
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
 
+  // Update current pipeline ID when initialPipelineId prop changes
+  React.useEffect(() => {
+    if (initialPipelineId) {
+      setCurrentPipelineId(initialPipelineId);
+    }
+  }, [initialPipelineId]);
+
+  // Handle pipeline change from D3Map
+  const handlePipelineChange = React.useCallback((newPipelineId: string) => {
+    setCurrentPipelineId(newPipelineId);
+  }, []);
+
+  // Get current pipeline display state
+  const currentDisplayState = React.useMemo(() => {
+    return pipelineDisplayState[currentPipelineId] || { flipX: false, flipY: false };
+  }, [pipelineDisplayState, currentPipelineId]);
+
+  // Helper function to update display state for current pipeline
+  const updatePipelineDisplayState = React.useCallback((updates: Partial<{ flipX: boolean; flipY: boolean }>) => {
+    setPipelineDisplayState(prev => ({
+      ...prev,
+      [currentPipelineId]: {
+        ...prev[currentPipelineId],
+        flipX: prev[currentPipelineId]?.flipX || false,
+        flipY: prev[currentPipelineId]?.flipY || false,
+        ...updates
+      }
+    }));
+  }, [currentPipelineId]);
+
+  // Custom toggle handler that manages pipeline-specific display state
+  const handleTogglesChange = React.useCallback((newToggles: string[]) => {
+    // Update pipeline-specific display state based on flip toggles
+    const newFlipX = newToggles.includes("flip-horizontal");
+    const newFlipY = newToggles.includes("flip-vertical");
+
+    updatePipelineDisplayState({
+      flipX: newFlipX,
+      flipY: newFlipY
+    });
+
+    setToggles(newToggles);
+  }, [updatePipelineDisplayState]);
+
   // Vote stats are now calculated at StatementExplorerDrawer level for better performance
   // Removed global vote stats calculation to avoid calculating stats for all statements
 
@@ -113,8 +163,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           console.log('Loading data from Kedro API:', kedroBaseUrl);
 
           const [kedroData, statementsData] = await Promise.all([
-            fetchAndProcessKedroData(kedroBaseUrl, pipelineId),
-            loadStatementsData(kedroBaseUrl, pipelineId)
+            fetchAndProcessKedroData(kedroBaseUrl, initialPipelineId),
+            loadStatementsData(kedroBaseUrl, initialPipelineId)
           ]);
 
           // Kedro data is already sorted in fetchAndProcessKedroData
@@ -175,7 +225,29 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
     };
 
     init();
-  }, [kedroBaseUrl, pipelineId]);
+  }, [kedroBaseUrl, initialPipelineId]);
+
+  // Synchronize toggles array with pipeline display state when pipeline changes
+  React.useEffect(() => {
+    // Build the expected toggles array based on current pipeline's display state
+    const nonFlipToggles = toggles.filter(toggle => !toggle.startsWith('flip-'));
+    const expectedToggles = [...nonFlipToggles];
+
+    if (currentDisplayState.flipX) {
+      expectedToggles.push('flip-horizontal');
+    }
+    if (currentDisplayState.flipY) {
+      expectedToggles.push('flip-vertical');
+    }
+
+    // Check if current toggles match expected toggles
+    const currentFlipToggles = toggles.filter(toggle => toggle.startsWith('flip-')).sort();
+    const expectedFlipToggles = expectedToggles.filter(toggle => toggle.startsWith('flip-')).sort();
+
+    if (JSON.stringify(currentFlipToggles) !== JSON.stringify(expectedFlipToggles)) {
+      setToggles(expectedToggles);
+    }
+  }, [currentDisplayState, currentPipelineId]);
 
   // Keyboard shortcuts for color selection
   React.useEffect(() => {
@@ -227,7 +299,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
         try {
           // Use the current dataset instead of loading projections from file
           const participantIds = dataset.map(([id]) => id);
-          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, pipelineId);
+          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineId);
 
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
@@ -254,7 +326,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       loadVotes();
     }
-  }, [layerMode, statementId, dataset, kedroBaseUrl, pipelineId]);
+  }, [layerMode, statementId, dataset, kedroBaseUrl, currentPipelineId]);
 
   // Load metrics data when switching to metrics mode
   React.useEffect(() => {
@@ -274,7 +346,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
           const voteCounts = await getVoteCountsForAllParticipants({
             kedroBaseUrl,
-            pipelineId,
+            pipelineId: currentPipelineId,
             statementIds
           });
 
@@ -291,7 +363,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, pipelineId, statements]);
+  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
@@ -347,7 +419,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           minVoteCount: 1,
           maxStatementsCount: 10,
           kedroBaseUrl,
-          pipelineId
+          pipelineId: currentPipelineId
         }
       );
 
@@ -541,13 +613,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
             onQuickSelect={handleQuickSelect}
             onLassoStart={handleLassoStart}
             onLassoEnd={handleLassoEnd}
-            flipX={toggles.includes("flip-horizontal")}
-            flipY={toggles.includes("flip-vertical")}
+            flipX={currentDisplayState.flipX}
+            flipY={currentDisplayState.flipY}
             colorsToFront={colorsToFront}
             testAnimation={testAnimation}
             kedroBaseUrl={kedroBaseUrl}
             pipelineFilter={pipelineFilter}
             availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
+            onPipelineChange={handlePipelineChange}
           />
         </div>
       </div>
@@ -561,7 +634,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           onColorIndexChange={setColorIndex}
           statements={statements}
           toggles={toggles}
-          onTogglesChange={setToggles}
+          onTogglesChange={handleTogglesChange}
           pointGroups={pointGroups}
           drawerOpen={drawerOpen}
           onDrawerOpenChange={setDrawerOpen}
@@ -585,7 +658,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, p
           dataset={dataset}
           // Kedro configuration props
           kedroBaseUrl={kedroBaseUrl}
-          pipelineId={pipelineId}
+          pipelineId={currentPipelineId}
         />
       </div>
 

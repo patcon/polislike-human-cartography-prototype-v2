@@ -80,19 +80,19 @@ function Combobox({
               // Custom filter for precise matching including underscores
               const option = options.find(opt => opt.value === value)
               if (!option) return 0
-              
+
               const searchLower = search.toLowerCase()
               const labelLower = option.label.toLowerCase()
-              
+
               // Exact match gets highest score
               if (labelLower === searchLower) return 1
-              
+
               // Starts with match gets high score
               if (labelLower.startsWith(searchLower)) return 0.9
-              
+
               // Contains match (including underscores) gets medium score
               if (labelLower.includes(searchLower)) return 0.7
-              
+
               // No match
               return 0
             }}

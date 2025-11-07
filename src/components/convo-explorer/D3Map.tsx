@@ -40,6 +40,8 @@ type D3MapProps = {
   pipelineFilter?: string;
   /** Available pipelines for switching */
   availablePipelines?: Array<{id: string, name: string}>;
+  /** Called when pipeline changes in the selector */
+  onPipelineChange?: (pipelineId: string) => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -61,6 +63,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   kedroBaseUrl,
   pipelineFilter,
   availablePipelines = [],
+  onPipelineChange,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -430,10 +433,14 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Handle pipeline change with animation (works for both Kedro and static)
   const handlePipelineChange = React.useCallback((newPipeline: string) => {
     if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
+
     setIsAnimating(true);
     setPreviousPipeline(selectedPipeline);
     setSelectedPipeline(newPipeline);
-  }, [testAnimation, pipelineData, isAnimating, selectedPipeline]);
+
+    // Notify parent component about pipeline change
+    onPipelineChange?.(newPipeline);
+  }, [testAnimation, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
 
   // Handle toggle between current and previous pipeline
   const handleTogglePipeline = React.useCallback(() => {
@@ -442,7 +449,10 @@ export const D3Map: React.FC<D3MapProps> = ({
     const temp = selectedPipeline;
     setSelectedPipeline(previousPipeline);
     setPreviousPipeline(temp);
-  }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline]);
+
+    // Notify parent component about pipeline change
+    onPipelineChange?.(previousPipeline);
+  }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
 
   // Auto-cycling logic - trigger next cycle when animation completes
   React.useEffect(() => {
