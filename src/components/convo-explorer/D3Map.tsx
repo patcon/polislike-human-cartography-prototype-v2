@@ -380,13 +380,20 @@ export const D3Map: React.FC<D3MapProps> = ({
       });
 
     if (isAnimating) {
-      updateSelection
+      const transition = updateSelection
         .transition()
         .duration(1000)
         .ease(d3.easeQuadInOut)
         .attr("cx", d => xScale(d.x))
-        .attr("cy", d => yScale(d.y))
-        .on("end", () => setIsAnimating(false));
+        .attr("cy", d => yScale(d.y));
+
+      // Use transition.end() promise to properly handle when all animations complete
+      transition.end().then(() => {
+        setIsAnimating(false);
+      }).catch(() => {
+        // Handle case where transition is interrupted
+        setIsAnimating(false);
+      });
     } else {
       updateSelection
         .attr("cx", d => xScale(d.x))
