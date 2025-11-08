@@ -4,6 +4,9 @@ import * as React from "react";
 import * as d3 from "d3";
 import { Label } from "@/components/ui/label";
 
+// Configuration constant for segmented cluster view
+const SEGMENT_CLUSTERED = true;
+
 type Point = {
   id: string;
   x: number;
@@ -489,24 +492,47 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   // Calculate cluster proportions at current water level
   const clusterProportions = React.useMemo(() => {
     if (!points.length || !Object.keys(labelsByThreshold).length) {
-      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0 };
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [] };
     }
 
     const threshold = nearestThreshold(currentLambda);
     const labels = labelsByThreshold[threshold];
     if (!labels) {
-      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0 };
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [] };
     }
 
     const clusteredCount = labels.filter(label => label !== -1).length;
     const unclusteredCount = labels.filter(label => label === -1).length;
     const total = clusteredCount + unclusteredCount;
 
+    // Calculate cluster groups for segmented view
+    const clusterGroups: Array<{ clusterId: number; count: number; percentage: number }> = [];
+    if (SEGMENT_CLUSTERED) {
+      const clusterCounts = new Map<number, number>();
+      labels.forEach(label => {
+        if (label !== -1) {
+          clusterCounts.set(label, (clusterCounts.get(label) || 0) + 1);
+        }
+      });
+
+      // Convert to array and sort by cluster ID to maintain consistent order
+      Array.from(clusterCounts.entries())
+        .sort(([a], [b]) => a - b)
+        .forEach(([clusterId, count]) => {
+          clusterGroups.push({
+            clusterId,
+            count,
+            percentage: total > 0 ? (count / total) * 100 : 0
+          });
+        });
+    }
+
     return {
       clustered: total > 0 ? (clusteredCount / total) * 100 : 0,
       unclustered: total > 0 ? (unclusteredCount / total) * 100 : 0,
       clusteredCount,
-      unclusteredCount
+      unclusteredCount,
+      clusterGroups
     };
   }, [points.length, labelsByThreshold, currentLambda, nearestThreshold]);
 
@@ -559,32 +585,62 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
             <div className="relative w-full mt-2 h-6 bg-gray-200 rounded-md overflow-hidden">
               {/* Bar segments */}
               <div className="flex h-full">
-                {/* Clustered segment */}
-                {clusterProportions.clusteredCount > 0 && (
-                  <div
-                    className="h-full transition-all duration-300 ease-in-out"
-                    style={{
-                      backgroundColor: "#1d4ed8", // Darker blue for better contrast
-                      width: `${clusterProportions.clustered}%`,
-                    }}
-                  />
-                )}
+                {SEGMENT_CLUSTERED ? (
+                  // Segmented view - show each cluster group with alternating colors
+                  <>
+                    {clusterProportions.clusterGroups.map((group, index) => (
+                      <div
+                        key={group.clusterId}
+                        className="h-full transition-all duration-300 ease-in-out"
+                        style={{
+                          backgroundColor: index % 2 === 0 ? "#1d4ed8" : "#3b82f6", // Alternating blue shades
+                          width: `${group.percentage}%`,
+                        }}
+                      />
+                    ))}
+                    {/* Unclustered segment */}
+                    {clusterProportions.unclusteredCount > 0 && (
+                      <div
+                        className="h-full transition-all duration-300 ease-in-out"
+                        style={{
+                          backgroundColor: "#d1d5db", // Light gray for unclustered
+                          width: `${clusterProportions.unclustered}%`,
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  // Original view - single clustered segment
+                  <>
+                    {/* Clustered segment */}
+                    {clusterProportions.clusteredCount > 0 && (
+                      <div
+                        className="h-full transition-all duration-300 ease-in-out"
+                        style={{
+                          backgroundColor: "#1d4ed8", // Darker blue for better contrast
+                          width: `${clusterProportions.clustered}%`,
+                        }}
+                      />
+                    )}
 
-                {/* Unclustered segment */}
-                {clusterProportions.unclusteredCount > 0 && (
-                  <div
-                    className="h-full transition-all duration-300 ease-in-out"
-                    style={{
-                      backgroundColor: "#d1d5db", // Original light gray
-                      width: `${clusterProportions.unclustered}%`,
-                    }}
-                  />
+                    {/* Unclustered segment */}
+                    {clusterProportions.unclusteredCount > 0 && (
+                      <div
+                        className="h-full transition-all duration-300 ease-in-out"
+                        style={{
+                          backgroundColor: "#d1d5db", // Original light gray
+                          width: `${clusterProportions.unclustered}%`,
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
 
+              {/* Text overlays for both segmented and original views */}
               {/* Light text layer (visible on dark backgrounds) */}
               <div className="absolute inset-0 flex items-center pointer-events-none">
-                {/* Clustered count - light text clipped to dark blue area */}
+                {/* Clustered count - light text clipped to clustered area */}
                 {clusterProportions.clusteredCount > 0 && (
                   <div
                     className="flex items-center justify-center text-xs font-semibold text-white h-full transition-all duration-300 ease-in-out"
@@ -597,7 +653,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                   </div>
                 )}
 
-                {/* Unclustered count - light text for dark blue area, spans full width but right-aligned */}
+                {/* Unclustered count - light text for clustered area, spans full width but right-aligned */}
                 {clusterProportions.unclusteredCount > 0 && (
                   <div
                     className="flex items-center justify-end pr-2 text-xs font-semibold text-white h-full absolute inset-0 transition-all duration-300 ease-in-out"
@@ -612,7 +668,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
 
               {/* Dark text layer (visible on light background) */}
               <div className="absolute inset-0 flex items-center pointer-events-none">
-                {/* Clustered count - dark text clipped away from blue area */}
+                {/* Clustered count - dark text clipped away from clustered area */}
                 {clusterProportions.clusteredCount > 0 && (
                   <div
                     className="flex items-center justify-center text-xs font-semibold text-gray-800 h-full transition-all duration-300 ease-in-out"
