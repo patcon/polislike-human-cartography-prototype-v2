@@ -581,6 +581,13 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
               Selected points: {selectedCount} / {totalPoints} ({percentage}%)
             </div>
 
+            {/* Group count - only show when segmented clustering is enabled */}
+            {SEGMENT_CLUSTERED && (
+              <div className="text-sm font-medium text-gray-700">
+                Group count: {clusterProportions.clusterGroups.length}
+              </div>
+            )}
+
             {/* Custom proportional bar with advanced text clipping */}
             <div className="relative w-full mt-2 h-6 bg-gray-200 rounded-md overflow-hidden">
               {/* Bar segments */}
