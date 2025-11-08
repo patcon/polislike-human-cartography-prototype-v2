@@ -492,18 +492,32 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   // Calculate cluster proportions at current water level
   const clusterProportions = React.useMemo(() => {
     if (!points.length || !Object.keys(labelsByThreshold).length) {
-      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [] };
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [], selectedClusterId: null };
     }
 
     const threshold = nearestThreshold(currentLambda);
     const labels = labelsByThreshold[threshold];
     if (!labels) {
-      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [] };
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0, clusterGroups: [], selectedClusterId: null };
     }
 
     const clusteredCount = labels.filter(label => label !== -1).length;
     const unclusteredCount = labels.filter(label => label === -1).length;
     const total = clusteredCount + unclusteredCount;
+
+    // Determine which cluster is selected (if any)
+    let selectedClusterId: number | null = null;
+    if (selectedPoints.size > 0) {
+      // Get the cluster ID of the first selected point
+      const firstSelectedPoint = Array.from(selectedPoints)[0];
+      const pointIndex = points.findIndex(p => p.id === firstSelectedPoint);
+      if (pointIndex !== -1) {
+        const clusterId = labels[pointIndex];
+        if (clusterId !== -1) {
+          selectedClusterId = clusterId;
+        }
+      }
+    }
 
     // Calculate cluster groups for segmented view
     const clusterGroups: Array<{ clusterId: number; count: number; percentage: number }> = [];
@@ -532,9 +546,10 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       unclustered: total > 0 ? (unclusteredCount / total) * 100 : 0,
       clusteredCount,
       unclusteredCount,
-      clusterGroups
+      clusterGroups,
+      selectedClusterId
     };
-  }, [points.length, labelsByThreshold, currentLambda, nearestThreshold]);
+  }, [points.length, labelsByThreshold, currentLambda, nearestThreshold, selectedPoints, points]);
 
   if (isLoading) {
     return (
@@ -602,6 +617,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                         style={{
                           backgroundColor: index % 2 === 0 ? "#1d4ed8" : "#3b82f6", // Alternating blue shades
                           width: `${group.percentage}%`,
+                          boxShadow: clusterProportions.selectedClusterId === group.clusterId ? "inset 0 0 0 2px black" : "none",
                         }}
                       />
                     ))}
