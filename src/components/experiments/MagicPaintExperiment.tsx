@@ -726,9 +726,6 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                 checked={autoSelectMode}
                 onChange={(e) => {
                   setAutoSelectMode(e.target.checked);
-                  if (!e.target.checked) {
-                    setExpandSelectionMode(false);
-                  }
                   setLastSelectedPoint(null);
                 }}
               />
