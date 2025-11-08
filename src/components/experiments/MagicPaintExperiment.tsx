@@ -666,7 +666,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                 {/* Clustered count - light text clipped to clustered area */}
                 {clusterProportions.clusteredCount > 0 && (
                   <div
-                    className="flex items-center justify-center text-xs font-semibold text-white h-full transition-all duration-300 ease-in-out"
+                    className="flex items-center justify-start pl-2 text-xs font-semibold text-white h-full transition-all duration-300 ease-in-out"
                     style={{
                       width: `${clusterProportions.clustered}%`,
                       clipPath: `inset(0 ${100 - clusterProportions.clustered}% 0 0)`,
@@ -694,7 +694,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
                 {/* Clustered count - dark text clipped away from clustered area */}
                 {clusterProportions.clusteredCount > 0 && (
                   <div
-                    className="flex items-center justify-center text-xs font-semibold text-gray-800 h-full transition-all duration-300 ease-in-out"
+                    className="flex items-center justify-start pl-2 text-xs font-semibold text-gray-800 h-full transition-all duration-300 ease-in-out"
                     style={{
                       width: `${clusterProportions.clustered}%`,
                       clipPath: `inset(0 0 0 ${clusterProportions.clustered}%)`,
