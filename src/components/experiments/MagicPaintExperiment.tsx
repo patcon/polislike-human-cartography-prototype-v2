@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as d3 from "d3";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 type Point = {
   id: string;
@@ -486,6 +487,30 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     };
   }, [points, currentLambda, nearestThreshold, labelsByThreshold, selectedPoints, displayGroupColors, handleBackgroundClick]);
 
+  // Calculate cluster proportions at current water level
+  const clusterProportions = React.useMemo(() => {
+    if (!points.length || !Object.keys(labelsByThreshold).length) {
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0 };
+    }
+
+    const threshold = nearestThreshold(currentLambda);
+    const labels = labelsByThreshold[threshold];
+    if (!labels) {
+      return { clustered: 0, unclustered: 0, clusteredCount: 0, unclusteredCount: 0 };
+    }
+
+    const clusteredCount = labels.filter(label => label !== -1).length;
+    const unclusteredCount = labels.filter(label => label === -1).length;
+    const total = clusteredCount + unclusteredCount;
+
+    return {
+      clustered: total > 0 ? (clusteredCount / total) * 100 : 0,
+      unclustered: total > 0 ? (unclusteredCount / total) * 100 : 0,
+      clusteredCount,
+      unclusteredCount
+    };
+  }, [points.length, labelsByThreshold, currentLambda, nearestThreshold]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center w-screen h-screen">
@@ -525,6 +550,50 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
               className="w-full"
               disabled={autoSelectMode}
             />
+
+            {/* Cluster Proportion Badge */}
+            <div className="flex items-center w-full mt-2">
+              {/* Clustered points badge - uses flex-grow to fill remaining space */}
+              {clusterProportions.clusteredCount > 0 && (
+                <Badge
+                  className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
+                  style={{
+                    backgroundColor: "#2563eb", // Blue for clustered
+                    flexGrow: clusterProportions.clusteredCount,
+                    minWidth: 'fit-content',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    textAlign: 'right',
+                    transition: 'background-color 300ms ease-in-out',
+                    borderRadius: clusterProportions.unclusteredCount > 0 ? '0.375rem 0 0 0.375rem' : '0.375rem',
+                  }}
+                >
+                  {clusterProportions.clusteredCount}
+                </Badge>
+              )}
+
+              {/* Unclustered (noise) points badge - uses proportional width */}
+              {clusterProportions.unclusteredCount > 0 && (
+                <Badge
+                  className="text-gray-600 border-0 text-xs py-0.5 h-6 pl-2 pr-2 flex-shrink-0"
+                  style={{
+                    backgroundColor: "#d1d5db", // Light gray for unclustered/noise
+                    width: `${clusterProportions.unclustered}%`,
+                    minWidth: 'fit-content',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    textAlign: 'right',
+                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+                    borderRadius: clusterProportions.clusteredCount > 0 ? '0 0.375rem 0.375rem 0' : '0.375rem',
+                    marginLeft: clusterProportions.clusteredCount > 0 ? '-1px' : '0',
+                  }}
+                >
+                  {clusterProportions.unclusteredCount}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
