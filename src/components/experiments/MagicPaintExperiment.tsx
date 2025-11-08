@@ -3,7 +3,6 @@
 import * as React from "react";
 import * as d3 from "d3";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 
 type Point = {
   id: string;
@@ -551,48 +550,93 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
               disabled={autoSelectMode}
             />
 
-            {/* Cluster Proportion Badge */}
-            <div className="flex items-center w-full mt-2">
-              {/* Clustered points badge - uses flex-grow to fill remaining space */}
-              {clusterProportions.clusteredCount > 0 && (
-                <Badge
-                  className="text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2"
-                  style={{
-                    backgroundColor: "#2563eb", // Blue for clustered
-                    flexGrow: clusterProportions.clusteredCount,
-                    minWidth: 'fit-content',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    textAlign: 'right',
-                    transition: 'background-color 300ms ease-in-out',
-                    borderRadius: clusterProportions.unclusteredCount > 0 ? '0.375rem 0 0 0.375rem' : '0.375rem',
-                  }}
-                >
-                  {clusterProportions.clusteredCount}
-                </Badge>
-              )}
+            {/* Selected points count */}
+            <div className="text-sm font-medium text-gray-700 mt-2">
+              Selected points: {selectedCount} / {totalPoints} ({percentage}%)
+            </div>
 
-              {/* Unclustered (noise) points badge - uses proportional width */}
-              {clusterProportions.unclusteredCount > 0 && (
-                <Badge
-                  className="text-gray-600 border-0 text-xs py-0.5 h-6 pl-2 pr-2 flex-shrink-0"
-                  style={{
-                    backgroundColor: "#d1d5db", // Light gray for unclustered/noise
-                    width: `${clusterProportions.unclustered}%`,
-                    minWidth: 'fit-content',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    textAlign: 'right',
-                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
-                    borderRadius: clusterProportions.clusteredCount > 0 ? '0 0.375rem 0.375rem 0' : '0.375rem',
-                    marginLeft: clusterProportions.clusteredCount > 0 ? '-1px' : '0',
-                  }}
-                >
-                  {clusterProportions.unclusteredCount}
-                </Badge>
-              )}
+            {/* Custom proportional bar with advanced text clipping */}
+            <div className="relative w-full mt-2 h-6 bg-gray-200 rounded-md overflow-hidden">
+              {/* Bar segments */}
+              <div className="flex h-full">
+                {/* Clustered segment */}
+                {clusterProportions.clusteredCount > 0 && (
+                  <div
+                    className="h-full transition-all duration-300 ease-in-out"
+                    style={{
+                      backgroundColor: "#1d4ed8", // Darker blue for better contrast
+                      width: `${clusterProportions.clustered}%`,
+                    }}
+                  />
+                )}
+
+                {/* Unclustered segment */}
+                {clusterProportions.unclusteredCount > 0 && (
+                  <div
+                    className="h-full transition-all duration-300 ease-in-out"
+                    style={{
+                      backgroundColor: "#d1d5db", // Original light gray
+                      width: `${clusterProportions.unclustered}%`,
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Light text layer (visible on dark backgrounds) */}
+              <div className="absolute inset-0 flex items-center pointer-events-none">
+                {/* Clustered count - light text clipped to dark blue area */}
+                {clusterProportions.clusteredCount > 0 && (
+                  <div
+                    className="flex items-center justify-center text-xs font-semibold text-white h-full transition-all duration-300 ease-in-out"
+                    style={{
+                      width: `${clusterProportions.clustered}%`,
+                      clipPath: `inset(0 ${100 - clusterProportions.clustered}% 0 0)`,
+                    }}
+                  >
+                    {clusterProportions.clusteredCount}
+                  </div>
+                )}
+
+                {/* Unclustered count - light text for dark blue area, spans full width but right-aligned */}
+                {clusterProportions.unclusteredCount > 0 && (
+                  <div
+                    className="flex items-center justify-end pr-2 text-xs font-semibold text-white h-full absolute inset-0 transition-all duration-300 ease-in-out"
+                    style={{
+                      clipPath: `inset(0 ${100 - clusterProportions.clustered}% 0 0)`,
+                    }}
+                  >
+                    {clusterProportions.unclusteredCount}
+                  </div>
+                )}
+              </div>
+
+              {/* Dark text layer (visible on light background) */}
+              <div className="absolute inset-0 flex items-center pointer-events-none">
+                {/* Clustered count - dark text clipped away from blue area */}
+                {clusterProportions.clusteredCount > 0 && (
+                  <div
+                    className="flex items-center justify-center text-xs font-semibold text-gray-800 h-full transition-all duration-300 ease-in-out"
+                    style={{
+                      width: `${clusterProportions.clustered}%`,
+                      clipPath: `inset(0 0 0 ${clusterProportions.clustered}%)`,
+                    }}
+                  >
+                    {clusterProportions.clusteredCount}
+                  </div>
+                )}
+
+                {/* Unclustered count - dark text for light gray area, spans full width but right-aligned */}
+                {clusterProportions.unclusteredCount > 0 && (
+                  <div
+                    className="flex items-center justify-end pr-2 text-xs font-semibold text-gray-800 h-full absolute inset-0 transition-all duration-300 ease-in-out"
+                    style={{
+                      clipPath: `inset(0 0 0 ${clusterProportions.clustered}%)`,
+                    }}
+                  >
+                    {clusterProportions.unclusteredCount}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -630,10 +674,6 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
               />
               <span className="text-sm">Style by cluster label (debug)</span>
             </label>
-          </div>
-
-          <div className="text-sm font-medium text-gray-700">
-            Selected points: {selectedCount} / {totalPoints} ({percentage}%)
           </div>
         </div>
       </div>
