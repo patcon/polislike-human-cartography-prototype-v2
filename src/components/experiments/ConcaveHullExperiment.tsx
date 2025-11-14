@@ -339,14 +339,14 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     try {
       // Convert points to screen coordinates
       const screenPoints: [number, number][] = clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]);
-      
+
       // Use concaveman to generate concave hull
       // concavity parameter: lower values = more detailed/concave, higher values = more convex
       const concavity = hullConfig.concavity;
       const lengthThreshold = hullConfig.lengthThreshold;
-      
+
       const hullPoints = concaveman(screenPoints, concavity, lengthThreshold);
-      
+
       if (!hullPoints || hullPoints.length < 3) {
         // Fallback to convex hull if concaveman fails
         const convexHull = d3.polygonHull(screenPoints as [number, number][]);
@@ -383,18 +383,18 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     const drawHulls = () => {
       if (hullConfig.enabled) {
         const clusterGroups = new Map<number, Point[]>();
-        
+
         // Group points by cluster (excluding noise if configured)
         points.forEach((point, index) => {
           const clusterId = labels[index];
           if (hullConfig.excludeNoise && clusterId === -1) return;
-          
+
           // If showOnlySelected is true, only show hulls for selected clusters
           if (hullConfig.showOnlySelected) {
             const isPointSelected = selectedPoints.has(point.id);
             if (!isPointSelected) return;
           }
-          
+
           if (clusterId !== -1) {
             if (!clusterGroups.has(clusterId)) {
               clusterGroups.set(clusterId, []);

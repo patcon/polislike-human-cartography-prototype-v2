@@ -15,7 +15,7 @@ export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg border max-w-xs">
       <h3 className="text-lg font-semibold mb-3">Concave Hull Visualization</h3>
-      
+
       <div className="space-y-3">
         <label className="flex items-center space-x-2">
           <input
@@ -25,7 +25,7 @@ export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
           />
           <span className="text-sm">Show concave hulls around clusters</span>
         </label>
-        
+
         {config.enabled && (
           <>
             <div className="space-y-2">

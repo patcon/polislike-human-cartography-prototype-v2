@@ -39,7 +39,7 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
         <DialogHeader>
           <DialogTitle>Concave Hull Configuration</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="flex items-center space-x-2">
