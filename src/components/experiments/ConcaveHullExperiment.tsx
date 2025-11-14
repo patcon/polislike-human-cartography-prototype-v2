@@ -126,6 +126,9 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
         <ConcaveHullPanel
           config={hullConfig}
           onConfigChange={setHullConfig}
+          points={points}
+          labels={labelsByThreshold[nearestThreshold(currentLambda)]}
+          selectedPoints={selectedPoints}
         />
       </div>
     </div>

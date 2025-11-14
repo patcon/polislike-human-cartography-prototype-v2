@@ -1,18 +1,36 @@
 import React from 'react';
+import * as d3 from "d3";
 import { Button } from "@/components/ui/button";
 import { ConcaveHullConfigModal } from './ConcaveHullConfigModal';
+import { ConcaveHullPerimeterChart } from './ConcaveHullPerimeterChart';
+import { calculateHullPerimeter } from './hullPerimeterUtils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import type { ConcaveHullConfig } from './ConcaveHullConfigModal';
+import type { Point } from './types';
 
 interface ConcaveHullPanelProps {
   config: ConcaveHullConfig;
   onConfigChange: (config: ConcaveHullConfig) => void;
+  points?: Point[];
+  labels?: number[];
+  selectedPoints?: Set<string>;
 }
 
 export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
   config,
-  onConfigChange
+  onConfigChange,
+  points = [],
+  labels = [],
+  selectedPoints = new Set()
 }) => {
+  // Create color scale (same as used in HDBSCANMap)
+  const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+  // Calculate hull perimeter data
+  const perimeterData = React.useMemo(() => {
+    if (!points.length || !labels.length) return [];
+    return calculateHullPerimeter(points, labels, selectedPoints, config, color);
+  }, [points, labels, selectedPoints, config, color]);
   return (
     <div className="bg-white rounded-lg shadow-lg border w-80">
       <Accordion type="single" collapsible defaultValue="hull-panel">
@@ -21,7 +39,7 @@ export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
             <h3 className="text-lg font-semibold text-left">Concave Hull Visualization</h3>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
-            <div className="space-y-3">
+            <div className="space-y-4">
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -78,6 +96,13 @@ export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
                     </Button>
                   </ConcaveHullConfigModal>
                 </>
+              )}
+
+              {/* Hull Perimeter Chart */}
+              {config.enabled && perimeterData.length > 0 && (
+                <div className="pt-2 border-t border-gray-200">
+                  <ConcaveHullPerimeterChart data={perimeterData} />
+                </div>
               )}
             </div>
           </AccordionContent>
