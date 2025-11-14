@@ -41,19 +41,23 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
             <div key={item.clusterId} className="flex flex-col items-center space-y-1">
               {/* Bar */}
               <div
-                className="rounded-t transition-all duration-200 hover:opacity-80"
+                className={`rounded-t transition-all duration-200 hover:opacity-80 ${
+                  item.hasSelectedPoints ? 'ring-2 ring-black ring-inset' : ''
+                }`}
                 style={{
                   width: barWidth,
                   height: barHeight,
                   backgroundColor: item.color,
                   minHeight: 2 // Ensure very small bars are still visible
                 }}
-                title={`Cluster ${item.clusterId}: ${item.perimeter.toFixed(2)}`}
+                title={`Cluster ${item.clusterId}: ${item.perimeter.toFixed(2)}${item.hasSelectedPoints ? ' (selected)' : ''}`}
               />
 
               {/* Cluster ID label - angled to prevent overflow affecting width */}
               <div
-                className={`${labelFontSize} text-gray-600 font-mono transform -rotate-70 whitespace-nowrap`}
+                className={`${labelFontSize} font-mono transform -rotate-70 whitespace-nowrap ${
+                  item.hasSelectedPoints ? 'text-gray-800 font-bold' : 'text-gray-600'
+                }`}
                 style={{
                   transformOrigin: 'top right',
                   marginTop: '2px',
