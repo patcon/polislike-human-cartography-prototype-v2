@@ -4,9 +4,8 @@ import * as React from "react";
 import * as d3 from "d3";
 import { ExperimentControlsPanel } from './shared/ExperimentControlsPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
-import { ConcaveHullConfigModal } from './shared/ConcaveHullConfigModal';
+import { ConcaveHullPanel } from './shared/ConcaveHullPanel';
 import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
-import { Button } from "@/components/ui/button";
 
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
@@ -46,7 +45,8 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     strokeOpacity: 0.6,
     strokeWidth: 2,
     showOnlySelected: false,
-    excludeNoise: true
+    excludeNoise: true,
+    renderOrder: 'below'
   });
 
   const color = d3.scaleOrdinal(d3.schemeTableau10);
@@ -356,44 +356,51 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     const labels = labelsByThreshold[threshold];
     if (!labels) return;
 
-    // Draw concave hulls if enabled
-    if (hullConfig.enabled) {
-      const clusterGroups = new Map<number, Point[]>();
-      
-      // Group points by cluster (excluding noise if configured)
-      points.forEach((point, index) => {
-        const clusterId = labels[index];
-        if (hullConfig.excludeNoise && clusterId === -1) return;
+    // Function to draw concave hulls
+    const drawHulls = () => {
+      if (hullConfig.enabled) {
+        const clusterGroups = new Map<number, Point[]>();
         
-        // If showOnlySelected is true, only show hulls for selected clusters
-        if (hullConfig.showOnlySelected) {
-          const isPointSelected = selectedPoints.has(point.id);
-          if (!isPointSelected) return;
-        }
-        
-        if (clusterId !== -1) {
-          if (!clusterGroups.has(clusterId)) {
-            clusterGroups.set(clusterId, []);
+        // Group points by cluster (excluding noise if configured)
+        points.forEach((point, index) => {
+          const clusterId = labels[index];
+          if (hullConfig.excludeNoise && clusterId === -1) return;
+          
+          // If showOnlySelected is true, only show hulls for selected clusters
+          if (hullConfig.showOnlySelected) {
+            const isPointSelected = selectedPoints.has(point.id);
+            if (!isPointSelected) return;
           }
-          clusterGroups.get(clusterId)!.push(point);
-        }
-      });
+          
+          if (clusterId !== -1) {
+            if (!clusterGroups.has(clusterId)) {
+              clusterGroups.set(clusterId, []);
+            }
+            clusterGroups.get(clusterId)!.push(point);
+          }
+        });
 
-      // Draw hulls for each cluster
-      clusterGroups.forEach((clusterPoints, clusterId) => {
-        if (clusterPoints.length >= 3) {
-          const hullPath = generateConcaveHull(clusterPoints);
-          if (hullPath) {
-            container.append("path")
-              .attr("d", hullPath)
-              .attr("fill", color(clusterId.toString()))
-              .attr("fill-opacity", hullConfig.fillOpacity)
-              .attr("stroke", color(clusterId.toString()))
-              .attr("stroke-width", hullConfig.strokeWidth / currentTransform.k)
-              .attr("stroke-opacity", hullConfig.strokeOpacity);
+        // Draw hulls for each cluster
+        clusterGroups.forEach((clusterPoints, clusterId) => {
+          if (clusterPoints.length >= 3) {
+            const hullPath = generateConcaveHull(clusterPoints);
+            if (hullPath) {
+              container.append("path")
+                .attr("d", hullPath)
+                .attr("fill", color(clusterId.toString()))
+                .attr("fill-opacity", hullConfig.fillOpacity)
+                .attr("stroke", color(clusterId.toString()))
+                .attr("stroke-width", hullConfig.strokeWidth / currentTransform.k)
+                .attr("stroke-opacity", hullConfig.strokeOpacity);
+            }
           }
-        }
-      });
+        });
+      }
+    };
+
+    // Draw hulls below points if configured
+    if (hullConfig.renderOrder === 'below') {
+      drawHulls();
     }
 
     // Separate points into selected and unselected for proper z-order
@@ -486,6 +493,11 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
         const pointIndex = points.findIndex(p => p.id === d.id);
         handlePointClick(d.id, pointIndex);
       });
+
+    // Draw hulls above points if configured
+    if (hullConfig.renderOrder === 'above') {
+      drawHulls();
+    }
 
     console.log('🎨 Drew', container.selectAll("circle").size(), 'circles');
 
@@ -627,31 +639,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
   const selectedCount = selectedPoints.size;
   const totalPoints = points.length;
 
-  // Additional controls for concave hull
-  const additionalControls = (
-    <div className="space-y-2 border-t pt-2">
-      <label className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={hullConfig.enabled}
-          onChange={(e) => setHullConfig(prev => ({ ...prev, enabled: e.target.checked }))}
-        />
-        <span className="text-sm">Show concave hulls around clusters</span>
-      </label>
-      
-      {hullConfig.enabled && (
-        <ConcaveHullConfigModal
-          config={hullConfig}
-          onConfigChange={setHullConfig}
-        >
-          <Button variant="outline" size="sm" className="w-full mt-2">
-            Configure Hulls
-          </Button>
-        </ConcaveHullConfigModal>
-      )}
-    </div>
-  );
-
   return (
     <div className="relative w-screen h-screen">
       <svg
@@ -660,25 +647,31 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
         style={{ touchAction: 'none' }}
       />
 
-      <ExperimentControlsPanel
-        title="HDBSCAN Concave Hull Explorer"
-        currentLambda={currentLambda}
-        onLambdaChange={setCurrentLambda}
-        selectedCount={selectedCount}
-        totalPoints={totalPoints}
-        clusterProportions={clusterProportions}
-        autoSelectMode={autoSelectMode}
-        onAutoSelectModeChange={(checked) => {
-          setAutoSelectMode(checked);
-          setLastSelectedPoint(null);
-        }}
-        expandSelectionMode={expandSelectionMode}
-        onExpandSelectionModeChange={setExpandSelectionMode}
-        displayGroupColors={displayGroupColors}
-        onDisplayGroupColorsChange={setDisplayGroupColors}
-        segmentClustered={SEGMENT_CLUSTERED}
-        additionalControls={additionalControls}
-      />
+      <div className="absolute top-4 left-4 flex flex-col gap-4 z-10">
+        <ExperimentControlsPanel
+          title="HDBSCAN Concave Hull Explorer"
+          currentLambda={currentLambda}
+          onLambdaChange={setCurrentLambda}
+          selectedCount={selectedCount}
+          totalPoints={totalPoints}
+          clusterProportions={clusterProportions}
+          autoSelectMode={autoSelectMode}
+          onAutoSelectModeChange={(checked) => {
+            setAutoSelectMode(checked);
+            setLastSelectedPoint(null);
+          }}
+          expandSelectionMode={expandSelectionMode}
+          onExpandSelectionModeChange={setExpandSelectionMode}
+          displayGroupColors={displayGroupColors}
+          onDisplayGroupColorsChange={setDisplayGroupColors}
+          segmentClustered={SEGMENT_CLUSTERED}
+        />
+
+        <ConcaveHullPanel
+          config={hullConfig}
+          onConfigChange={setHullConfig}
+        />
+      </div>
     </div>
   );
 };

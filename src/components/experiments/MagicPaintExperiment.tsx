@@ -568,24 +568,26 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         style={{ touchAction: 'none' }}
       />
 
-      <ExperimentControlsPanel
-        title="HDBSCAN Cluster Explorer"
-        currentLambda={currentLambda}
-        onLambdaChange={setCurrentLambda}
-        selectedCount={selectedCount}
-        totalPoints={totalPoints}
-        clusterProportions={clusterProportions}
-        autoSelectMode={autoSelectMode}
-        onAutoSelectModeChange={(checked) => {
-          setAutoSelectMode(checked);
-          setLastSelectedPoint(null);
-        }}
-        expandSelectionMode={expandSelectionMode}
-        onExpandSelectionModeChange={setExpandSelectionMode}
-        displayGroupColors={displayGroupColors}
-        onDisplayGroupColorsChange={setDisplayGroupColors}
-        segmentClustered={SEGMENT_CLUSTERED}
-      />
+      <div className="absolute top-4 left-4 z-10">
+        <ExperimentControlsPanel
+          title="HDBSCAN Cluster Explorer"
+          currentLambda={currentLambda}
+          onLambdaChange={setCurrentLambda}
+          selectedCount={selectedCount}
+          totalPoints={totalPoints}
+          clusterProportions={clusterProportions}
+          autoSelectMode={autoSelectMode}
+          onAutoSelectModeChange={(checked) => {
+            setAutoSelectMode(checked);
+            setLastSelectedPoint(null);
+          }}
+          expandSelectionMode={expandSelectionMode}
+          onExpandSelectionModeChange={setExpandSelectionMode}
+          displayGroupColors={displayGroupColors}
+          onDisplayGroupColorsChange={setDisplayGroupColors}
+          segmentClustered={SEGMENT_CLUSTERED}
+        />
+      </div>
     </div>
   );
 };

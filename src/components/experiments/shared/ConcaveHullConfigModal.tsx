@@ -11,6 +11,7 @@ interface ConcaveHullConfig {
   strokeWidth: number;
   showOnlySelected: boolean;
   excludeNoise: boolean;
+  renderOrder: 'below' | 'above';
 }
 
 interface ConcaveHullConfigModalProps {
@@ -137,6 +138,35 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
                 </label>
                 <p className="text-xs text-gray-600">
                   Noise points (cluster ID -1) are automatically excluded from hull generation.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Render order</Label>
+                <div className="space-y-1">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="renderOrder"
+                      value="below"
+                      checked={config.renderOrder === 'below'}
+                      onChange={(e) => handleConfigUpdate({ renderOrder: e.target.value as 'below' | 'above' })}
+                    />
+                    <span className="text-sm">Below points (background)</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="renderOrder"
+                      value="above"
+                      checked={config.renderOrder === 'above'}
+                      onChange={(e) => handleConfigUpdate({ renderOrder: e.target.value as 'below' | 'above' })}
+                    />
+                    <span className="text-sm">Above points (foreground)</span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Controls whether hulls appear behind or in front of data points.
                 </p>
               </div>
             </>

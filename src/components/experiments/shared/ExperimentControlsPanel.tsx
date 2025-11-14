@@ -31,7 +31,6 @@ interface ExperimentControlsPanelProps {
   displayGroupColors: boolean;
   onDisplayGroupColorsChange: (checked: boolean) => void;
   segmentClustered?: boolean;
-  additionalControls?: React.ReactNode;
 }
 
 export const ExperimentControlsPanel: React.FC<ExperimentControlsPanelProps> = ({
@@ -47,13 +46,12 @@ export const ExperimentControlsPanel: React.FC<ExperimentControlsPanelProps> = (
   onExpandSelectionModeChange,
   displayGroupColors,
   onDisplayGroupColorsChange,
-  segmentClustered = true,
-  additionalControls
+  segmentClustered = true
 }) => {
   const percentage = totalPoints > 0 ? Math.round((selectedCount / totalPoints) * 100) : 0;
 
   return (
-    <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg border max-w-xs z-10">
+    <div className="bg-white p-4 rounded-lg shadow-lg border max-w-xs">
       <h3 className="text-lg font-semibold mb-3">{title}</h3>
 
       <div className="space-y-3">
@@ -124,9 +122,6 @@ export const ExperimentControlsPanel: React.FC<ExperimentControlsPanelProps> = (
             <span className="text-sm">Style by cluster label (debug)</span>
           </label>
         </div>
-
-        {/* Additional controls can be inserted here */}
-        {additionalControls}
       </div>
     </div>
   );
