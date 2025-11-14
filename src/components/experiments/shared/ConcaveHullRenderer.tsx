@@ -15,7 +15,6 @@ interface ConcaveHullRendererProps {
   selectedPoints?: Set<string>;
   currentTransform?: d3.ZoomTransform;
   color?: d3.ScaleOrdinal<string, string>;
-  renderOrder?: 'above' | 'below';
   hullConfig: ConcaveHullConfig;
 }
 
@@ -28,7 +27,6 @@ export const ConcaveHullRenderer: React.FC<ConcaveHullRendererProps> = ({
   selectedPoints,
   currentTransform,
   color,
-  renderOrder,
   hullConfig
 }) => {
   // Generate concave hull for a cluster using concaveman

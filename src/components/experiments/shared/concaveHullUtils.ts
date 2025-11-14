@@ -76,7 +76,8 @@ export const renderConcaveHulls = (
           .attr("stroke", color(clusterId.toString()))
           .attr("stroke-width", hullConfig.strokeWidth / currentTransform.k)
           .attr("stroke-opacity", hullConfig.strokeOpacity)
-          .attr("data-base-stroke-width", hullConfig.strokeWidth.toString());
+          .attr("data-base-stroke-width", hullConfig.strokeWidth.toString())
+          .style("pointer-events", "none");
       }
     }
   });

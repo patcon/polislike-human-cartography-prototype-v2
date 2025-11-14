@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import type { Point, LabelsByThreshold, MapVisualizationProps, MapRenderContext } from './types';
+import type { MapVisualizationProps, MapRenderContext } from './types';
 
 export const HDBSCANMap: React.FC<MapVisualizationProps> = ({
   points,

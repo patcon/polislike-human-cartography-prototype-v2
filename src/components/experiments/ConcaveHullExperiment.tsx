@@ -27,7 +27,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     expandSelectionMode,
     displayGroupColors,
     selectedPoints,
-    lastSelectedPoint,
     setCurrentLambda,
     setAutoSelectMode,
     setExpandSelectionMode,
