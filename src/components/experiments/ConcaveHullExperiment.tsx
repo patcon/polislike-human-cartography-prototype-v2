@@ -1,35 +1,22 @@
 "use client";
 
 import * as React from "react";
-import * as d3 from "d3";
-import concaveman from "concaveman";
 import { ClusterSelectionPanel } from './shared/ClusterSelectionPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
 import { ConcaveHullPanel } from './shared/ConcaveHullPanel';
+import { HDBSCANMap } from './shared/HDBSCANMap';
+import { renderConcaveHulls } from './shared/concaveHullUtils';
+import type { Point, LabelsByThreshold, MapCallbacks, MapRenderContext } from './shared/types';
 import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
 
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
-
-type Point = {
-  id: string;
-  x: number;
-  y: number;
-  label?: number;
-};
-
-type LabelsByThreshold = {
-  [threshold: string]: number[];
-};
 
 type DisplaySettings = {
   // Remove width/height props since we'll use full screen
 };
 
 export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
-  const svgRef = React.useRef<SVGSVGElement>(null);
-  const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-
   const [points, setPoints] = React.useState<Point[]>([]);
   const [labelsByThreshold, setLabelsByThreshold] = React.useState<LabelsByThreshold>({});
   const [currentLambda, setCurrentLambda] = React.useState(3.0);
@@ -50,8 +37,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     excludeNoise: true,
     renderOrder: 'above'
   });
-
-  const color = d3.scaleOrdinal(d3.schemeTableau10);
 
   // Load data
   React.useEffect(() => {
@@ -114,48 +99,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     const closest = keys.reduce((a, b) => Math.abs(a - val) < Math.abs(b - val) ? a : b);
     return closest.toFixed(2);
   }, [labelsByThreshold]);
-
-  // Calculate scales
-  const { xScale, yScale } = React.useMemo(() => {
-    if (!points.length) return { xScale: null, yScale: null };
-
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const margin = 40;
-
-    const xExtent = d3.extent(points, d => d.x) as [number, number];
-    const yExtent = d3.extent(points, d => d.y) as [number, number];
-
-    const xScale = d3.scaleLinear()
-      .domain(xExtent)
-      .range([margin, width - margin]);
-
-    const yScale = d3.scaleLinear()
-      .domain(yExtent)
-      .range([height - margin, margin]);
-
-    return { xScale, yScale };
-  }, [points]);
-
-  // Initialize SVG immediately when ref is available
-  React.useEffect(() => {
-    if (!svgRef.current) return;
-
-    const svg = d3.select(svgRef.current);
-    svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
-
-    if (!containerRef.current) {
-      containerRef.current = svg.append("g");
-    }
-  });
-
-  // Update SVG dimensions when scales change
-  React.useEffect(() => {
-    if (!svgRef.current || !xScale || !yScale) return;
-
-    const svg = d3.select(svgRef.current);
-    svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
-  }, [xScale, yScale]);
 
   // Handle background click
   const handleBackgroundClick = React.useCallback(() => {
@@ -332,267 +275,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     }
   }, [currentLambda, nearestThreshold, labelsByThreshold, autoSelectMode, expandSelectionMode, selectedPoints, lastSelectedPoint, handleAutoSelect, findNextDeeperLambda, selectCluster]);
 
-  // Generate concave hull for a cluster using concaveman
-  const generateConcaveHull = React.useCallback((clusterPoints: Point[]): string => {
-    if (clusterPoints.length < 3) return "";
-
-    try {
-      // Convert points to screen coordinates
-      const screenPoints: [number, number][] = clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]);
-
-      // Use concaveman to generate concave hull
-      // concavity parameter: lower values = more detailed/concave, higher values = more convex
-      const concavity = hullConfig.concavity;
-      const lengthThreshold = hullConfig.lengthThreshold;
-
-      const hullPoints = concaveman(screenPoints, concavity, lengthThreshold);
-
-      if (!hullPoints || hullPoints.length < 3) {
-        // Fallback to convex hull if concaveman fails
-        const convexHull = d3.polygonHull(screenPoints as [number, number][]);
-        if (!convexHull || convexHull.length < 3) return "";
-        return `M${convexHull.map(p => p.join(",")).join("L")}Z`;
-      }
-
-      return `M${hullPoints.map(p => p.join(",")).join("L")}Z`;
-    } catch (error) {
-      console.warn('Concaveman failed, falling back to convex hull:', error);
-      // Fallback to convex hull on error
-      const fallbackScreenPoints: [number, number][] = clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]);
-      const fallbackHullPoints = d3.polygonHull(fallbackScreenPoints);
-      if (!fallbackHullPoints || fallbackHullPoints.length < 3) return "";
-      return `M${fallbackHullPoints.map(p => p.join(",")).join("L")}Z`;
-    }
-  }, [xScale, yScale, hullConfig.concavity, hullConfig.lengthThreshold]);
-
-  // Draw visualization
-  React.useEffect(() => {
-    if (!containerRef.current || !xScale || !yScale || !points.length || !Object.keys(labelsByThreshold).length) return;
-
-    const container = containerRef.current;
-    const currentTransform = d3.zoomTransform(container.node()!);
-
-    // Clear existing elements
-    container.selectAll("*").remove();
-
-    const threshold = nearestThreshold(currentLambda);
-    const labels = labelsByThreshold[threshold];
-    if (!labels) return;
-
-    // Function to draw concave hulls
-    const drawHulls = () => {
-      if (hullConfig.enabled) {
-        const clusterGroups = new Map<number, Point[]>();
-
-        // Group points by cluster (excluding noise if configured)
-        points.forEach((point, index) => {
-          const clusterId = labels[index];
-          if (hullConfig.excludeNoise && clusterId === -1) return;
-
-          // If showOnlySelected is true, only show hulls for selected clusters
-          if (hullConfig.showOnlySelected) {
-            const isPointSelected = selectedPoints.has(point.id);
-            if (!isPointSelected) return;
-          }
-
-          if (clusterId !== -1) {
-            if (!clusterGroups.has(clusterId)) {
-              clusterGroups.set(clusterId, []);
-            }
-            clusterGroups.get(clusterId)!.push(point);
-          }
-        });
-
-        // Draw hulls for each cluster
-        clusterGroups.forEach((clusterPoints, clusterId) => {
-          if (clusterPoints.length >= 3) {
-            const hullPath = generateConcaveHull(clusterPoints);
-            if (hullPath) {
-              container.append("path")
-                .attr("d", hullPath)
-                .attr("fill", color(clusterId.toString()))
-                .attr("fill-opacity", hullConfig.fillOpacity)
-                .attr("stroke", color(clusterId.toString()))
-                .attr("stroke-width", hullConfig.strokeWidth / currentTransform.k)
-                .attr("stroke-opacity", hullConfig.strokeOpacity);
-            }
-          }
-        });
-      }
-    };
-
-    // Draw hulls below points if configured
-    if (hullConfig.renderOrder === 'below') {
-      drawHulls();
-    }
-
-    // Separate points into selected and unselected for proper z-order
-    const unselectedPoints = points.filter(d => !selectedPoints.has(d.id));
-    const selectedPointsArray = points.filter(d => selectedPoints.has(d.id));
-
-    // Draw unselected points first (bottom layer)
-    container.selectAll(".unselected-point")
-      .data(unselectedPoints)
-      .enter()
-      .append("circle")
-      .attr("class", "unselected-point")
-      .attr("r", 4 / currentTransform.k)
-      .attr("cx", d => xScale(d.x))
-      .attr("cy", d => yScale(d.y))
-      .attr("fill", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-
-        if (displayGroupColors) {
-          if (label === -1) {
-            return "#cccccc"; // Gray for noise
-          }
-          return color(label.toString());
-        } else {
-          return "#d3d3d3"; // Light gray for unselected
-        }
-      })
-      .attr("opacity", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-        if (displayGroupColors) {
-          return label === -1 ? 0.4 : 1.0; // Make noise points more transparent
-        } else {
-          return 1.0;
-        }
-      })
-      .attr("stroke", "#333")
-      .attr("stroke-width", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-        const isNoise = label === -1;
-
-        if (displayGroupColors && isNoise) return 0;
-        return 1 / currentTransform.k;
-      })
-      .style("cursor", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-        return label === -1 ? "default" : "pointer";
-      })
-      .on("click", (event, d) => {
-        event.stopPropagation();
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        handlePointClick(d.id, pointIndex);
-      });
-
-    // Draw selected points on top (top layer)
-    container.selectAll(".selected-point")
-      .data(selectedPointsArray)
-      .enter()
-      .append("circle")
-      .attr("class", "selected-point")
-      .attr("r", 4 / currentTransform.k)
-      .attr("cx", d => xScale(d.x))
-      .attr("cy", d => yScale(d.y))
-      .attr("fill", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-
-        if (displayGroupColors) {
-          if (label === -1) {
-            return "#cccccc"; // Gray for noise
-          }
-          return color(label.toString());
-        } else {
-          return "#ff8c00"; // Orange for selected
-        }
-      })
-      .attr("opacity", 1.0)
-      .attr("stroke", "black")
-      .attr("stroke-width", 2 / currentTransform.k)
-      .style("cursor", (d) => {
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        const label = labels[pointIndex];
-        return label === -1 ? "default" : "pointer";
-      })
-      .on("click", (event, d) => {
-        event.stopPropagation();
-        const pointIndex = points.findIndex(p => p.id === d.id);
-        handlePointClick(d.id, pointIndex);
-      });
-
-    // Draw hulls above points if configured
-    if (hullConfig.renderOrder === 'above') {
-      drawHulls();
-    }
-
-    console.log('🎨 Drew', container.selectAll("circle").size(), 'circles');
-
-  }, [points, xScale, yScale, labelsByThreshold, currentLambda, nearestThreshold, selectedPoints, displayGroupColors, handlePointClick, hullConfig, generateConcaveHull, color]);
-
-  // Add zoom behavior
-  React.useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
-
-    const svg = d3.select(svgRef.current);
-    const container = containerRef.current;
-
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 10])
-      .filter((event) => {
-        // Allow wheel events for zooming
-        if (event.type === "wheel") return true;
-        // Allow touch events for multi-touch zoom and pan on mobile
-        if (event.type === "touchstart" || event.type === "touchmove" || event.type === "touchend") {
-          return true;
-        }
-        // Allow mouse events for panning (but not clicking on points)
-        if (event.type === "mousedown") {
-          const target = event.target as Element;
-          return !target.closest("circle");
-        }
-        return false;
-      })
-      .on("zoom", (event) => {
-        const transform = event.transform;
-        container.attr("transform", transform);
-
-        // Update circle sizes and stroke widths for both selected and unselected
-        container.selectAll(".unselected-point")
-          .attr("r", 4 / transform.k)
-          .attr("stroke-width", function(d: any) {
-            const pointIndex = points.findIndex(p => p.id === d.id);
-            const threshold = nearestThreshold(currentLambda);
-            const labels = labelsByThreshold[threshold];
-            if (!labels) return 1 / transform.k;
-
-            const label = labels[pointIndex];
-            const isNoise = label === -1;
-
-            if (displayGroupColors && isNoise) return 0;
-            return 1 / transform.k;
-          });
-
-        container.selectAll(".selected-point")
-          .attr("r", 4 / transform.k)
-          .attr("stroke-width", 2 / transform.k);
-
-        // Update hull stroke widths
-        container.selectAll("path")
-          .attr("stroke-width", hullConfig.strokeWidth / transform.k);
-      });
-
-    svg.call(zoom);
-
-    // Background click handler
-    svg.on("click", function(event) {
-      if (event.target === this || event.target === container.node()) {
-        handleBackgroundClick();
-      }
-    });
-
-    return () => {
-      svg.on(".zoom", null);
-      svg.on("click", null);
-    };
-  }, [points, currentLambda, nearestThreshold, labelsByThreshold, selectedPoints, displayGroupColors, handleBackgroundClick]);
-
   // Calculate cluster proportions at current water level
   const clusterProportions = React.useMemo(() => {
     if (!points.length || !Object.keys(labelsByThreshold).length) {
@@ -655,6 +337,25 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     };
   }, [points.length, labelsByThreshold, currentLambda, nearestThreshold, selectedPoints, points]);
 
+  // Create map callbacks
+  const mapCallbacks: MapCallbacks = React.useMemo(() => ({
+    onPointClick: handlePointClick,
+    onBackgroundClick: handleBackgroundClick
+  }), [handlePointClick, handleBackgroundClick]);
+
+  // Hull rendering functions
+  const renderHullsBelow = React.useCallback((context: MapRenderContext) => {
+    if (hullConfig.renderOrder === 'below') {
+      renderConcaveHulls(context, hullConfig);
+    }
+  }, [hullConfig]);
+
+  const renderHullsAbove = React.useCallback((context: MapRenderContext) => {
+    if (hullConfig.renderOrder === 'above') {
+      renderConcaveHulls(context, hullConfig);
+    }
+  }, [hullConfig]);
+
   if (isLoading) {
     return <LoadingDisplay message="Loading HDBSCAN data..." />;
   }
@@ -664,10 +365,15 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
 
   return (
     <div className="relative w-screen h-screen">
-      <svg
-        ref={svgRef}
-        className="w-screen h-screen block bg-gray-50"
-        style={{ touchAction: 'none' }}
+      <HDBSCANMap
+        points={points}
+        labelsByThreshold={labelsByThreshold}
+        currentLambda={currentLambda}
+        selectedPoints={selectedPoints}
+        displayGroupColors={displayGroupColors}
+        callbacks={mapCallbacks}
+        onRenderBelowPoints={renderHullsBelow}
+        onRenderAbovePoints={renderHullsAbove}
       />
 
       <div className="absolute top-4 left-4 flex flex-col gap-4 z-10">
