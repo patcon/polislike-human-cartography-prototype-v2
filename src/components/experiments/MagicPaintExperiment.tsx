@@ -558,7 +558,6 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
 
   const selectedCount = selectedPoints.size;
   const totalPoints = points.length;
-  const percentage = totalPoints > 0 ? Math.round((selectedCount / totalPoints) * 100) : 0;
 
   return (
     <div className="relative w-screen h-screen">
