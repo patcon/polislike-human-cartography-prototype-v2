@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
+import concaveman from "concaveman";
 import { ExperimentControlsPanel } from './shared/ExperimentControlsPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
 import { ConcaveHullPanel } from './shared/ConcaveHullPanel';
@@ -40,13 +41,14 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
   const [lastSelectedPoint, setLastSelectedPoint] = React.useState<string | null>(null);
   const [hullConfig, setHullConfig] = React.useState<ConcaveHullConfig>({
     enabled: false,
-    alpha: 1.0,
-    fillOpacity: 0.2,
+    concavity: 2.0,
+    lengthThreshold: 0,
+    fillOpacity: 0.75,
     strokeOpacity: 0.6,
     strokeWidth: 2,
     showOnlySelected: false,
     excludeNoise: true,
-    renderOrder: 'below'
+    renderOrder: 'above'
   });
 
   const color = d3.scaleOrdinal(d3.schemeTableau10);
@@ -330,17 +332,38 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     }
   }, [currentLambda, nearestThreshold, labelsByThreshold, autoSelectMode, expandSelectionMode, selectedPoints, lastSelectedPoint, handleAutoSelect, findNextDeeperLambda, selectCluster]);
 
-  // Generate concave hull for a cluster
+  // Generate concave hull for a cluster using concaveman
   const generateConcaveHull = React.useCallback((clusterPoints: Point[]): string => {
     if (clusterPoints.length < 3) return "";
 
-    // Simple convex hull using d3.polygonHull for now
-    // In a real implementation, you'd use a concave hull algorithm
-    const hullPoints = d3.polygonHull(clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]));
-    if (!hullPoints || hullPoints.length < 3) return "";
+    try {
+      // Convert points to screen coordinates
+      const screenPoints: [number, number][] = clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]);
+      
+      // Use concaveman to generate concave hull
+      // concavity parameter: lower values = more detailed/concave, higher values = more convex
+      const concavity = hullConfig.concavity;
+      const lengthThreshold = hullConfig.lengthThreshold;
+      
+      const hullPoints = concaveman(screenPoints, concavity, lengthThreshold);
+      
+      if (!hullPoints || hullPoints.length < 3) {
+        // Fallback to convex hull if concaveman fails
+        const convexHull = d3.polygonHull(screenPoints as [number, number][]);
+        if (!convexHull || convexHull.length < 3) return "";
+        return `M${convexHull.map(p => p.join(",")).join("L")}Z`;
+      }
 
-    return `M${hullPoints.map(p => p.join(",")).join("L")}Z`;
-  }, [xScale, yScale]);
+      return `M${hullPoints.map(p => p.join(",")).join("L")}Z`;
+    } catch (error) {
+      console.warn('Concaveman failed, falling back to convex hull:', error);
+      // Fallback to convex hull on error
+      const fallbackScreenPoints: [number, number][] = clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]);
+      const fallbackHullPoints = d3.polygonHull(fallbackScreenPoints);
+      if (!fallbackHullPoints || fallbackHullPoints.length < 3) return "";
+      return `M${fallbackHullPoints.map(p => p.join(",")).join("L")}Z`;
+    }
+  }, [xScale, yScale, hullConfig.concavity, hullConfig.lengthThreshold]);
 
   // Draw visualization
   React.useEffect(() => {

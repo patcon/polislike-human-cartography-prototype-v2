@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 
 interface ConcaveHullConfig {
   enabled: boolean;
-  alpha: number;
+  concavity: number;
+  lengthThreshold: number;
   fillOpacity: number;
   strokeOpacity: number;
   strokeWidth: number;
@@ -55,19 +56,37 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
             <>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
-                  Alpha parameter: {config.alpha.toFixed(2)}
+                  Concavity: {config.concavity.toFixed(1)}
                 </Label>
                 <input
                   type="range"
-                  min="0.1"
-                  max="2.0"
+                  min="0.0"
+                  max="5.0"
                   step="0.1"
-                  value={config.alpha}
-                  onChange={(e) => handleConfigUpdate({ alpha: parseFloat(e.target.value) })}
+                  value={config.concavity}
+                  onChange={(e) => handleConfigUpdate({ concavity: parseFloat(e.target.value) })}
                   className="w-full"
                 />
                 <p className="text-xs text-gray-600">
-                  Controls hull tightness. Lower values create tighter hulls.
+                  Controls hull shape. Lower values create more detailed/concave hulls.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Length threshold: {config.lengthThreshold.toFixed(0)}
+                </Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={config.lengthThreshold}
+                  onChange={(e) => handleConfigUpdate({ lengthThreshold: parseFloat(e.target.value) })}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-600">
+                  Minimum segment length. Higher values create simpler shapes.
                 </p>
               </div>
 
