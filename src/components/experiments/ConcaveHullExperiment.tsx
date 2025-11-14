@@ -3,7 +3,7 @@
 import * as React from "react";
 import * as d3 from "d3";
 import concaveman from "concaveman";
-import { ExperimentControlsPanel } from './shared/ExperimentControlsPanel';
+import { ClusterSelectionPanel } from './shared/ClusterSelectionPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
 import { ConcaveHullPanel } from './shared/ConcaveHullPanel';
 import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
@@ -671,7 +671,7 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
       />
 
       <div className="absolute top-4 left-4 flex flex-col gap-4 z-10">
-        <ExperimentControlsPanel
+        <ClusterSelectionPanel
           title="HDBSCAN Concave Hull Explorer"
           currentLambda={currentLambda}
           onLambdaChange={setCurrentLambda}

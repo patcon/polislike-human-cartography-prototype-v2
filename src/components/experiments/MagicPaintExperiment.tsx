@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { ExperimentControlsPanel } from './shared/ExperimentControlsPanel';
+import { ClusterSelectionPanel } from './shared/ClusterSelectionPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
 
 // Configuration constant for segmented cluster view
@@ -568,7 +568,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       />
 
       <div className="absolute top-4 left-4 z-10">
-        <ExperimentControlsPanel
+        <ClusterSelectionPanel
           title="HDBSCAN Cluster Explorer"
           currentLambda={currentLambda}
           onLambdaChange={setCurrentLambda}

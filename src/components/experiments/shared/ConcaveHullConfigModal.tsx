@@ -41,55 +41,6 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={config.enabled}
-                onChange={(e) => handleConfigUpdate({ enabled: e.target.checked })}
-              />
-              <span className="text-sm font-medium">Enable concave hulls</span>
-            </label>
-          </div>
-
-          {config.enabled && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Concavity: {config.concavity.toFixed(1)}
-                </Label>
-                <input
-                  type="range"
-                  min="0.0"
-                  max="5.0"
-                  step="0.1"
-                  value={config.concavity}
-                  onChange={(e) => handleConfigUpdate({ concavity: parseFloat(e.target.value) })}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-600">
-                  Controls hull shape. Lower values create more detailed/concave hulls.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Length threshold: {config.lengthThreshold.toFixed(0)}
-                </Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={config.lengthThreshold}
-                  onChange={(e) => handleConfigUpdate({ lengthThreshold: parseFloat(e.target.value) })}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-600">
-                  Minimum segment length. Higher values create simpler shapes.
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label className="text-sm font-medium">
                   Fill opacity: {Math.round(config.fillOpacity * 100)}%
                 </Label>
@@ -146,20 +97,6 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={config.excludeNoise}
-                    onChange={(e) => handleConfigUpdate({ excludeNoise: e.target.checked })}
-                  />
-                  <span className="text-sm">Exclude noise points (always enabled)</span>
-                </label>
-                <p className="text-xs text-gray-600">
-                  Noise points (cluster ID -1) are automatically excluded from hull generation.
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label className="text-sm font-medium">Render order</Label>
                 <div className="space-y-1">
                   <label className="flex items-center space-x-2">
@@ -187,8 +124,6 @@ export const ConcaveHullConfigModal: React.FC<ConcaveHullConfigModalProps> = ({
                   Controls whether hulls appear behind or in front of data points.
                 </p>
               </div>
-            </>
-          )}
         </div>
       </DialogContent>
     </Dialog>

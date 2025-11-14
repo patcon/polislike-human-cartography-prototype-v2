@@ -17,7 +17,7 @@ interface ClusterProportions {
   selectedClusterId: number | null;
 }
 
-interface ExperimentControlsPanelProps {
+interface ClusterSelectionPanelProps {
   title: string;
   currentLambda: number;
   onLambdaChange: (value: number) => void;
@@ -33,7 +33,7 @@ interface ExperimentControlsPanelProps {
   segmentClustered?: boolean;
 }
 
-export const ExperimentControlsPanel: React.FC<ExperimentControlsPanelProps> = ({
+export const ClusterSelectionPanel: React.FC<ClusterSelectionPanelProps> = ({
   title,
   currentLambda,
   onLambdaChange,
