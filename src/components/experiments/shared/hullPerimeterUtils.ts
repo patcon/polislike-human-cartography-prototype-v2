@@ -8,6 +8,8 @@ export interface HullPerimeterData {
   perimeter: number;
   color: string;
   hasSelectedPoints: boolean;
+  clusterSize: number;
+  perimeterPerParticipant: number;
 }
 
 export const calculateHullPerimeter = (
@@ -49,12 +51,16 @@ export const calculateHullPerimeter = (
       if (perimeter > 0) {
         // Check if this cluster has any selected points
         const hasSelectedPoints = clusterPoints.some(point => selectedPoints.has(point.id));
+        const clusterSize = clusterPoints.length;
+        const perimeterPerParticipant = perimeter / clusterSize;
 
         perimeterData.push({
           clusterId,
           perimeter,
           color: color(clusterId.toString()),
           hasSelectedPoints,
+          clusterSize,
+          perimeterPerParticipant
         });
       }
     }

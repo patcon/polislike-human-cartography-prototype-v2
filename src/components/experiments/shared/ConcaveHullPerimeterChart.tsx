@@ -10,6 +10,7 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
   data,
   maxHeight = 120
 }) => {
+  const [showPerParticipant, setShowPerParticipant] = React.useState(false);
   if (!data.length) {
     return (
       <div className="text-xs text-gray-500 text-center py-4">
@@ -18,8 +19,8 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
     );
   }
 
-  // Find the maximum perimeter for scaling
-  const maxPerimeter = Math.max(...data.map(d => d.perimeter));
+  // Find the maximum value for scaling (either perimeter or perimeter per participant)
+  const maxValue = Math.max(...data.map(d => showPerParticipant ? d.perimeterPerParticipant : d.perimeter));
 
   // Calculate bar width and spacing - spacing gets very small or zero as count increases
   const availableWidth = 240; // Total available width for all bars
@@ -31,11 +32,14 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-gray-700">Hull Perimeters</h4>
+      <h4 className="text-sm font-medium text-gray-700">
+        Hull {showPerParticipant ? 'Perimeters per Participant' : 'Perimeters'}
+      </h4>
 
       <div className="flex items-end justify-center" style={{ height: maxHeight + 20, gap: `${barSpacing}px` }}>
         {data.map((item) => {
-          const barHeight = (item.perimeter / maxPerimeter) * maxHeight;
+          const value = showPerParticipant ? item.perimeterPerParticipant : item.perimeter;
+          const barHeight = (value / maxValue) * maxHeight;
 
           return (
             <div key={item.clusterId} className="flex flex-col items-center space-y-1">
@@ -50,7 +54,7 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
                   backgroundColor: item.color,
                   minHeight: 2 // Ensure very small bars are still visible
                 }}
-                title={`Cluster ${item.clusterId}: ${item.perimeter.toFixed(2)}${item.hasSelectedPoints ? ' (selected)' : ''}`}
+                title={`Cluster ${item.clusterId}: ${value.toFixed(2)}${showPerParticipant ? ' per participant' : ''}${item.hasSelectedPoints ? ' (selected)' : ''} (${item.clusterSize} participants)`}
               />
 
               {/* Cluster ID label - angled to prevent overflow affecting width */}
@@ -71,11 +75,25 @@ export const ConcaveHullPerimeterChart: React.FC<ConcaveHullPerimeterChartProps>
         })}
       </div>
 
+      {/* Checkbox for per-participant view */}
+      <div className="flex items-center space-x-2 pt-2 border-t border-gray-200">
+        <input
+          type="checkbox"
+          id="perParticipant"
+          checked={showPerParticipant}
+          onChange={(e) => setShowPerParticipant(e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor="perParticipant" className="text-xs text-gray-700 cursor-pointer">
+          Show perimeter per participant
+        </label>
+      </div>
+
       {/* Legend/Info */}
       <div className="text-xs text-gray-500 space-y-1">
         <div className="flex justify-between">
           <span>Clusters: {data.length}</span>
-          <span>Max: {maxPerimeter.toFixed(1)}</span>
+          <span>Max: {maxValue.toFixed(1)}{showPerParticipant ? '/p' : ''}</span>
         </div>
         <div className="text-center">
           Hover bars for exact values
