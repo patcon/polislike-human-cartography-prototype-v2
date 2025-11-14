@@ -4,6 +4,9 @@ import * as React from "react";
 import * as d3 from "d3";
 import { ExperimentControlsPanel } from './shared/ExperimentControlsPanel';
 import { LoadingDisplay } from './shared/LoadingDisplay';
+import { ConcaveHullConfigModal } from './shared/ConcaveHullConfigModal';
+import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
+import { Button } from "@/components/ui/button";
 
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
@@ -23,7 +26,7 @@ type DisplaySettings = {
   // Remove width/height props since we'll use full screen
 };
 
-export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
+export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
 
@@ -36,6 +39,15 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   const [selectedPoints, setSelectedPoints] = React.useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = React.useState(true);
   const [lastSelectedPoint, setLastSelectedPoint] = React.useState<string | null>(null);
+  const [hullConfig, setHullConfig] = React.useState<ConcaveHullConfig>({
+    enabled: false,
+    alpha: 1.0,
+    fillOpacity: 0.2,
+    strokeOpacity: 0.6,
+    strokeWidth: 2,
+    showOnlySelected: false,
+    excludeNoise: true
+  });
 
   const color = d3.scaleOrdinal(d3.schemeTableau10);
 
@@ -318,6 +330,18 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     }
   }, [currentLambda, nearestThreshold, labelsByThreshold, autoSelectMode, expandSelectionMode, selectedPoints, lastSelectedPoint, handleAutoSelect, findNextDeeperLambda, selectCluster]);
 
+  // Generate concave hull for a cluster
+  const generateConcaveHull = React.useCallback((clusterPoints: Point[]): string => {
+    if (clusterPoints.length < 3) return "";
+
+    // Simple convex hull using d3.polygonHull for now
+    // In a real implementation, you'd use a concave hull algorithm
+    const hullPoints = d3.polygonHull(clusterPoints.map(p => [xScale!(p.x), yScale!(p.y)]));
+    if (!hullPoints || hullPoints.length < 3) return "";
+
+    return `M${hullPoints.map(p => p.join(",")).join("L")}Z`;
+  }, [xScale, yScale]);
+
   // Draw visualization
   React.useEffect(() => {
     if (!containerRef.current || !xScale || !yScale || !points.length || !Object.keys(labelsByThreshold).length) return;
@@ -331,6 +355,46 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     const threshold = nearestThreshold(currentLambda);
     const labels = labelsByThreshold[threshold];
     if (!labels) return;
+
+    // Draw concave hulls if enabled
+    if (hullConfig.enabled) {
+      const clusterGroups = new Map<number, Point[]>();
+      
+      // Group points by cluster (excluding noise if configured)
+      points.forEach((point, index) => {
+        const clusterId = labels[index];
+        if (hullConfig.excludeNoise && clusterId === -1) return;
+        
+        // If showOnlySelected is true, only show hulls for selected clusters
+        if (hullConfig.showOnlySelected) {
+          const isPointSelected = selectedPoints.has(point.id);
+          if (!isPointSelected) return;
+        }
+        
+        if (clusterId !== -1) {
+          if (!clusterGroups.has(clusterId)) {
+            clusterGroups.set(clusterId, []);
+          }
+          clusterGroups.get(clusterId)!.push(point);
+        }
+      });
+
+      // Draw hulls for each cluster
+      clusterGroups.forEach((clusterPoints, clusterId) => {
+        if (clusterPoints.length >= 3) {
+          const hullPath = generateConcaveHull(clusterPoints);
+          if (hullPath) {
+            container.append("path")
+              .attr("d", hullPath)
+              .attr("fill", color(clusterId.toString()))
+              .attr("fill-opacity", hullConfig.fillOpacity)
+              .attr("stroke", color(clusterId.toString()))
+              .attr("stroke-width", hullConfig.strokeWidth / currentTransform.k)
+              .attr("stroke-opacity", hullConfig.strokeOpacity);
+          }
+        }
+      });
+    }
 
     // Separate points into selected and unselected for proper z-order
     const unselectedPoints = points.filter(d => !selectedPoints.has(d.id));
@@ -425,7 +489,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
 
     console.log('🎨 Drew', container.selectAll("circle").size(), 'circles');
 
-  }, [points, xScale, yScale, labelsByThreshold, currentLambda, nearestThreshold, selectedPoints, displayGroupColors, handlePointClick]);
+  }, [points, xScale, yScale, labelsByThreshold, currentLambda, nearestThreshold, selectedPoints, displayGroupColors, handlePointClick, hullConfig, generateConcaveHull, color]);
 
   // Add zoom behavior
   React.useEffect(() => {
@@ -473,6 +537,10 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         container.selectAll(".selected-point")
           .attr("r", 4 / transform.k)
           .attr("stroke-width", 2 / transform.k);
+
+        // Update hull stroke widths
+        container.selectAll("path")
+          .attr("stroke-width", hullConfig.strokeWidth / transform.k);
       });
 
     svg.call(zoom);
@@ -558,7 +626,31 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
 
   const selectedCount = selectedPoints.size;
   const totalPoints = points.length;
-  const percentage = totalPoints > 0 ? Math.round((selectedCount / totalPoints) * 100) : 0;
+
+  // Additional controls for concave hull
+  const additionalControls = (
+    <div className="space-y-2 border-t pt-2">
+      <label className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={hullConfig.enabled}
+          onChange={(e) => setHullConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+        />
+        <span className="text-sm">Show concave hulls around clusters</span>
+      </label>
+      
+      {hullConfig.enabled && (
+        <ConcaveHullConfigModal
+          config={hullConfig}
+          onConfigChange={setHullConfig}
+        >
+          <Button variant="outline" size="sm" className="w-full mt-2">
+            Configure Hulls
+          </Button>
+        </ConcaveHullConfigModal>
+      )}
+    </div>
+  );
 
   return (
     <div className="relative w-screen h-screen">
@@ -569,7 +661,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
       />
 
       <ExperimentControlsPanel
-        title="HDBSCAN Cluster Explorer"
+        title="HDBSCAN Concave Hull Explorer"
         currentLambda={currentLambda}
         onLambdaChange={setCurrentLambda}
         selectedCount={selectedCount}
@@ -585,6 +677,7 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
         displayGroupColors={displayGroupColors}
         onDisplayGroupColorsChange={setDisplayGroupColors}
         segmentClustered={SEGMENT_CLUSTERED}
+        additionalControls={additionalControls}
       />
     </div>
   );
