@@ -23,8 +23,8 @@ export const ConcaveHullPanel: React.FC<ConcaveHullPanelProps> = ({
   labels = [],
   selectedPoints = new Set()
 }) => {
-  // Create color scale (same as used in HDBSCANMap)
-  const color = d3.scaleOrdinal(d3.schemeTableau10);
+  // Create color scale (same as used in HDBSCANMap) - memoized to prevent unnecessary recalculations
+  const color = React.useMemo(() => d3.scaleOrdinal(d3.schemeTableau10), []);
 
   // Calculate hull perimeter data
   const perimeterData = React.useMemo(() => {
