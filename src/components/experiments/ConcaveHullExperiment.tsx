@@ -49,10 +49,10 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
 
   // Hull configuration state (specific to this experiment)
   const [hullConfig, setHullConfig] = React.useState<ConcaveHullConfig>({
-    enabled: false,
+    enabled: true,
     concavity: 2.0,
     lengthThreshold: 0,
-    fillOpacity: 0.75,
+    fillOpacity: 1.0,
     strokeOpacity: 0.6,
     strokeWidth: 2,
     showOnlySelected: false,
@@ -106,7 +106,7 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
 
       <div className="absolute top-4 left-4 flex flex-col gap-4 z-10">
         <ClusterSelectionPanel
-          title="HDBSCAN Concave Hull Explorer"
+          title="HDBSCAN Cluster Explorer"
           currentLambda={currentLambda}
           onLambdaChange={setCurrentLambda}
           selectedCount={selectedCount}
