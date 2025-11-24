@@ -253,7 +253,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [currentDisplayState, currentPipelineId]);
 
-  // Keyboard shortcuts for color selection
+  // Keyboard shortcuts for color selection and statement navigation
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle keyboard shortcuts when not typing in an input field
@@ -261,6 +261,30 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           event.target instanceof HTMLTextAreaElement ||
           event.target instanceof HTMLSelectElement) {
         return;
+      }
+
+      // Handle left/right arrow keys for statement navigation when votes layer is active
+      if (layerMode === "votes" && statements.length > 0) {
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          // Find current statement index
+          const currentIndex = statements.findIndex(s => String(s.statement_id) === statementId);
+
+          if (currentIndex !== -1) {
+            let newIndex;
+            if (event.key === 'ArrowLeft') {
+              // Go to previous statement (wrap around to end if at beginning)
+              newIndex = currentIndex === 0 ? statements.length - 1 : currentIndex - 1;
+            } else {
+              // Go to next statement (wrap around to beginning if at end)
+              newIndex = currentIndex === statements.length - 1 ? 0 : currentIndex + 1;
+            }
+
+            const newStatementId = String(statements[newIndex].statement_id);
+            setStatementId(newStatementId);
+            event.preventDefault();
+          }
+          return;
+        }
       }
 
       // Handle number keys 1-9 and 0 for color selection
@@ -285,7 +309,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [layerMode, statements, statementId]);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
