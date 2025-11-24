@@ -1,7 +1,6 @@
 // MetricsLayerConfig.tsx
 "use client";
 
-import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
