@@ -361,10 +361,21 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           } else if (metricConfig.type === "principal-components") {
             // Load principal component metrics (new logic)
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
-            
-            // For principal components, we need to use the PCA pipeline, not the current pipeline
-            const pcaPipelineId = kedroBaseUrl ? 'mean_pca_bestkmeans' : currentPipelineId;
-            
+
+            // Extract the imputer from the current pipeline ID and construct the PCA pipeline ID
+            // e.g., "mean_localmap_bestkmeans" -> "mean_pca_bestkmeans"
+            // e.g., "median_umap_bestkmeans" -> "median_pca_bestkmeans"
+            const pipelineParts = currentPipelineId.split('_');
+            let pcaPipelineId = 'mean_pca_bestkmeans'; // fallback default
+
+            if (pipelineParts.length >= 3) {
+              const imputer = pipelineParts[0]; // e.g., "mean", "median"
+              const clustering = "bestkmeans"; // alwasy assume "bestkmeans"
+              pcaPipelineId = `${imputer}_pca_${clustering}`;
+            }
+
+            console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineId}"`);
+
             const componentValues = await getPrincipalComponentValues(componentIndex, {
               kedroBaseUrl,
               pipelineId: pcaPipelineId

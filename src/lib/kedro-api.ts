@@ -573,11 +573,11 @@ export async function loadFullProjections(kedroBaseUrl?: string, pipelineId?: st
       const { resolveAssetPath } = await import('./paths');
       const projectionsUrl = resolveAssetPath('/projections.json');
       const response = await fetch(projectionsUrl);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch local projections: ${response.status} ${response.statusText}`);
       }
-      
+
       projectionsArray = await response.json();
       console.log('✅ Successfully loaded projections from local file');
     }
@@ -615,7 +615,7 @@ export async function getPrincipalComponentValues(
   try {
     // Load full projections data
     const fullProjections = await loadFullProjections(kedroBaseUrl, pipelineId);
-    
+
     const componentValues = new Map<string, number>();
     let minValue = Infinity;
     let maxValue = -Infinity;
@@ -633,7 +633,7 @@ export async function getPrincipalComponentValues(
     // Second pass: normalize values to 0-1 range
     const normalizedValues = new Map<string, number>();
     const range = maxValue - minValue;
-    
+
     if (range > 0) {
       componentValues.forEach((value, participantId) => {
         normalizedValues.set(participantId, (value - minValue) / range);
