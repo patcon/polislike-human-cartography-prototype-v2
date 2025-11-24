@@ -357,6 +357,53 @@ export async function getStatementsJsonPath(kedroBaseUrl: string, pipelineId: st
 }
 
 /**
+ * Find the projections JSON node in the pipeline data
+ * Supports both v1 and v2 formats:
+ * - v1: looks for `${pipelineId}__projections_json` in individual pipeline
+ * - v2: looks for `${pipelineId}__projections_json` in branching pipeline
+ */
+export function findProjectionsJsonNode(apiResponse: KedroApiResponse, pipelineId: string = 'mean_pca_bestkmeans'): KedroNode | null {
+  return apiResponse.nodes.find(node =>
+    node.name === `${pipelineId}__projections_json`
+  ) || null;
+}
+
+/**
+ * Get the projections JSON file path from Kedro API
+ */
+export async function getProjectionsJsonPath(kedroBaseUrl: string, pipelineId: string = 'mean_pca_bestkmeans'): Promise<string> {
+  try {
+    console.log('🔄 Fetching Kedro pipeline data for projections JSON...', { kedroBaseUrl, pipelineId });
+    const apiResponse = await fetchKedroApiData(kedroBaseUrl, pipelineId);
+
+    console.log('🔍 Finding projections JSON node...');
+    const projectionsJsonNode = findProjectionsJsonNode(apiResponse, pipelineId);
+
+    if (!projectionsJsonNode) {
+      throw new Error(`Could not find projections JSON node with name "${pipelineId}__projections_json"`);
+    }
+
+    console.log(`✅ Found projections JSON node with ID: ${projectionsJsonNode.id}`);
+
+    console.log('📡 Fetching node data for projections JSON...');
+    const nodeData = await fetchKedroNodeData(kedroBaseUrl, projectionsJsonNode.id);
+
+    // The node data should contain a filepath key with the relative path
+    if (!nodeData || !('filepath' in nodeData) || typeof nodeData.filepath !== 'string') {
+      throw new Error(`Node data does not contain a valid filepath key. Available keys: ${Object.keys(nodeData || {}).join(', ')}`);
+    }
+
+    const filepath = nodeData.filepath as string;
+    console.log(`📄 Found projections JSON file path: ${filepath}`);
+    return filepath;
+
+  } catch (error) {
+    console.error('❌ Error getting projections JSON path:', error);
+    throw error;
+  }
+}
+
+/**
  * Get available pipeline IDs from the branching pipeline (v2 format)
  * Extracts pipeline IDs from scatter plot node names like "mean_localmap_bestkmeans__scatter_plot"
  * When v2 is available, only returns v2 pipeline IDs and ignores v1 pipeline names
@@ -467,6 +514,147 @@ export async function loadStatementsData(kedroBaseUrl?: string, pipelineId?: str
     }
   } catch (error) {
     console.error('❌ Error loading statements data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load projections data from JSON file
+ */
+export async function loadProjections(): Promise<Map<string, [number, number]>> {
+  try {
+    const { resolveAssetPath } = await import('./paths');
+    const projectionsUrl = resolveAssetPath('/projections.json');
+    const response = await fetch(projectionsUrl);
+    const projectionsArray = await response.json();
+
+    const projections = new Map<string, [number, number]>();
+
+    // Convert array format to Map
+    projectionsArray.forEach(([participantId, coordinates]: [string, [number, number]]) => {
+      projections.set(participantId, coordinates);
+    });
+
+    console.log(`Loaded ${projections.size} projections`);
+    return projections;
+  } catch (error) {
+    console.error('Failed to load projections:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load full projections data with all components from JSON file or Kedro API
+ */
+export async function loadFullProjections(kedroBaseUrl?: string, pipelineId?: string): Promise<Map<string, number[]>> {
+  try {
+    let projectionsArray: [string, number[]][];
+
+    if (kedroBaseUrl) {
+      // Load from Kedro API by fetching the projections JSON file
+      console.log('🔄 Loading full projections from Kedro API...', { kedroBaseUrl, pipelineId });
+      const relativePath = await getProjectionsJsonPath(kedroBaseUrl, pipelineId);
+      const projectionsUrl = `${kedroBaseUrl}/${relativePath}`;
+      console.log('📄 Loading projections from:', projectionsUrl);
+
+      // Add cache-busting parameter to ensure fresh data
+      const cacheBustUrl = `${projectionsUrl}?t=${Date.now()}`;
+      const response = await fetch(cacheBustUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projections: ${response.status} ${response.statusText}`);
+      }
+
+      projectionsArray = await response.json();
+      console.log('✅ Successfully loaded projections from Kedro API');
+    } else {
+      // Load from static file
+      console.log('📁 Loading full projections from static file...');
+      const { resolveAssetPath } = await import('./paths');
+      const projectionsUrl = resolveAssetPath('/projections.json');
+      const response = await fetch(projectionsUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch local projections: ${response.status} ${response.statusText}`);
+      }
+      
+      projectionsArray = await response.json();
+      console.log('✅ Successfully loaded projections from local file');
+    }
+
+    const projections = new Map<string, number[]>();
+
+    // Convert array format to Map
+    projectionsArray.forEach(([participantId, coordinates]: [string, number[]]) => {
+      projections.set(participantId, coordinates);
+    });
+
+    console.log(`Loaded ${projections.size} full projections with ${projectionsArray[0]?.[1]?.length || 0} components each`);
+    return projections;
+  } catch (error) {
+    console.error('Failed to load full projections:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get principal component values for all participants (normalized 0-1 for metrics visualization)
+ * @param componentIndex - The component index to extract (0-based, so component 3 = index 2)
+ * @param options - Configuration options
+ * @returns Map of participant IDs to normalized component values (0-1)
+ */
+export async function getPrincipalComponentValues(
+  componentIndex: number,
+  options: {
+    kedroBaseUrl?: string;
+    pipelineId?: string;
+  } = {}
+): Promise<Map<string, number>> {
+  const { kedroBaseUrl, pipelineId } = options;
+
+  try {
+    // Load full projections data
+    const fullProjections = await loadFullProjections(kedroBaseUrl, pipelineId);
+    
+    const componentValues = new Map<string, number>();
+    let minValue = Infinity;
+    let maxValue = -Infinity;
+
+    // First pass: collect all component values and find min/max
+    fullProjections.forEach((coordinates, participantId) => {
+      if (coordinates.length > componentIndex) {
+        const value = coordinates[componentIndex];
+        componentValues.set(participantId, value);
+        minValue = Math.min(minValue, value);
+        maxValue = Math.max(maxValue, value);
+      }
+    });
+
+    // Second pass: normalize values to 0-1 range
+    const normalizedValues = new Map<string, number>();
+    const range = maxValue - minValue;
+    
+    if (range > 0) {
+      componentValues.forEach((value, participantId) => {
+        normalizedValues.set(participantId, (value - minValue) / range);
+      });
+    } else {
+      // If all values are the same, set them all to 0.5
+      componentValues.forEach((_, participantId) => {
+        normalizedValues.set(participantId, 0.5);
+      });
+    }
+
+    console.log(`Calculated principal component ${componentIndex + 1} values for ${normalizedValues.size} participants (range: ${minValue.toFixed(3)} - ${maxValue.toFixed(3)})`);
+    return normalizedValues;
+  } catch (error) {
+    console.error(`Failed to get principal component ${componentIndex + 1} values:`, error);
+    // Return empty map instead of throwing in development
+    const isDev = import.meta.env?.DEV;
+    if (isDev) {
+      console.warn('Returning empty component values map due to error in development environment');
+      return new Map<string, number>();
+    }
     throw error;
   }
 }

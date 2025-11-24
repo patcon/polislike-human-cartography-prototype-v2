@@ -10,6 +10,7 @@ import { AboutDialog } from "./AboutDialog";
 import { INITIAL_ACTION, UNPAINTED_VALUE } from "@/constants";
 import type { Statement } from "./StatementExplorerDrawer";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
+import type { MetricConfig } from "./MetricsLayerConfig";
 
 type MapOverlayProps = {
   action?: "move-map" | "paint-groups";
@@ -30,6 +31,8 @@ type MapOverlayProps = {
   onStatementIdChange?: (statementId: string) => void;
   highlightPassVotes?: boolean;
   onHighlightPassVotesChange?: (value: boolean) => void;
+  metricConfig?: MetricConfig;
+  onMetricConfigChange?: (config: MetricConfig) => void;
   isUnpaintedGrouped?: boolean;
   onClearAllColors?: () => void;
 
@@ -67,6 +70,8 @@ export function MapOverlay({
   onStatementIdChange,
   highlightPassVotes = true,
   onHighlightPassVotesChange,
+  metricConfig,
+  onMetricConfigChange,
   isUnpaintedGrouped = false,
   onClearAllColors,
 
@@ -143,6 +148,8 @@ export function MapOverlay({
           onStatementIdChange={onStatementIdChange}
           highlightPassVotes={highlightPassVotes}
           onHighlightPassVotesChange={onHighlightPassVotesChange}
+          metricConfig={metricConfig}
+          onMetricConfigChange={onMetricConfigChange}
         />
         <StatementExplorerDrawer
           statements={statements}

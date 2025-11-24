@@ -17,10 +17,11 @@ import {
   getLabelArrayWithOptionalUngrouped,
 } from "../../lib/representative-statements";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
-import { fetchAndProcessKedroData, loadStatementsData } from "@/lib/kedro-api";
+import { fetchAndProcessKedroData, loadStatementsData, getPrincipalComponentValues } from "@/lib/kedro-api";
 import { useDebugMode } from "../../hooks/useDebugMode";
 import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
+import type { MetricConfig } from "./MetricsLayerConfig";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -76,6 +77,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // array parallel to dataset: metrics values 0-1 (for metrics mode)
   const [pointMetrics, setPointMetrics] = React.useState<(number | null)[]>([]);
+
+  // Metric configuration state
+  const [metricConfig, setMetricConfig] = React.useState<MetricConfig>({ type: "vote-count", style: "color" });
 
   // Debug mode state
   const debugMode = useDebugMode();
@@ -328,34 +332,50 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [layerMode, statementId, dataset, kedroBaseUrl, currentPipelineId]);
 
-  // Load metrics data when switching to metrics mode
+  // Load metrics data when switching to metrics mode or when metric config changes
   React.useEffect(() => {
     if (layerMode === "metrics" && dataset.length > 0) {
       const loadMetrics = async () => {
         try {
-          // Toggle to exclude moderated statements (set to true to enable filtering)
-          const EXCLUDE_MODERATED_STATEMENTS = true;
+          if (metricConfig.type === "vote-count") {
+            // Load vote count metrics (existing logic)
+            const EXCLUDE_MODERATED_STATEMENTS = true;
+            let statementIds: string[] | undefined;
 
-          let statementIds: string[] | undefined;
+            if (EXCLUDE_MODERATED_STATEMENTS && statements.length > 0) {
+              statementIds = getNonModeratedStatementIds(statements);
+              console.log(`Filtering to ${statementIds?.length || 0} non-moderated statements out of ${statements.length} total`);
+            }
 
-          if (EXCLUDE_MODERATED_STATEMENTS && statements.length > 0) {
-            // Filter out moderated statements
-            statementIds = getNonModeratedStatementIds(statements);
-            console.log(`Filtering to ${statementIds?.length || 0} non-moderated statements out of ${statements.length} total`);
+            const voteCounts = await getVoteCountsForAllParticipants({
+              kedroBaseUrl,
+              pipelineId: currentPipelineId,
+              statementIds
+            });
+
+            const newPointMetrics = dataset.map(([participantId]) => {
+              return voteCounts.get(participantId) ?? null;
+            });
+
+            setPointMetrics(newPointMetrics);
+          } else if (metricConfig.type === "principal-components") {
+            // Load principal component metrics (new logic)
+            const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
+            
+            // For principal components, we need to use the PCA pipeline, not the current pipeline
+            const pcaPipelineId = kedroBaseUrl ? 'mean_pca_bestkmeans' : currentPipelineId;
+            
+            const componentValues = await getPrincipalComponentValues(componentIndex, {
+              kedroBaseUrl,
+              pipelineId: pcaPipelineId
+            });
+
+            const newPointMetrics = dataset.map(([participantId]) => {
+              return componentValues.get(participantId) ?? null;
+            });
+
+            setPointMetrics(newPointMetrics);
           }
-
-          const voteCounts = await getVoteCountsForAllParticipants({
-            kedroBaseUrl,
-            pipelineId: currentPipelineId,
-            statementIds
-          });
-
-          // Create metrics values array parallel to dataset
-          const newPointMetrics = dataset.map(([participantId]) => {
-            return voteCounts.get(participantId) ?? null;
-          });
-
-          setPointMetrics(newPointMetrics);
         } catch (err) {
           console.error('Error loading metrics:', err);
         }
@@ -363,7 +383,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements]);
+  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements, metricConfig]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
@@ -646,6 +666,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           onStatementIdChange={setStatementId}
           highlightPassVotes={highlightPassVotes}
           onHighlightPassVotesChange={setHighlightPassVotes}
+          metricConfig={metricConfig}
+          onMetricConfigChange={setMetricConfig}
           onClearAllColors={handleOpenClearDialog}
           // Representative statements props
           representativeStatements={representativeStatements}

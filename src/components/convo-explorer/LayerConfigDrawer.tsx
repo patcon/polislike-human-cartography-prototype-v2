@@ -13,7 +13,7 @@ import { X } from "lucide-react";
 import { LayerTypeButton } from "./LayerTypeButton";
 import { Vote, Group, Ruler } from "lucide-react";
 import { VotesLayerConfig } from "./VotesLayerConfig";
-import { MetricsLayerConfig } from "./MetricsLayerConfig";
+import { MetricsLayerConfig, type MetricConfig } from "./MetricsLayerConfig";
 import "./LayerConfigDrawer.css";
 import { SelectLayerButton } from "./SelectLayerButton";
 
@@ -24,6 +24,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
     onStatementIdChange?: (statementId: string) => void;
     highlightPassVotes?: boolean;
     onHighlightPassVotesChange?: (value: boolean) => void;
+    metricConfig?: MetricConfig;
+    onMetricConfigChange?: (config: MetricConfig) => void;
   };
 
   export function LayerConfigDrawer({
@@ -33,6 +35,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
     onStatementIdChange,
     highlightPassVotes = true,
     onHighlightPassVotesChange,
+    metricConfig,
+    onMetricConfigChange,
   }: LayerConfigDrawerProps = {}) {
     // Use controlled state if provided, otherwise use internal state
     const [internalSelected, setInternalSelected] = React.useState<string>("groups");
@@ -117,7 +121,12 @@ import { SelectLayerButton } from "./SelectLayerButton";
                 onStatementIdChange={onStatementIdChange}
               />
             )}
-            {selected === "metrics" && <MetricsLayerConfig />}
+            {selected === "metrics" && (
+              <MetricsLayerConfig
+                config={metricConfig}
+                onConfigChange={onMetricConfigChange}
+              />
+            )}
           </div>
         </DrawerContent>
       </Drawer>

@@ -212,29 +212,7 @@ export async function getVotesForParticipants(
   }
 }
 
-/**
- * Load projections data from JSON file
- */
-export async function loadProjections(): Promise<Map<string, [number, number]>> {
-  try {
-    const projectionsUrl = resolveAssetPath('/projections.json');
-    const response = await fetch(projectionsUrl);
-    const projectionsArray = await response.json();
 
-    const projections = new Map<string, [number, number]>();
-
-    // Convert array format to Map
-    projectionsArray.forEach(([participantId, coordinates]: [string, [number, number]]) => {
-      projections.set(participantId, coordinates);
-    });
-
-    console.log(`Loaded ${projections.size} projections`);
-    return projections;
-  } catch (error) {
-    console.error('Failed to load projections:', error);
-    throw error;
-  }
-}
 
 /**
  * Convert vote number to vote type string
@@ -272,6 +250,7 @@ export async function getParticipantDataForStatement(
 }>> {
   try {
     // First load all projections to get the participant IDs
+    const { loadProjections } = await import('./kedro-api');
     const projections = await loadProjections();
     const participantIds = Array.from(projections.keys());
 
