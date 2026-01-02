@@ -112,6 +112,16 @@ export const D3Map: React.FC<D3MapProps> = ({
   // State to trigger re-calculation of radius on resize
   const [resizeCounter, forceUpdate] = React.useReducer(x => x + 1, 0);
 
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = React.useState({ width: "100%", height: 400 });
+
+  // Measure size once mounted
+  React.useEffect(() => {
+    if (!wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    setContainerSize({ width: rect.width, height: rect.height });
+  }, []);
+
   // Initialize selectedPipeline when pipeline options become available
   React.useEffect(() => {
     if (currentPipelineOptions.length > 0 && !selectedPipeline) {
@@ -302,8 +312,8 @@ export const D3Map: React.FC<D3MapProps> = ({
       });
     }
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const width = containerSize.width;
+    const height = containerSize.height;
     const margin = 20;
 
     const dataWidth = xExtent[1] - xExtent[0];
@@ -341,7 +351,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   React.useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+    svg.attr("width", containerSize.width).attr("height", containerSize.height);
 
     if (!containerRef.current) {
       containerRef.current = svg.append("g");
@@ -737,7 +747,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   }
 
   return (
-    <div className="relative w-screen h-screen">
+    <div ref={wrapperRef} style={{ width: "100%", height: 400, position: "relative" }}>
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
       {/* Pipeline Selector - unified for both Kedro and static projections */}
