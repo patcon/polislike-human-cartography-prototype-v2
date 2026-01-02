@@ -7,6 +7,7 @@
     "dev": "vite",
     "start": "npm run dev",
     "build": "tsc -b && vite build",
+    "build:widget": "vite build --config vite.widget.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -19,6 +20,7 @@
     "chromatic": "npx chromatic --project-token=chpt_38c770d91124bfb"
   },
   "dependencies": {
+    "@anywidget/react": "^0.2.0",
     "@duckdb/duckdb-wasm": "^1.30.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
