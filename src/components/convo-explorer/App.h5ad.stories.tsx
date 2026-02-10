@@ -34,6 +34,7 @@ function H5adFileLoader() {
         statements: parsed.statements,
         votesRows: parsed.votesRows,
         pipelineData: parsed.allEmbeddings,
+        fullDimensionEmbeddings: parsed.fullDimensionEmbeddings,
       });
     } catch (err) {
       console.error('Failed to load h5ad file:', err);

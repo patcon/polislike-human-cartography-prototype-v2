@@ -8,6 +8,8 @@ export type H5adData = {
   availableEmbeddings: string[];
   /** All 2D embeddings keyed by pipeline-style ID (X_ prefix stripped) */
   allEmbeddings: Record<string, [string, [number, number]][]>;
+  /** Full-dimension embeddings (>2D, e.g. PCA) keyed by pipeline-style ID */
+  fullDimensionEmbeddings: Record<string, [string, number[]][]>;
 };
 
 /**
@@ -155,6 +157,7 @@ export async function loadH5adFile(
     if (!obsmGroup) throw new Error('Missing /obsm group');
 
     const allEmbeddings: Record<string, [string, [number, number]][]> = {};
+    const fullDimensionEmbeddings: Record<string, [string, number[]][]> = {};
     for (const embKey of availableEmbeddings) {
       const ds = obsmGroup.get(embKey) as Dataset | null;
       if (!ds) continue;
@@ -174,16 +177,27 @@ export async function loadH5adFile(
         continue;
       }
 
+      // Strip X_ prefix for pipeline-style IDs
+      const pipelineId = embKey.replace(/^X_/, '');
+
+      // Always store 2D projection (first 2 columns)
       const embDataset: [string, [number, number]][] = [];
       for (let i = 0; i < nObs; i++) {
         const x = flatCoords[i * nDims];
         const y = flatCoords[i * nDims + 1];
         embDataset.push([obsNames[i], [x, y]]);
       }
-
-      // Strip X_ prefix for pipeline-style IDs
-      const pipelineId = embKey.replace(/^X_/, '');
       allEmbeddings[pipelineId] = embDataset;
+
+      // For high-dimensional embeddings (>2D), also store all dimensions
+      if (nDims > 2) {
+        const fullDataset: [string, number[]][] = [];
+        for (let i = 0; i < nObs; i++) {
+          const coords = flatCoords.slice(i * nDims, (i + 1) * nDims);
+          fullDataset.push([obsNames[i], coords]);
+        }
+        fullDimensionEmbeddings[pipelineId] = fullDataset;
+      }
     }
 
     // Use the selected embedding as the default dataset
@@ -238,7 +252,7 @@ export async function loadH5adFile(
     // --- Read votes from uns/votes ---
     const votesRows = readVotes(file);
 
-    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings };
+    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings };
   } finally {
     if (file) {
       file.close();

@@ -36,6 +36,8 @@ export type PreloadedData = {
   statements: { statement_id: string; txt: string; moderated: number }[];
   votesRows: { participant_id: string; comment_id: string; vote: number }[];
   pipelineData?: Record<string, [string, [number, number]][]>;
+  /** Full-dimension embeddings (>2D, e.g. PCA) for metrics layer */
+  fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
 };
 
 type AppProps = {
@@ -405,33 +407,69 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             setPointMetrics(newPointMetrics);
           } else if (metricConfig.type === "principal-components") {
-            // Load principal component metrics (new logic)
+            // Load principal component metrics
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
 
-            // Extract the imputer from the current pipeline ID and construct the PCA pipeline ID
-            // e.g., "mean_localmap_bestkmeans" -> "mean_pca_bestkmeans"
-            // e.g., "median_umap_bestkmeans" -> "median_pca_bestkmeans"
-            const pipelineParts = currentPipelineId.split('_');
-            let pcaPipelineId = 'mean_pca_bestkmeans'; // fallback default
+            if (preloadedData?.fullDimensionEmbeddings) {
+              // Preloaded mode: extract components from full-dimension embeddings
+              const embKeys = Object.keys(preloadedData.fullDimensionEmbeddings);
+              // Prefer pca_masked_unscaled, then any key containing 'pca', then first available
+              const pcaKey = embKeys.find(k => k === 'pca_masked_unscaled')
+                || embKeys.find(k => k.includes('pca'))
+                || embKeys[0];
 
-            if (pipelineParts.length >= 3) {
-              const imputer = pipelineParts[0]; // e.g., "mean", "median"
-              const clustering = "bestkmeans"; // alwasy assume "bestkmeans"
-              pcaPipelineId = `${imputer}_pca_${clustering}`;
+              if (pcaKey) {
+                const fullData = preloadedData.fullDimensionEmbeddings[pcaKey];
+                console.log(`Using preloaded PCA embedding "${pcaKey}" (${fullData[0]?.[1]?.length || 0} dimensions)`);
+
+                // Build a map and normalize
+                const rawValues = new Map<string, number>();
+                let minValue = Infinity;
+                let maxValue = -Infinity;
+
+                for (const [pid, coords] of fullData) {
+                  if (coords.length > componentIndex) {
+                    const value = coords[componentIndex];
+                    rawValues.set(pid, value);
+                    minValue = Math.min(minValue, value);
+                    maxValue = Math.max(maxValue, value);
+                  }
+                }
+
+                const range = maxValue - minValue;
+                const newPointMetrics = dataset.map(([participantId]) => {
+                  const raw = rawValues.get(participantId);
+                  if (raw === undefined) return null;
+                  return range > 0 ? (raw - minValue) / range : 0.5;
+                });
+
+                console.log(`Calculated principal component ${metricConfig.component} for ${rawValues.size} participants (range: ${minValue.toFixed(3)} - ${maxValue.toFixed(3)})`);
+                setPointMetrics(newPointMetrics);
+              }
+            } else {
+              // Kedro/static mode: derive PCA pipeline ID from current pipeline
+              const pipelineParts = currentPipelineId.split('_');
+              let pcaPipelineId = 'mean_pca_bestkmeans'; // fallback default
+
+              if (pipelineParts.length >= 3) {
+                const imputer = pipelineParts[0]; // e.g., "mean", "median"
+                const clustering = "bestkmeans";
+                pcaPipelineId = `${imputer}_pca_${clustering}`;
+              }
+
+              console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineId}"`);
+
+              const componentValues = await getPrincipalComponentValues(componentIndex, {
+                kedroBaseUrl,
+                pipelineId: pcaPipelineId
+              });
+
+              const newPointMetrics = dataset.map(([participantId]) => {
+                return componentValues.get(participantId) ?? null;
+              });
+
+              setPointMetrics(newPointMetrics);
             }
-
-            console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineId}"`);
-
-            const componentValues = await getPrincipalComponentValues(componentIndex, {
-              kedroBaseUrl,
-              pipelineId: pcaPipelineId
-            });
-
-            const newPointMetrics = dataset.map(([participantId]) => {
-              return componentValues.get(participantId) ?? null;
-            });
-
-            setPointMetrics(newPointMetrics);
           }
         } catch (err) {
           console.error('Error loading metrics:', err);
