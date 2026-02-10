@@ -27,3 +27,6 @@ dist-ssr
 storybook-static
 
 .env
+
+# Don't commit and h5ad exports we might use for testing
+*.h5ad
