@@ -55,6 +55,14 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   right,
   bottom,
 }) => {
+  // Measure the longest pipeline label to set a stable combobox width
+  const longestLabel = React.useMemo(() => {
+    return availablePipelines.reduce((longest, p) => {
+      const label = `${p.name}${pipelineLoadingStates[p.id] ? " (Loading...)" : ""}`;
+      return label.length > longest.length ? label : longest;
+    }, "");
+  }, [availablePipelines, pipelineLoadingStates]);
+
   if (!enableAnimation || availablePipelines.length === 0) {
     return null;
   }
@@ -73,6 +81,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           Pipeline {isAnimating && "(Animating...)"}
         </h3>
         <div className="flex items-center gap-2">
+          <div style={{ minWidth: `${longestLabel.length + 4}ch` }}>
           <Combobox
             value={selectedPipeline}
             onValueChange={onPipelineChange}
@@ -85,8 +94,8 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             placeholder="Select pipeline..."
             searchPlaceholder="Search pipelines..."
             emptyMessage="No pipeline found."
-            className="flex-1 min-w-0"
           />
+          </div>
           <Button
             variant="outline"
             size="sm"
