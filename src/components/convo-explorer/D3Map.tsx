@@ -5,6 +5,8 @@ import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { PipelineSelector } from "./PipelineSelector";
+import { Button } from "../ui/button";
+import { Upload } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -764,7 +766,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
       {/* Pipeline Selector - unified for both Kedro and static projections */}
-      {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) && (
+      {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) ? (
         <PipelineSelector
           availablePipelines={currentPipelineOptions}
           selectedPipeline={selectedPipeline}
@@ -782,6 +784,18 @@ export const D3Map: React.FC<D3MapProps> = ({
           top="1rem"
           left="1rem"
         />
+      ) : onLoadFile && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onLoadFile}
+          title="Load .h5ad file"
+          className="absolute bg-white/90 backdrop-blur-sm shadow-sm"
+          style={{ top: '1rem', left: '1rem' }}
+        >
+          <Upload className="h-4 w-4 mr-1" />
+          Load .h5ad
+        </Button>
       )}
 
     </div>
