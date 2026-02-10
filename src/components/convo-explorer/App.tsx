@@ -35,6 +35,7 @@ export type PreloadedData = {
   dataset: [string, [number, number]][];
   statements: { statement_id: string; txt: string; moderated: number }[];
   votesRows: { participant_id: string; comment_id: string; vote: number }[];
+  pipelineData?: Record<string, [string, [number, number]][]>;
 };
 
 type AppProps = {
@@ -691,11 +692,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             flipX={currentDisplayState.flipX}
             flipY={currentDisplayState.flipY}
             colorsToFront={colorsToFront}
-            testAnimation={testAnimation}
+            testAnimation={testAnimation || !!preloadedData?.pipelineData}
             kedroBaseUrl={kedroBaseUrl}
             pipelineFilter={pipelineFilter}
             availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
             onPipelineChange={handlePipelineChange}
+            preloadedPipelineData={preloadedData?.pipelineData}
           />
         </div>
       </div>

@@ -42,6 +42,8 @@ type D3MapProps = {
   availablePipelines?: Array<{id: string, name: string}>;
   /** Called when pipeline changes in the selector */
   onPipelineChange?: (pipelineId: string) => void;
+  /** Preloaded pipeline data (e.g. from h5ad file) — bypasses fetch-based loading */
+  preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -64,6 +66,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   pipelineFilter,
   availablePipelines = [],
   onPipelineChange,
+  preloadedPipelineData,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -103,8 +106,14 @@ export const D3Map: React.FC<D3MapProps> = ({
   );
   const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
 
+  // Preloaded pipeline options derived from preloadedPipelineData keys
+  const preloadedPipelineOptions = React.useMemo(() => {
+    if (!preloadedPipelineData) return [];
+    return Object.keys(preloadedPipelineData).map(id => ({ id, name: id }));
+  }, [preloadedPipelineData]);
+
   // Current pipeline options based on mode
-  const currentPipelineOptions = isKedroMode ? kedroOptions : staticPipelines;
+  const currentPipelineOptions = preloadedPipelineData ? preloadedPipelineOptions : isKedroMode ? kedroOptions : staticPipelines;
 
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
@@ -115,7 +124,12 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Initialize selectedPipeline when pipeline options become available
   React.useEffect(() => {
     if (currentPipelineOptions.length > 0 && !selectedPipeline) {
-      if (isKedroMode) {
+      if (preloadedPipelineData) {
+        // For preloaded data, use preferred order: localmap > umap > pacmap > first key
+        const preferredOrder = ['localmap', 'umap', 'pacmap'];
+        const preferred = preferredOrder.find(id => id in preloadedPipelineData);
+        setSelectedPipeline(preferred || currentPipelineOptions[0].id);
+      } else if (isKedroMode) {
         // Prioritize preferred Kedro pipeline if available, otherwise use first
         const preferredPipeline = currentPipelineOptions.find(p => p.id === PREFERRED_KEDRO_PIPELINE);
         const defaultPipeline = preferredPipeline || currentPipelineOptions[0];
@@ -125,7 +139,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         setSelectedPipeline('localmap');
       }
     }
-  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation]);
+  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation, preloadedPipelineData]);
 
   // Handle window resize to update radius (with throttling)
   React.useEffect(() => {
@@ -148,6 +162,12 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Load projection data only if testAnimation is enabled
   React.useEffect(() => {
     if (!testAnimation) return;
+
+    // If preloaded pipeline data is provided, use it directly
+    if (preloadedPipelineData) {
+      setPipelineData(preloadedPipelineData);
+      return;
+    }
 
     const loadProjections = async () => {
       try {
@@ -197,7 +217,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
 
     loadProjections();
-  }, [testAnimation, isKedroMode, kedroOptions]);
+  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {

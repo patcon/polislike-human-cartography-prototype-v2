@@ -6,6 +6,8 @@ export type H5adData = {
   statements: { statement_id: string; txt: string; moderated: number }[];
   votesRows: { participant_id: string; comment_id: string; vote: number }[];
   availableEmbeddings: string[];
+  /** All 2D embeddings keyed by pipeline-style ID (X_ prefix stripped) */
+  allEmbeddings: Record<string, [string, [number, number]][]>;
 };
 
 /**
@@ -148,35 +150,47 @@ export async function loadH5adFile(
     if (!obsGroup) throw new Error('Missing /obs group');
     const obsNames = readIndex(obsGroup);
 
-    // --- Read embedding coordinates ---
+    // --- Read embedding coordinates for all available embeddings ---
     const obsmGroup = file.get('obsm') as Group;
     if (!obsmGroup) throw new Error('Missing /obsm group');
-    const embeddingDs = obsmGroup.get(selectedEmbedding) as Dataset | null;
-    if (!embeddingDs) throw new Error(`Embedding "${selectedEmbedding}" not found in /obsm`);
 
-    const shape = embeddingDs.shape;
-    if (!shape || shape.length !== 2) {
-      throw new Error(`Embedding "${selectedEmbedding}" has unexpected shape`);
+    const allEmbeddings: Record<string, [string, [number, number]][]> = {};
+    for (const embKey of availableEmbeddings) {
+      const ds = obsmGroup.get(embKey) as Dataset | null;
+      if (!ds) continue;
+
+      const shape = ds.shape;
+      if (!shape || shape.length !== 2) continue;
+      const nObs = shape[0];
+      const nDims = shape[1];
+
+      const rawValue = ds.value;
+      let flatCoords: number[];
+      if (ArrayBuffer.isView(rawValue)) {
+        flatCoords = Array.from(rawValue as Float64Array | Float32Array);
+      } else if (Array.isArray(rawValue)) {
+        flatCoords = (rawValue as number[][]).flat();
+      } else {
+        continue;
+      }
+
+      const embDataset: [string, [number, number]][] = [];
+      for (let i = 0; i < nObs; i++) {
+        const x = flatCoords[i * nDims];
+        const y = flatCoords[i * nDims + 1];
+        embDataset.push([obsNames[i], [x, y]]);
+      }
+
+      // Strip X_ prefix for pipeline-style IDs
+      const pipelineId = embKey.replace(/^X_/, '');
+      allEmbeddings[pipelineId] = embDataset;
     }
-    const nObs = shape[0];
-    const nDims = shape[1];
 
-    // Read the flat typed array and reshape to [n_obs, 2]
-    const rawValue = embeddingDs.value;
-    let flatCoords: number[];
-    if (ArrayBuffer.isView(rawValue)) {
-      flatCoords = Array.from(rawValue as Float64Array | Float32Array);
-    } else if (Array.isArray(rawValue)) {
-      flatCoords = (rawValue as number[][]).flat();
-    } else {
-      throw new Error(`Unexpected embedding data format`);
-    }
-
-    const dataset: [string, [number, number]][] = [];
-    for (let i = 0; i < nObs; i++) {
-      const x = flatCoords[i * nDims];
-      const y = flatCoords[i * nDims + 1];
-      dataset.push([obsNames[i], [x, y]]);
+    // Use the selected embedding as the default dataset
+    const pipelineId = selectedEmbedding.replace(/^X_/, '');
+    const dataset = allEmbeddings[pipelineId];
+    if (!dataset) {
+      throw new Error(`Embedding "${selectedEmbedding}" could not be read from /obsm`);
     }
 
     // --- Read statements (var) ---
@@ -224,7 +238,7 @@ export async function loadH5adFile(
     // --- Read votes from uns/votes ---
     const votesRows = readVotes(file);
 
-    return { dataset, statements, votesRows, availableEmbeddings };
+    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings };
   } finally {
     if (file) {
       file.close();

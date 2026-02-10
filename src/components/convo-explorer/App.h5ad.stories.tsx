@@ -3,20 +3,16 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { App } from './App';
 import type { PreloadedData } from './App';
 import { loadH5adFile } from '../../lib/h5ad-loader';
-import type { H5adData } from '../../lib/h5ad-loader';
 
 /**
  * Wrapper component that provides a file picker for loading h5ad files,
  * parses them with h5wasm, and renders the App with preloaded data.
+ * Embedding switching is handled by D3Map's PipelineSelector with animation.
  */
 function H5adFileLoader() {
-  const [data, setData] = React.useState<H5adData | null>(null);
+  const [preloadedData, setPreloadedData] = React.useState<PreloadedData | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [selectedEmbedding, setSelectedEmbedding] = React.useState<string | null>(null);
-  // Store the file buffer so we can re-parse with a different embedding
-  // without needing the file input element (which is removed from DOM after loading)
-  const bufferRef = React.useRef<ArrayBuffer | null>(null);
 
   const handleFileChange = React.useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -27,14 +23,13 @@ function H5adFileLoader() {
 
     try {
       const buffer = await file.arrayBuffer();
-      bufferRef.current = buffer;
       const parsed = await loadH5adFile(buffer);
-      setData(parsed);
-      // Set the initially-selected embedding (first in preferred order)
-      const preferredOrder = ['X_localmap', 'X_umap', 'X_pacmap'];
-      const defaultEmbedding = preferredOrder.find(k => parsed.availableEmbeddings.includes(k))
-        ?? parsed.availableEmbeddings[0];
-      setSelectedEmbedding(defaultEmbedding);
+      setPreloadedData({
+        dataset: parsed.dataset,
+        statements: parsed.statements,
+        votesRows: parsed.votesRows,
+        pipelineData: parsed.allEmbeddings,
+      });
     } catch (err) {
       console.error('Failed to load h5ad file:', err);
       setError(err instanceof Error ? err.message : 'Failed to parse h5ad file');
@@ -43,25 +38,8 @@ function H5adFileLoader() {
     }
   }, []);
 
-  const handleEmbeddingChange = React.useCallback(async (newEmbedding: string) => {
-    if (!bufferRef.current) return;
-    setSelectedEmbedding(newEmbedding);
-    setLoading(true);
-    setError(null);
-
-    try {
-      const parsed = await loadH5adFile(bufferRef.current, newEmbedding);
-      setData(parsed);
-    } catch (err) {
-      console.error('Failed to reload with new embedding:', err);
-      setError(err instanceof Error ? err.message : 'Failed to reload embedding');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   // File picker screen
-  if (!data) {
+  if (!preloadedData) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 max-w-md text-center p-8">
@@ -93,39 +71,7 @@ function H5adFileLoader() {
     );
   }
 
-  const preloadedData: PreloadedData = {
-    dataset: data.dataset,
-    statements: data.statements,
-    votesRows: data.votesRows,
-  };
-
-  return (
-    <div className="relative h-screen w-screen">
-      {/* Embedding selector overlay */}
-      {data.availableEmbeddings.length > 1 && (
-        <div className="absolute top-2 left-2 z-[100] pointer-events-auto">
-          <select
-            value={selectedEmbedding ?? ''}
-            onChange={(e) => handleEmbeddingChange(e.target.value)}
-            disabled={loading}
-            className="text-xs px-2 py-1 rounded border bg-background/90 backdrop-blur-sm shadow-sm"
-          >
-            {data.availableEmbeddings.map((key) => (
-              <option key={key} value={key}>
-                {key.replace(/^X_/, '')}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {loading && (
-        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-background/50">
-          <p className="text-sm text-muted-foreground">Switching embedding...</p>
-        </div>
-      )}
-      <App preloadedData={preloadedData} />
-    </div>
-  );
+  return <App preloadedData={preloadedData} />;
 }
 
 const meta: Meta = {
