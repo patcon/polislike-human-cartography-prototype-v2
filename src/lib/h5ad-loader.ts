@@ -239,8 +239,16 @@ export async function loadH5adFile(
 }
 
 /**
+ * Find the first matching key from a list of candidates.
+ */
+function findKey(available: string[], candidates: string[]): string | undefined {
+  return candidates.find(k => available.includes(k));
+}
+
+/**
  * Read votes DataFrame from uns/votes.
- * Expected columns: voter_id (or participant_id), comment_id, vote
+ * Handles both hyphenated (valency-anndata: voter-id, comment-id) and
+ * underscored (voter_id, comment_id, participant_id) column naming conventions.
  */
 function readVotes(file: H5File): H5adData['votesRows'] {
   const unsGroup = file.get('uns') as Group | null;
@@ -251,30 +259,29 @@ function readVotes(file: H5File): H5adData['votesRows'] {
 
   const votesKeys = votesGroup.keys();
 
-  // Read participant IDs - try voter_id first, then participant_id
-  let participantIds: (string | number)[];
-  if (votesKeys.includes('voter_id')) {
-    participantIds = readColumn(votesGroup, 'voter_id');
-  } else if (votesKeys.includes('participant_id')) {
-    participantIds = readColumn(votesGroup, 'participant_id');
-  } else {
-    console.warn('No voter_id or participant_id column found in uns/votes');
+  // Read participant IDs - try multiple naming conventions
+  const participantKey = findKey(votesKeys, ['voter-id', 'voter_id', 'participant_id', 'participant-id']);
+  if (!participantKey) {
+    console.warn('No voter/participant ID column found in uns/votes. Available keys:', votesKeys);
     return [];
   }
+  const participantIds = readColumn(votesGroup, participantKey);
 
-  // Read comment_id
-  if (!votesKeys.includes('comment_id')) {
-    console.warn('No comment_id column found in uns/votes');
+  // Read comment/statement IDs
+  const commentKey = findKey(votesKeys, ['comment-id', 'comment_id', 'statement_id', 'statement-id']);
+  if (!commentKey) {
+    console.warn('No comment/statement ID column found in uns/votes. Available keys:', votesKeys);
     return [];
   }
-  const commentIds = readColumn(votesGroup, 'comment_id');
+  const commentIds = readColumn(votesGroup, commentKey);
 
   // Read vote values
-  if (!votesKeys.includes('vote')) {
-    console.warn('No vote column found in uns/votes');
+  const voteKey = findKey(votesKeys, ['vote', 'votes']);
+  if (!voteKey) {
+    console.warn('No vote column found in uns/votes. Available keys:', votesKeys);
     return [];
   }
-  const votes = readColumn(votesGroup, 'vote');
+  const votes = readColumn(votesGroup, voteKey);
 
   const rows: H5adData['votesRows'] = [];
   for (let i = 0; i < participantIds.length; i++) {

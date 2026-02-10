@@ -14,6 +14,9 @@ function H5adFileLoader() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [selectedEmbedding, setSelectedEmbedding] = React.useState<string | null>(null);
+  // Store the file buffer so we can re-parse with a different embedding
+  // without needing the file input element (which is removed from DOM after loading)
+  const bufferRef = React.useRef<ArrayBuffer | null>(null);
 
   const handleFileChange = React.useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -24,6 +27,7 @@ function H5adFileLoader() {
 
     try {
       const buffer = await file.arrayBuffer();
+      bufferRef.current = buffer;
       const parsed = await loadH5adFile(buffer);
       setData(parsed);
       // Set the initially-selected embedding (first in preferred order)
@@ -40,25 +44,13 @@ function H5adFileLoader() {
   }, []);
 
   const handleEmbeddingChange = React.useCallback(async (newEmbedding: string) => {
-    if (!data) return;
+    if (!bufferRef.current) return;
     setSelectedEmbedding(newEmbedding);
     setLoading(true);
     setError(null);
 
     try {
-      // Re-read the file from the emscripten FS isn't possible after close,
-      // so we need the user to re-upload. Instead, store the buffer.
-      // For simplicity, we ask user to re-select. But actually we can
-      // use the fileInputRef to get the file again.
-      const fileInput = document.querySelector<HTMLInputElement>('#h5ad-file-input');
-      const file = fileInput?.files?.[0];
-      if (!file) {
-        setError('Please re-select the file to change embeddings');
-        setLoading(false);
-        return;
-      }
-      const buffer = await file.arrayBuffer();
-      const parsed = await loadH5adFile(buffer, newEmbedding);
+      const parsed = await loadH5adFile(bufferRef.current, newEmbedding);
       setData(parsed);
     } catch (err) {
       console.error('Failed to reload with new embedding:', err);
@@ -66,7 +58,7 @@ function H5adFileLoader() {
     } finally {
       setLoading(false);
     }
-  }, [data]);
+  }, []);
 
   // File picker screen
   if (!data) {
@@ -90,7 +82,6 @@ function H5adFileLoader() {
           >
             {loading ? 'Loading...' : 'Choose .h5ad file'}
             <input
-              id="h5ad-file-input"
               type="file"
               accept=".h5ad,.h5,.hdf5"
               onChange={handleFileChange}
@@ -155,7 +146,7 @@ statements, and votes directly in the browser using h5wasm.
 - \`obs\` — participant index (IDs)
 - \`obsm/X_*\` — 2D embeddings (e.g. \`X_localmap\`, \`X_umap\`)
 - \`var\` — statement index + \`content\` and \`moderation_state\` columns
-- \`uns/votes\` — DataFrame with \`voter_id\`, \`comment_id\`, \`vote\` columns
+- \`uns/votes\` — DataFrame with \`voter-id\`, \`comment-id\`, \`vote\` columns
         `,
       },
     },
