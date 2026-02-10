@@ -403,6 +403,47 @@ export function getNonModeratedStatementIds(statements: Array<{ statement_id: st
 }
 
 /**
+ * Load votes data from in-memory rows into DuckDB.
+ * Used when votes come from an h5ad file rather than a parquet URL.
+ * Creates the votes table with the same schema as the parquet-loaded version.
+ */
+export async function loadVotesFromMemory(
+  votesRows: { participant_id: string; comment_id: string; vote: number }[]
+): Promise<void> {
+  if (!conn) {
+    await initializeDuckDB();
+  }
+
+  try {
+    // Create the votes table
+    await conn!.query(`
+      CREATE OR REPLACE TABLE votes (
+        participant_id VARCHAR,
+        comment_id VARCHAR,
+        vote INTEGER
+      )
+    `);
+
+    // Insert in batches of 1000
+    const BATCH_SIZE = 1000;
+    for (let i = 0; i < votesRows.length; i += BATCH_SIZE) {
+      const batch = votesRows.slice(i, i + BATCH_SIZE);
+      const values = batch
+        .map(r => `('${r.participant_id}', '${r.comment_id}', ${r.vote})`)
+        .join(',');
+      await conn!.query(`INSERT INTO votes VALUES ${values}`);
+    }
+
+    votesTableLoaded = true;
+    lastVotesConfig = 'memory';
+    console.log(`✅ Loaded ${votesRows.length} vote rows from memory into DuckDB`);
+  } catch (error) {
+    console.error('Failed to load votes from memory:', error);
+    throw new Error('Failed to load votes data from memory');
+  }
+}
+
+/**
  * Close DuckDB connection and cleanup
  */
 export async function closeDuckDB(): Promise<void> {

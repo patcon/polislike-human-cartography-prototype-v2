@@ -8,7 +8,7 @@ import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
 import { PathasLogo } from "./PathasLogo";
-import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB } from "../../lib/duckdb";
+import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
 import {
@@ -31,14 +31,21 @@ function findDatasetIndex(dataset: [string, [number, number]][], targetId: numbe
   return dataset.findIndex((d) => String(d[0]) === targetIdStr);
 }
 
+export type PreloadedData = {
+  dataset: [string, [number, number]][];
+  statements: { statement_id: string; txt: string; moderated: number }[];
+  votesRows: { participant_id: string; comment_id: string; vote: number }[];
+};
+
 type AppProps = {
   testAnimation?: boolean;
   kedroBaseUrl?: string;
   initialPipelineId?: string;
   pipelineFilter?: string;
+  preloadedData?: PreloadedData;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -162,7 +169,20 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   React.useEffect(() => {
     const init = async () => {
       try {
-        if (kedroBaseUrl) {
+        if (preloadedData) {
+          // Preloaded mode: data already parsed (e.g. from h5ad file)
+          console.log('Using preloaded data');
+
+          setDataset(preloadedData.dataset);
+          setStatements(preloadedData.statements);
+
+          // Initialize DuckDB and load votes from memory
+          await initializeDuckDB();
+          if (preloadedData.votesRows.length > 0) {
+            await loadVotesFromMemory(preloadedData.votesRows);
+          }
+          console.log('Preloaded data set and DuckDB initialized');
+        } else if (kedroBaseUrl) {
           // Kedro mode: fetch data from Kedro API
           console.log('Loading data from Kedro API:', kedroBaseUrl);
 
@@ -229,7 +249,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     };
 
     init();
-  }, [kedroBaseUrl, initialPipelineId]);
+  }, [kedroBaseUrl, initialPipelineId, preloadedData]);
 
   // Synchronize toggles array with pipeline display state when pipeline changes
   React.useEffect(() => {
