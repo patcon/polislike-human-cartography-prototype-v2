@@ -13,6 +13,11 @@ function H5adFileLoader() {
   const [preloadedData, setPreloadedData] = React.useState<PreloadedData | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleLoadFile = React.useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const handleFileChange = React.useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -35,6 +40,8 @@ function H5adFileLoader() {
       setError(err instanceof Error ? err.message : 'Failed to parse h5ad file');
     } finally {
       setLoading(false);
+      // Reset so re-selecting the same file triggers onChange again
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, []);
 
@@ -53,25 +60,39 @@ function H5adFileLoader() {
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
-          <label
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".h5ad,.h5,.hdf5"
+            onChange={handleFileChange}
+            className="sr-only"
+          />
+          <button
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-md border cursor-pointer
               hover:bg-accent hover:text-accent-foreground transition-colors
               ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+            onClick={handleLoadFile}
+            disabled={loading}
           >
             {loading ? 'Loading...' : 'Choose .h5ad file'}
-            <input
-              type="file"
-              accept=".h5ad,.h5,.hdf5"
-              onChange={handleFileChange}
-              className="sr-only"
-            />
-          </label>
+          </button>
         </div>
       </div>
     );
   }
 
-  return <App preloadedData={preloadedData} />;
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".h5ad,.h5,.hdf5"
+        onChange={handleFileChange}
+        className="sr-only"
+      />
+      <App preloadedData={preloadedData} onLoadFile={handleLoadFile} />
+    </>
+  );
 }
 
 const meta: Meta = {

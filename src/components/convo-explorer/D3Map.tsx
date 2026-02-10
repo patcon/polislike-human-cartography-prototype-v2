@@ -44,6 +44,8 @@ type D3MapProps = {
   onPipelineChange?: (pipelineId: string) => void;
   /** Preloaded pipeline data (e.g. from h5ad file) — bypasses fetch-based loading */
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
+  /** Callback to trigger loading a new file (shown as button in PipelineSelector) */
+  onLoadFile?: () => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -67,6 +69,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   availablePipelines = [],
   onPipelineChange,
   preloadedPipelineData,
+  onLoadFile,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -775,6 +778,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           pipelineLoadingStates={Object.fromEntries(
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
+          onLoadFile={onLoadFile}
           top="1rem"
           left="1rem"
         />

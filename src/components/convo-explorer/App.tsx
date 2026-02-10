@@ -44,9 +44,10 @@ type AppProps = {
   initialPipelineId?: string;
   pipelineFilter?: string;
   preloadedData?: PreloadedData;
+  onLoadFile?: () => void;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData, onLoadFile }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -698,6 +699,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
             onPipelineChange={handlePipelineChange}
             preloadedPipelineData={preloadedData?.pipelineData}
+            onLoadFile={onLoadFile}
           />
         </div>
       </div>

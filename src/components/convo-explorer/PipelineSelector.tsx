@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Combobox, type ComboboxOption } from "../ui/combobox";
 import { Button } from "../ui/button";
-import { Repeat1, Repeat } from "lucide-react";
+import { Repeat1, Repeat, Upload } from "lucide-react";
 
 interface PipelineOption {
   id: string;
@@ -37,6 +37,8 @@ interface PipelineSelectorProps {
   right?: number | string;
   /** Custom positioning - bottom coordinate */
   bottom?: number | string;
+  /** Callback to trigger loading a new file */
+  onLoadFile?: () => void;
 }
 
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
@@ -54,6 +56,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   left = "1rem",
   right,
   bottom,
+  onLoadFile,
 }) => {
   // Measure the longest pipeline label to set a stable combobox width
   const longestLabel = React.useMemo(() => {
@@ -115,6 +118,17 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           >
             <Repeat className="h-4 w-4" />
           </Button>
+          {onLoadFile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLoadFile}
+              disabled={isAnimating}
+              title="Load a new file"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>
