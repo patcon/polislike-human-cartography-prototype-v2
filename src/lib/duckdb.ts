@@ -76,6 +76,11 @@ export function getConnection(): duckdb.AsyncDuckDBConnection | null {
  * Ensure votes table is loaded (only loads once per configuration)
  */
 export async function ensureVotesTableLoaded(kedroBaseUrl?: string, pipelineId?: string): Promise<void> {
+  // If votes were loaded from memory (e.g. h5ad file), never overwrite them
+  if (votesTableLoaded && lastVotesConfig === 'memory') {
+    return;
+  }
+
   // Create a unique key for this configuration
   const configKey = `${kedroBaseUrl || 'local'}:${pipelineId || 'default'}`;
 
