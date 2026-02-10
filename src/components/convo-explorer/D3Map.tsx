@@ -5,6 +5,8 @@ import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { PipelineSelector } from "./PipelineSelector";
+import { Button } from "../ui/button";
+import { Import, Info } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -42,6 +44,10 @@ type D3MapProps = {
   availablePipelines?: Array<{id: string, name: string}>;
   /** Called when pipeline changes in the selector */
   onPipelineChange?: (pipelineId: string) => void;
+  /** Preloaded pipeline data (e.g. from h5ad file) — bypasses fetch-based loading */
+  preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
+  /** Callback to trigger loading a new file (shown as button in PipelineSelector) */
+  onLoadFile?: () => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -64,6 +70,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   pipelineFilter,
   availablePipelines = [],
   onPipelineChange,
+  preloadedPipelineData,
+  onLoadFile,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -103,8 +111,14 @@ export const D3Map: React.FC<D3MapProps> = ({
   );
   const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
 
+  // Preloaded pipeline options derived from preloadedPipelineData keys
+  const preloadedPipelineOptions = React.useMemo(() => {
+    if (!preloadedPipelineData) return [];
+    return Object.keys(preloadedPipelineData).map(id => ({ id, name: id }));
+  }, [preloadedPipelineData]);
+
   // Current pipeline options based on mode
-  const currentPipelineOptions = isKedroMode ? kedroOptions : staticPipelines;
+  const currentPipelineOptions = preloadedPipelineData ? preloadedPipelineOptions : isKedroMode ? kedroOptions : staticPipelines;
 
   // Auto-cycling state
   const [isAutoCycling, setIsAutoCycling] = React.useState(false);
@@ -115,7 +129,12 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Initialize selectedPipeline when pipeline options become available
   React.useEffect(() => {
     if (currentPipelineOptions.length > 0 && !selectedPipeline) {
-      if (isKedroMode) {
+      if (preloadedPipelineData) {
+        // For preloaded data, use preferred order: localmap > umap > pacmap > first key
+        const preferredOrder = ['localmap', 'umap', 'pacmap'];
+        const preferred = preferredOrder.find(id => id in preloadedPipelineData);
+        setSelectedPipeline(preferred || currentPipelineOptions[0].id);
+      } else if (isKedroMode) {
         // Prioritize preferred Kedro pipeline if available, otherwise use first
         const preferredPipeline = currentPipelineOptions.find(p => p.id === PREFERRED_KEDRO_PIPELINE);
         const defaultPipeline = preferredPipeline || currentPipelineOptions[0];
@@ -125,7 +144,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         setSelectedPipeline('localmap');
       }
     }
-  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation]);
+  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation, preloadedPipelineData]);
 
   // Handle window resize to update radius (with throttling)
   React.useEffect(() => {
@@ -148,6 +167,12 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Load projection data only if testAnimation is enabled
   React.useEffect(() => {
     if (!testAnimation) return;
+
+    // If preloaded pipeline data is provided, use it directly
+    if (preloadedPipelineData) {
+      setPipelineData(preloadedPipelineData);
+      return;
+    }
 
     const loadProjections = async () => {
       try {
@@ -197,7 +222,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
 
     loadProjections();
-  }, [testAnimation, isKedroMode, kedroOptions]);
+  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {
@@ -741,7 +766,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       <svg ref={svgRef} className="w-screen h-screen block bg-gray-100" />
 
       {/* Pipeline Selector - unified for both Kedro and static projections */}
-      {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) && (
+      {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) ? (
         <PipelineSelector
           availablePipelines={currentPipelineOptions}
           selectedPipeline={selectedPipeline}
@@ -755,9 +780,34 @@ export const D3Map: React.FC<D3MapProps> = ({
           pipelineLoadingStates={Object.fromEntries(
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
-          top="1rem"
+          onLoadFile={onLoadFile}
+          top="2.5rem"
           left="1rem"
         />
+      ) : onLoadFile && (
+        <div className="absolute flex items-center gap-1" style={{ top: '2.5rem', left: '1rem' }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLoadFile}
+            title="Import .h5ad file"
+            className="bg-white/90 backdrop-blur-sm shadow-sm"
+          >
+            <Import className="h-4 w-4 mr-1" />
+            Import .h5ad
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 bg-white/90 backdrop-blur-sm shadow-sm"
+            title="How to export .h5ad files"
+            asChild
+          >
+            <a href="https://valency-anndata-export-test.streamlit.app/" target="_blank" rel="noopener noreferrer">
+              <Info className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
       )}
 
     </div>

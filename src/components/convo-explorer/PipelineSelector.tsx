@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Combobox, type ComboboxOption } from "../ui/combobox";
 import { Button } from "../ui/button";
-import { Repeat1, Repeat } from "lucide-react";
+import { Repeat1, Repeat, Import } from "lucide-react";
 
 interface PipelineOption {
   id: string;
@@ -37,6 +37,8 @@ interface PipelineSelectorProps {
   right?: number | string;
   /** Custom positioning - bottom coordinate */
   bottom?: number | string;
+  /** Callback to trigger loading a new file */
+  onLoadFile?: () => void;
 }
 
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
@@ -54,7 +56,16 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   left = "1rem",
   right,
   bottom,
+  onLoadFile,
 }) => {
+  // Measure the longest pipeline label to set a stable combobox width
+  const longestLabel = React.useMemo(() => {
+    return availablePipelines.reduce((longest, p) => {
+      const label = `${p.name}${pipelineLoadingStates[p.id] ? " (Loading...)" : ""}`;
+      return label.length > longest.length ? label : longest;
+    }, "");
+  }, [availablePipelines, pipelineLoadingStates]);
+
   if (!enableAnimation || availablePipelines.length === 0) {
     return null;
   }
@@ -73,6 +84,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           Pipeline {isAnimating && "(Animating...)"}
         </h3>
         <div className="flex items-center gap-2">
+          <div style={{ minWidth: `${longestLabel.length + 4}ch` }}>
           <Combobox
             value={selectedPipeline}
             onValueChange={onPipelineChange}
@@ -85,8 +97,8 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             placeholder="Select pipeline..."
             searchPlaceholder="Search pipelines..."
             emptyMessage="No pipeline found."
-            className="flex-1 min-w-0"
           />
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -106,6 +118,17 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           >
             <Repeat className="h-4 w-4" />
           </Button>
+          {onLoadFile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLoadFile}
+              disabled={isAnimating}
+              title="Import a new file"
+            >
+              <Import className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>
