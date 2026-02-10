@@ -781,7 +781,7 @@ export const D3Map: React.FC<D3MapProps> = ({
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
           onLoadFile={onLoadFile}
-          top="1rem"
+          top="2.5rem"
           left="1rem"
         />
       ) : onLoadFile && (
@@ -791,7 +791,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           onClick={onLoadFile}
           title="Load .h5ad file"
           className="absolute bg-white/90 backdrop-blur-sm shadow-sm"
-          style={{ top: '1rem', left: '1rem' }}
+          style={{ top: '2.5rem', left: '1rem' }}
         >
           <Upload className="h-4 w-4 mr-1" />
           Load .h5ad
