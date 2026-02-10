@@ -6,7 +6,7 @@ import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { PipelineSelector } from "./PipelineSelector";
 import { Button } from "../ui/button";
-import { Import } from "lucide-react";
+import { Import, Info } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -785,17 +785,29 @@ export const D3Map: React.FC<D3MapProps> = ({
           left="1rem"
         />
       ) : onLoadFile && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onLoadFile}
-          title="Import .h5ad file"
-          className="absolute bg-white/90 backdrop-blur-sm shadow-sm"
-          style={{ top: '2.5rem', left: '1rem' }}
-        >
-          <Import className="h-4 w-4 mr-1" />
-          Import .h5ad
-        </Button>
+        <div className="absolute flex items-center gap-1" style={{ top: '2.5rem', left: '1rem' }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLoadFile}
+            title="Import .h5ad file"
+            className="bg-white/90 backdrop-blur-sm shadow-sm"
+          >
+            <Import className="h-4 w-4 mr-1" />
+            Import .h5ad
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 bg-white/90 backdrop-blur-sm shadow-sm"
+            title="How to export .h5ad files"
+            asChild
+          >
+            <a href="https://valency-anndata-export-test.streamlit.app/" target="_blank" rel="noopener noreferrer">
+              <Info className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
       )}
 
     </div>
