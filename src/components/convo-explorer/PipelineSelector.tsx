@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Combobox, type ComboboxOption } from "../ui/combobox";
 import { Button } from "../ui/button";
-import { Repeat1, Repeat, Upload } from "lucide-react";
+import { Repeat1, Repeat, Import } from "lucide-react";
 
 interface PipelineOption {
   id: string;
@@ -124,9 +124,9 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
               size="sm"
               onClick={onLoadFile}
               disabled={isAnimating}
-              title="Load a new file"
+              title="Import a new file"
             >
-              <Upload className="h-4 w-4" />
+              <Import className="h-4 w-4" />
             </Button>
           )}
         </div>

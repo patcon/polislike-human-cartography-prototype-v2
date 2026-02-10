@@ -6,7 +6,7 @@ import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { PipelineSelector } from "./PipelineSelector";
 import { Button } from "../ui/button";
-import { Upload } from "lucide-react";
+import { Import } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -789,12 +789,12 @@ export const D3Map: React.FC<D3MapProps> = ({
           variant="outline"
           size="sm"
           onClick={onLoadFile}
-          title="Load .h5ad file"
+          title="Import .h5ad file"
           className="absolute bg-white/90 backdrop-blur-sm shadow-sm"
           style={{ top: '2.5rem', left: '1rem' }}
         >
-          <Upload className="h-4 w-4 mr-1" />
-          Load .h5ad
+          <Import className="h-4 w-4 mr-1" />
+          Import .h5ad
         </Button>
       )}
 
