@@ -54,12 +54,12 @@ export function MetricsLayerConfig({
   return (
     <div className="grid grid-cols-2 gap-6">
       {/* Metric radio group */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-sm font-medium">Metric</Label>
         <RadioGroup
           value={config.type}
           onValueChange={handleMetricTypeChange}
-          className="space-y-2"
+          className="space-y-1"
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="vote-count" id="vote-count" />
