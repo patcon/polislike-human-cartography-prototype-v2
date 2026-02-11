@@ -73,22 +73,21 @@ export function MetricsLayerConfig({
             <Label htmlFor="principal-components" className="text-sm">
               Principal components
             </Label>
-            {config.type === "principal-components" && (
-              <div className="flex items-center space-x-2 ml-4">
-                <Label htmlFor="component-input" className="text-xs">
-                  Component:
-                </Label>
-                <Input
-                  id="component-input"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={config.type === "principal-components" ? config.component : 3}
-                  onChange={(e) => handleComponentChange(parseInt(e.target.value) || 3)}
-                  className="w-16 h-6 text-xs"
-                />
-              </div>
-            )}
+            <div className="flex items-center space-x-2 ml-4">
+              <Label htmlFor="component-input" className="text-xs">
+                Component:
+              </Label>
+              <Input
+                id="component-input"
+                type="number"
+                min="1"
+                max="10"
+                value={config.type === "principal-components" ? config.component : 3}
+                onChange={(e) => handleComponentChange(parseInt(e.target.value) || 3)}
+                disabled={config.type !== "principal-components"}
+                className="w-16 h-6 text-xs"
+              />
+            </div>
           </div>
 
           {hasObsColumns && (
