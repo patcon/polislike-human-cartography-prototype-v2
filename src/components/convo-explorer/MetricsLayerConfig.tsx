@@ -92,26 +92,22 @@ export function MetricsLayerConfig({
           </div>
 
           {hasObsColumns && (
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="obs-column" id="obs-column" />
-                <Label htmlFor="obs-column" className="text-sm">
-                  Other
-                </Label>
-              </div>
-              {config.type === "obs-column" && (
-                <div className="pl-6">
-                  <Combobox
-                    options={obsColumnKeys.map((key) => ({ value: key, label: key }))}
-                    value={config.column}
-                    onValueChange={handleObsColumnChange}
-                    placeholder="Select column..."
-                    searchPlaceholder="Search columns..."
-                    emptyMessage="No columns found."
-                    triggerClassName="h-8 text-xs"
-                  />
-                </div>
-              )}
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="obs-column" id="obs-column" />
+              <Label htmlFor="obs-column" className="text-sm">
+                Other
+              </Label>
+              <Combobox
+                options={obsColumnKeys.map((key) => ({ value: key, label: key }))}
+                value={config.type === "obs-column" ? config.column : ""}
+                onValueChange={handleObsColumnChange}
+                placeholder="Select column..."
+                searchPlaceholder="Search columns..."
+                emptyMessage="No columns found."
+                disabled={config.type !== "obs-column"}
+                className="ml-2 w-48"
+                triggerClassName="h-7 text-xs"
+              />
             </div>
           )}
         </RadioGroup>
