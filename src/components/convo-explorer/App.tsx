@@ -38,6 +38,8 @@ export type PreloadedData = {
   pipelineData?: Record<string, [string, [number, number]][]>;
   /** Full-dimension embeddings (>2D, e.g. PCA) for metrics layer */
   fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
+  /** Per-participant metadata columns from obs/ */
+  obsColumns?: Record<string, (string | number)[]>;
 };
 
 type AppProps = {
@@ -406,6 +408,67 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             });
 
             setPointMetrics(newPointMetrics);
+          } else if (metricConfig.type === "obs-column") {
+            // Load obs column metrics from preloaded data
+            if (preloadedData?.obsColumns) {
+              const columnValues = preloadedData.obsColumns[metricConfig.column];
+              if (columnValues) {
+                // Build a map from participant ID (obsNames) to value
+                // obsColumns arrays are parallel to dataset rows via obsNames ordering
+                const obsNames = preloadedData.dataset.map(([id]) => id);
+                const valueMap = new Map<string, string | number>();
+                for (let i = 0; i < obsNames.length; i++) {
+                  if (i < columnValues.length) {
+                    valueMap.set(obsNames[i], columnValues[i]);
+                  }
+                }
+
+                // Determine if numeric or categorical
+                const numericValues: number[] = [];
+                let isNumeric = true;
+                for (const v of columnValues) {
+                  if (typeof v === 'number' && !isNaN(v)) {
+                    numericValues.push(v);
+                  } else if (typeof v === 'string') {
+                    const parsed = parseFloat(v);
+                    if (!isNaN(parsed)) {
+                      numericValues.push(parsed);
+                    } else {
+                      isNumeric = false;
+                      break;
+                    }
+                  }
+                }
+
+                if (isNumeric && numericValues.length > 0) {
+                  // Numeric: normalize min-max to 0-1
+                  const min = Math.min(...numericValues);
+                  const max = Math.max(...numericValues);
+                  const range = max - min;
+
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === undefined) return null;
+                    const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+                    return range > 0 ? (num - min) / range : 0.5;
+                  });
+                  setPointMetrics(newPointMetrics);
+                } else {
+                  // Categorical: assign unique integer indices, then normalize to 0-1
+                  const uniqueValues = [...new Set(columnValues.map(String))];
+                  const valueToIndex = new Map(uniqueValues.map((v, i) => [v, i]));
+                  const maxIndex = Math.max(uniqueValues.length - 1, 1);
+
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === undefined) return null;
+                    const idx = valueToIndex.get(String(raw)) ?? 0;
+                    return idx / maxIndex;
+                  });
+                  setPointMetrics(newPointMetrics);
+                }
+              }
+            }
           } else if (metricConfig.type === "principal-components") {
             // Load principal component metrics
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
@@ -478,7 +541,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements, metricConfig]);
+  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements, metricConfig, preloadedData]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
@@ -552,6 +615,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
+
+  // Derive obs column keys from preloaded data for the "Other" metrics option
+  const obsColumnKeys = React.useMemo(() => {
+    if (!preloadedData?.obsColumns) return undefined;
+    const keys = Object.keys(preloadedData.obsColumns);
+    return keys.length > 0 ? keys : undefined;
+  }, [preloadedData?.obsColumns]);
 
   // Detect if we're on a mobile device
   const isMobile = React.useMemo(() => {
@@ -765,6 +835,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           onHighlightPassVotesChange={setHighlightPassVotes}
           metricConfig={metricConfig}
           onMetricConfigChange={setMetricConfig}
+          obsColumnKeys={obsColumnKeys}
           onClearAllColors={handleOpenClearDialog}
           // Representative statements props
           representativeStatements={representativeStatements}

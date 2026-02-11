@@ -10,6 +10,8 @@ export type H5adData = {
   allEmbeddings: Record<string, [string, [number, number]][]>;
   /** Full-dimension embeddings (>2D, e.g. PCA) keyed by pipeline-style ID */
   fullDimensionEmbeddings: Record<string, [string, number[]][]>;
+  /** Per-participant metadata columns from obs/ (excludes the index column) */
+  obsColumns: Record<string, (string | number)[]>;
 };
 
 /**
@@ -152,6 +154,31 @@ export async function loadH5adFile(
     if (!obsGroup) throw new Error('Missing /obs group');
     const obsNames = readIndex(obsGroup);
 
+    // --- Read obs columns (per-participant metadata) ---
+    const obsColumns: Record<string, (string | number)[]> = {};
+    {
+      // Determine the index column name to skip
+      let indexColumnName = '_index';
+      try {
+        const indexAttr = obsGroup.get_attribute('_index', true);
+        if (typeof indexAttr === 'string') {
+          indexColumnName = indexAttr;
+        }
+      } catch {
+        // Fall back to '_index'
+      }
+
+      for (const key of obsGroup.keys()) {
+        // Skip the index column and internal attributes
+        if (key === indexColumnName || key === '_index') continue;
+        try {
+          obsColumns[key] = readColumn(obsGroup, key);
+        } catch {
+          // Skip columns that can't be read (e.g. unsupported types)
+        }
+      }
+    }
+
     // --- Read embedding coordinates for all available embeddings ---
     const obsmGroup = file.get('obsm') as Group;
     if (!obsmGroup) throw new Error('Missing /obsm group');
@@ -252,7 +279,7 @@ export async function loadH5adFile(
     // --- Read votes from uns/votes ---
     const votesRows = readVotes(file);
 
-    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings };
+    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns };
   } finally {
     if (file) {
       file.close();

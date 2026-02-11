@@ -5,25 +5,33 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 
 export type MetricConfig =
   | { type: "vote-count"; style: "color" | "opacity" }
-  | { type: "principal-components"; component: number };
+  | { type: "principal-components"; component: number }
+  | { type: "obs-column"; column: string };
 
 type MetricsLayerConfigProps = {
   config?: MetricConfig;
   onConfigChange?: (config: MetricConfig) => void;
+  obsColumnKeys?: string[];
 };
 
 export function MetricsLayerConfig({
   config = { type: "vote-count", style: "color" },
   onConfigChange,
+  obsColumnKeys,
 }: MetricsLayerConfigProps) {
+  const hasObsColumns = obsColumnKeys && obsColumnKeys.length > 0;
+
   const handleMetricTypeChange = (newType: string) => {
     if (newType === "vote-count") {
       onConfigChange?.({ type: "vote-count", style: "color" });
     } else if (newType === "principal-components") {
       onConfigChange?.({ type: "principal-components", component: 3 });
+    } else if (newType === "obs-column" && hasObsColumns) {
+      onConfigChange?.({ type: "obs-column", column: obsColumnKeys[0] });
     }
   };
 
@@ -39,15 +47,19 @@ export function MetricsLayerConfig({
     }
   };
 
+  const handleObsColumnChange = (column: string) => {
+    onConfigChange?.({ type: "obs-column", column });
+  };
+
   return (
     <div className="grid grid-cols-2 gap-6">
       {/* Metric radio group */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-sm font-medium">Metric</Label>
         <RadioGroup
           value={config.type}
           onValueChange={handleMetricTypeChange}
-          className="space-y-2"
+          className="space-y-1"
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="vote-count" id="vote-count" />
@@ -61,23 +73,42 @@ export function MetricsLayerConfig({
             <Label htmlFor="principal-components" className="text-sm">
               Principal components
             </Label>
-            {config.type === "principal-components" && (
-              <div className="flex items-center space-x-2 ml-4">
-                <Label htmlFor="component-input" className="text-xs">
-                  Component:
-                </Label>
-                <Input
-                  id="component-input"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={config.type === "principal-components" ? config.component : 3}
-                  onChange={(e) => handleComponentChange(parseInt(e.target.value) || 3)}
-                  className="w-16 h-6 text-xs"
-                />
-              </div>
-            )}
+            <div className="flex items-center space-x-2 ml-4">
+              <Label htmlFor="component-input" className="text-xs">
+                Component:
+              </Label>
+              <Input
+                id="component-input"
+                type="number"
+                min="1"
+                max="10"
+                value={config.type === "principal-components" ? config.component : 3}
+                onChange={(e) => handleComponentChange(parseInt(e.target.value) || 3)}
+                disabled={config.type !== "principal-components"}
+                className="w-16 h-6 text-xs"
+              />
+            </div>
           </div>
+
+          {hasObsColumns && (
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="obs-column" id="obs-column" />
+              <Label htmlFor="obs-column" className="text-sm">
+                Other
+              </Label>
+              <Combobox
+                options={obsColumnKeys.map((key) => ({ value: key, label: key }))}
+                value={config.type === "obs-column" ? config.column : ""}
+                onValueChange={handleObsColumnChange}
+                placeholder="Select column..."
+                searchPlaceholder="Search columns..."
+                emptyMessage="No columns found."
+                disabled={config.type !== "obs-column"}
+                className="ml-2 w-48"
+                triggerClassName="h-7 text-xs"
+              />
+            </div>
+          )}
         </RadioGroup>
       </div>
 

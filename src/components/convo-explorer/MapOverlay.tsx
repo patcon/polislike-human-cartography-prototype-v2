@@ -33,6 +33,7 @@ type MapOverlayProps = {
   onHighlightPassVotesChange?: (value: boolean) => void;
   metricConfig?: MetricConfig;
   onMetricConfigChange?: (config: MetricConfig) => void;
+  obsColumnKeys?: string[];
   isUnpaintedGrouped?: boolean;
   onClearAllColors?: () => void;
 
@@ -72,6 +73,7 @@ export function MapOverlay({
   onHighlightPassVotesChange,
   metricConfig,
   onMetricConfigChange,
+  obsColumnKeys,
   isUnpaintedGrouped = false,
   onClearAllColors,
 
@@ -150,6 +152,7 @@ export function MapOverlay({
           onHighlightPassVotesChange={onHighlightPassVotesChange}
           metricConfig={metricConfig}
           onMetricConfigChange={onMetricConfigChange}
+          obsColumnKeys={obsColumnKeys}
         />
         <StatementExplorerDrawer
           statements={statements}
