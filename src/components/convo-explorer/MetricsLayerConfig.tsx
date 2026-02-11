@@ -5,25 +5,33 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 
 export type MetricConfig =
   | { type: "vote-count"; style: "color" | "opacity" }
-  | { type: "principal-components"; component: number };
+  | { type: "principal-components"; component: number }
+  | { type: "obs-column"; column: string };
 
 type MetricsLayerConfigProps = {
   config?: MetricConfig;
   onConfigChange?: (config: MetricConfig) => void;
+  obsColumnKeys?: string[];
 };
 
 export function MetricsLayerConfig({
   config = { type: "vote-count", style: "color" },
   onConfigChange,
+  obsColumnKeys,
 }: MetricsLayerConfigProps) {
+  const hasObsColumns = obsColumnKeys && obsColumnKeys.length > 0;
+
   const handleMetricTypeChange = (newType: string) => {
     if (newType === "vote-count") {
       onConfigChange?.({ type: "vote-count", style: "color" });
     } else if (newType === "principal-components") {
       onConfigChange?.({ type: "principal-components", component: 3 });
+    } else if (newType === "obs-column" && hasObsColumns) {
+      onConfigChange?.({ type: "obs-column", column: obsColumnKeys[0] });
     }
   };
 
@@ -37,6 +45,10 @@ export function MetricsLayerConfig({
     if (config.type === "vote-count" && (style === "color" || style === "opacity")) {
       onConfigChange?.({ type: "vote-count", style });
     }
+  };
+
+  const handleObsColumnChange = (column: string) => {
+    onConfigChange?.({ type: "obs-column", column });
   };
 
   return (
@@ -78,6 +90,30 @@ export function MetricsLayerConfig({
               </div>
             )}
           </div>
+
+          {hasObsColumns && (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="obs-column" id="obs-column" />
+                <Label htmlFor="obs-column" className="text-sm">
+                  Other
+                </Label>
+              </div>
+              {config.type === "obs-column" && (
+                <div className="pl-6">
+                  <Combobox
+                    options={obsColumnKeys.map((key) => ({ value: key, label: key }))}
+                    value={config.column}
+                    onValueChange={handleObsColumnChange}
+                    placeholder="Select column..."
+                    searchPlaceholder="Search columns..."
+                    emptyMessage="No columns found."
+                    triggerClassName="h-8 text-xs"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </RadioGroup>
       </div>
 

@@ -14,3 +14,15 @@ export const Default: Story = {
   render: () => <MetricsLayerConfig />,
 };
 
+export const WithObsColumns: Story = {
+  render: () => (
+    <MetricsLayerConfig
+      config={{ type: "obs-column", column: "cluster_label" }}
+      obsColumnKeys={["cluster_label", "n_votes", "confidence_score", "age_group"]}
+    />
+  ),
+};
+
+export const WithoutObsColumns: Story = {
+  render: () => <MetricsLayerConfig />,
+};

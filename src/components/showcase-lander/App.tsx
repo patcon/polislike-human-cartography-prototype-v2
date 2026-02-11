@@ -59,6 +59,7 @@ const App: React.FC = () => {
         votesRows: parsed.votesRows,
         pipelineData: parsed.allEmbeddings,
         fullDimensionEmbeddings: parsed.fullDimensionEmbeddings,
+        obsColumns: parsed.obsColumns,
       });
     } catch (err) {
       console.error('Failed to load h5ad file:', err);
