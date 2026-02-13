@@ -52,6 +52,13 @@ vi.mock('d3', () => {
       on: vi.fn().mockReturnThis(),
     })),
     line: vi.fn(() => vi.fn()),
+    scaleSequential: vi.fn(() => {
+      const scale = (v: number) => `rgb(${Math.round(v * 255)}, ${Math.round(v * 255)}, 255)`;
+      scale.domain = vi.fn().mockReturnValue(scale);
+      scale.interpolator = vi.fn().mockReturnValue(scale);
+      return scale;
+    }),
+    interpolateBlues: vi.fn((t) => `rgb(0, 0, ${Math.round(t * 255)})`),
   };
 });
 

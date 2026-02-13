@@ -3,6 +3,8 @@
 import * as React from "react";
 import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
+import type { ObsColumnType } from "@/lib/color-schemes";
+import { BOOLEAN_COLORS, NULL_COLOR, HIDE_NULL_POINTS, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
@@ -23,6 +25,8 @@ type D3MapProps = {
   palette?: string[];
   /** Current layer mode for determining coloring strategy */
   layerMode?: "groups" | "votes" | "metrics";
+  /** Type of the current metric, controls color scheme in metrics mode */
+  metricsType?: ObsColumnType;
   onSelectionChange?: (ids: (number | string)[]) => void;
   /** Called when exactly one point is clicked/tapped. Return false to allow event propagation. */
   onQuickSelect?: (id: string) => boolean | void;
@@ -58,6 +62,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   pointColors = [],
   palette = PALETTE_COLORS,
   layerMode = "groups",
+  metricsType = "continuous",
   onSelectionChange,
   onQuickSelect,
   onLassoStart,
@@ -245,48 +250,41 @@ export const D3Map: React.FC<D3MapProps> = ({
     return radiusMultiplier * devicePixelRatio;
   }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
 
-  // --- Color scale for metrics mode ---
-  const metricsColorScale = React.useMemo(() => {
-    const createColorScale = (
-      scheme: "gold-darkred" | "viridis" | "plasma" | "inferno" | "magma" = "gold-darkred",
-      inverse: boolean = false
-    ) => {
-      const domain = inverse ? [1, 0] : [0, 1];
-      const scale = d3.scaleSequential().domain(domain);
-
-      switch (scheme) {
-        case "viridis":
-          return scale.interpolator(d3.interpolateViridis);
-        case "plasma":
-          return scale.interpolator(d3.interpolatePlasma);
-        case "inferno":
-          return scale.interpolator(d3.interpolateInferno);
-        case "magma":
-          return scale.interpolator(d3.interpolateMagma);
-        case "gold-darkred":
-        default:
-          return scale.interpolator(d3.interpolateHcl('gold', 'darkred'));
-      }
-    };
-
-    // Change these parameters to switch color schemes and/or reverse
-    return createColorScale("plasma", true);
-  }, []);
+  // --- Color scale for continuous metrics mode ---
+  const continuousColorScale = React.useMemo(() => createContinuousScale(), []);
 
   // --- Color helper function ---
   const getPointColor = React.useCallback((colorValue: number | null) => {
+    if (layerMode === "metrics") {
+      if (colorValue == null) {
+        return HIDE_NULL_POINTS ? NULL_COLOR : NULL_COLOR;
+      }
+      switch (metricsType) {
+        case "boolean":
+          return colorValue ? BOOLEAN_COLORS.true : BOOLEAN_COLORS.false;
+        case "categorical":
+          return getCategoricalColor(colorValue);
+        case "continuous":
+        default:
+          return continuousColorScale(colorValue);
+      }
+    }
+
     if (colorValue == null) {
       return UNPAINTED_COLOR;
     }
 
-    if (layerMode === "metrics") {
-      // For metrics mode, treat colorValue as 0-1 and use custom color scale
-      return metricsColorScale(colorValue);
-    } else {
-      // For groups/votes mode, treat colorValue as palette index
-      return palette[colorValue % palette.length];
+    // For groups/votes mode, treat colorValue as palette index
+    return palette[colorValue % palette.length];
+  }, [layerMode, metricsType, palette, continuousColorScale]);
+
+  // --- Point opacity helper for null hiding in metrics mode ---
+  const getPointOpacity = React.useCallback((colorValue: number | null) => {
+    if (layerMode === "metrics" && colorValue == null && HIDE_NULL_POINTS) {
+      return 0;
     }
-  }, [layerMode, palette, metricsColorScale]);
+    return 0.9;
+  }, [layerMode]);
 
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
@@ -402,7 +400,8 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      });
+      })
+      .attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
 
     if (isAnimating) {
       const transition = updateSelection
@@ -436,7 +435,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", 0.9);
+      .attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
 
     // EXIT
     circles.exit().remove();
@@ -748,8 +747,9 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d: any) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      });
-  }, [pointColors, palette, layerMode, getPointColor]);
+      })
+      .attr("opacity", (d: any) => getPointOpacity(pointColors[d.originalIndex]));
+  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
     let inside = false;

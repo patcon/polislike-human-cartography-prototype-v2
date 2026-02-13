@@ -21,6 +21,8 @@ import { useDebugMode } from "../../hooks/useDebugMode";
 import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 import type { MetricConfig } from "./MetricsLayerConfig";
+import type { ObsColumnType } from "@/lib/color-schemes";
+import type { ObsColumnInfo } from "@/lib/h5ad-loader";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -37,8 +39,8 @@ export type PreloadedData = {
   pipelineData?: Record<string, [string, [number, number]][]>;
   /** Full-dimension embeddings (>2D, e.g. PCA) for metrics layer */
   fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
-  /** Per-participant metadata columns from obs/ */
-  obsColumns?: Record<string, (string | number)[]>;
+  /** Per-participant metadata columns from obs/ with type metadata */
+  obsColumns?: Record<string, ObsColumnInfo>;
 };
 
 type AppProps = {
@@ -92,6 +94,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Metric configuration state
   const [metricConfig, setMetricConfig] = React.useState<MetricConfig>({ type: "vote-count", style: "color" });
+
+  // Type of the current metric (drives color scheme in D3Map)
+  const [metricsType, setMetricsType] = React.useState<ObsColumnType>('continuous');
 
   // Debug mode state
   const debugMode = useDebugMode();
@@ -387,6 +392,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       const loadMetrics = async () => {
         try {
           if (metricConfig.type === "vote-count") {
+            setMetricsType('continuous');
+
             // Load vote count metrics (existing logic)
             const EXCLUDE_MODERATED_STATEMENTS = true;
             let statementIds: string[] | undefined;
@@ -408,67 +415,64 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             setPointMetrics(newPointMetrics);
           } else if (metricConfig.type === "obs-column") {
-            // Load obs column metrics from preloaded data
+            // Load obs column metrics from preloaded data using type metadata
             if (preloadedData?.obsColumns) {
-              const columnValues = preloadedData.obsColumns[metricConfig.column];
-              if (columnValues) {
-                // Build a map from participant ID (obsNames) to value
-                // obsColumns arrays are parallel to dataset rows via obsNames ordering
+              const columnInfo = preloadedData.obsColumns[metricConfig.column];
+              if (columnInfo) {
+                setMetricsType(columnInfo.type);
+
                 const obsNames = preloadedData.dataset.map(([id]) => id);
-                const valueMap = new Map<string, string | number>();
+                const valueMap = new Map<string, string | number | null>();
                 for (let i = 0; i < obsNames.length; i++) {
-                  if (i < columnValues.length) {
-                    valueMap.set(obsNames[i], columnValues[i]);
+                  if (i < columnInfo.values.length) {
+                    valueMap.set(obsNames[i], columnInfo.values[i]);
                   }
                 }
 
-                // Determine if numeric or categorical
-                const numericValues: number[] = [];
-                let isNumeric = true;
-                for (const v of columnValues) {
-                  if (typeof v === 'number' && !isNaN(v)) {
-                    numericValues.push(v);
-                  } else if (typeof v === 'string') {
-                    const parsed = parseFloat(v);
-                    if (!isNaN(parsed)) {
-                      numericValues.push(parsed);
-                    } else {
-                      isNumeric = false;
-                      break;
+                if (columnInfo.type === 'boolean') {
+                  // Boolean: true(1)→1, false(0)→0, null→null
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === null || raw === undefined) return null;
+                    return Number(raw) ? 1 : 0;
+                  });
+                  setPointMetrics(newPointMetrics);
+                } else if (columnInfo.type === 'categorical') {
+                  // Categorical: map value to its index in categories array
+                  const categories = columnInfo.categories ?? [];
+                  const categoryIndex = new Map(categories.map((c, i) => [String(c), i]));
+
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === null || raw === undefined) return null;
+                    return categoryIndex.get(String(raw)) ?? null;
+                  });
+                  setPointMetrics(newPointMetrics);
+                } else {
+                  // Continuous: min-max normalize to 0-1
+                  const numericValues: number[] = [];
+                  for (const v of columnInfo.values) {
+                    if (v !== null && typeof v === 'number' && !isNaN(v)) {
+                      numericValues.push(v);
                     }
                   }
-                }
-
-                if (isNumeric && numericValues.length > 0) {
-                  // Numeric: normalize min-max to 0-1
-                  const min = Math.min(...numericValues);
-                  const max = Math.max(...numericValues);
+                  const min = numericValues.length > 0 ? Math.min(...numericValues) : 0;
+                  const max = numericValues.length > 0 ? Math.max(...numericValues) : 1;
                   const range = max - min;
 
                   const newPointMetrics = dataset.map(([participantId]) => {
                     const raw = valueMap.get(participantId);
-                    if (raw === undefined) return null;
+                    if (raw === null || raw === undefined) return null;
                     const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+                    if (isNaN(num)) return null;
                     return range > 0 ? (num - min) / range : 0.5;
-                  });
-                  setPointMetrics(newPointMetrics);
-                } else {
-                  // Categorical: assign unique integer indices, then normalize to 0-1
-                  const uniqueValues = [...new Set(columnValues.map(String))];
-                  const valueToIndex = new Map(uniqueValues.map((v, i) => [v, i]));
-                  const maxIndex = Math.max(uniqueValues.length - 1, 1);
-
-                  const newPointMetrics = dataset.map(([participantId]) => {
-                    const raw = valueMap.get(participantId);
-                    if (raw === undefined) return null;
-                    const idx = valueToIndex.get(String(raw)) ?? 0;
-                    return idx / maxIndex;
                   });
                   setPointMetrics(newPointMetrics);
                 }
               }
             }
           } else if (metricConfig.type === "principal-components") {
+            setMetricsType('continuous');
             // Load principal component metrics
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
 
@@ -791,6 +795,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
               ) :
               PALETTE_COLORS}
             layerMode={effectiveLayerMode}
+            metricsType={metricsType}
             onSelectionChange={handleSelectionChange}
             onQuickSelect={handleQuickSelect}
             onLassoStart={handleLassoStart}

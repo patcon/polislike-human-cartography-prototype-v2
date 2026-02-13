@@ -1,5 +1,12 @@
 import type { Group, Dataset, File as H5File } from 'h5wasm';
 import h5wasm from 'h5wasm';
+import type { ObsColumnType } from './color-schemes';
+
+export type ObsColumnInfo = {
+  values: (string | number | null)[];  // null for missing/NaN
+  type: ObsColumnType;
+  categories?: (string | number)[];    // for categorical: the ordered unique values
+};
 
 export type H5adData = {
   dataset: [string, [number, number]][];
@@ -10,8 +17,8 @@ export type H5adData = {
   allEmbeddings: Record<string, [string, [number, number]][]>;
   /** Full-dimension embeddings (>2D, e.g. PCA) keyed by pipeline-style ID */
   fullDimensionEmbeddings: Record<string, [string, number[]][]>;
-  /** Per-participant metadata columns from obs/ (excludes the index column) */
-  obsColumns: Record<string, (string | number)[]>;
+  /** Per-participant metadata columns from obs/ with type metadata */
+  obsColumns: Record<string, ObsColumnInfo>;
 };
 
 /**
@@ -88,6 +95,70 @@ function readColumn(parentGroup: Group, name: string): (string | number)[] {
 }
 
 /**
+ * Read a column from an AnnData obs group with type metadata.
+ * Detects the column type from h5ad structural metadata:
+ * - Group with encoding-type=categorical → 'categorical'
+ * - Dataset with boolean dtype → 'boolean'
+ * - Dataset with float/int dtype → 'continuous'
+ */
+function readObsColumn(parentGroup: Group, name: string): ObsColumnInfo {
+  const item = parentGroup.get(name);
+  if (!item) {
+    throw new Error(`Column "${name}" not found in ${parentGroup.path}`);
+  }
+
+  // Categorical column: stored as a Group with codes + categories sub-datasets
+  if ('keys' in item && typeof (item as Group).keys === 'function') {
+    const asGroup = item as Group;
+    const groupKeys = asGroup.keys();
+    if (groupKeys.includes('codes') && groupKeys.includes('categories')) {
+      const codesDs = asGroup.get('codes') as Dataset | null;
+      const categoriesDs = asGroup.get('categories') as Dataset | null;
+      if (!codesDs || !categoriesDs) {
+        throw new Error(`Categorical column "${name}" missing codes or categories`);
+      }
+      const codes = codesDs.json_value;
+      const categories = categoriesDs.json_value;
+      if (!Array.isArray(codes) || !Array.isArray(categories)) {
+        throw new Error(`Unexpected format for categorical column "${name}"`);
+      }
+      const values = (codes as number[]).map(code => {
+        if (code < 0) return null;  // -1 codes represent NaN/missing
+        return categories[code] as string | number;
+      });
+      return {
+        values,
+        type: 'categorical',
+        categories: categories as (string | number)[],
+      };
+    }
+  }
+
+  // Plain dataset — inspect dtype to determine type
+  if ('json_value' in item) {
+    const ds = item as Dataset;
+    const val = ds.json_value;
+    if (Array.isArray(val)) {
+      // Check for boolean dtype
+      const dtype = ds.dtype;
+      if (dtype === '<b1' || dtype === '|b1' || dtype === 'bool') {
+        return {
+          values: val.map(v => (v ? 1 : 0)),
+          type: 'boolean',
+        };
+      }
+      // Otherwise continuous (int or float)
+      return {
+        values: val as (string | number | null)[],
+        type: 'continuous',
+      };
+    }
+  }
+
+  throw new Error(`Could not read column "${name}" from ${parentGroup.path}`);
+}
+
+/**
  * List available 2D embeddings in obsm/.
  * Returns keys where the second dimension is 2+ (suitable for 2D scatter plots).
  */
@@ -154,8 +225,8 @@ export async function loadH5adFile(
     if (!obsGroup) throw new Error('Missing /obs group');
     const obsNames = readIndex(obsGroup);
 
-    // --- Read obs columns (per-participant metadata) ---
-    const obsColumns: Record<string, (string | number)[]> = {};
+    // --- Read obs columns (per-participant metadata) with type detection ---
+    const obsColumns: Record<string, ObsColumnInfo> = {};
     {
       // Determine the index column name to skip
       let indexColumnName = '_index';
@@ -172,7 +243,7 @@ export async function loadH5adFile(
         // Skip the index column and internal attributes
         if (key === indexColumnName || key === '_index') continue;
         try {
-          obsColumns[key] = readColumn(obsGroup, key);
+          obsColumns[key] = readObsColumn(obsGroup, key);
         } catch {
           // Skip columns that can't be read (e.g. unsupported types)
         }
