@@ -7,7 +7,6 @@ import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
-import { PathasLogo } from "./PathasLogo";
 import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
@@ -771,8 +770,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       translate="no"
       data-notranslate="true"
     >
-      <PathasLogo />
-
       {/* D3Map: absolutely positioned to fill parent */}
       <div className="absolute inset-0 z-0">
         <div

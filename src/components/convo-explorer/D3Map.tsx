@@ -781,11 +781,11 @@ export const D3Map: React.FC<D3MapProps> = ({
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
           onLoadFile={onLoadFile}
-          top="2.5rem"
+          top="1rem"
           left="1rem"
         />
       ) : onLoadFile && (
-        <div className="absolute flex items-center gap-1" style={{ top: '2.5rem', left: '1rem' }}>
+        <div className="absolute flex items-center gap-1" style={{ top: '1rem', left: '1rem' }}>
           <Button
             variant="outline"
             size="sm"
