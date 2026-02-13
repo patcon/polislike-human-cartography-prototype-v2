@@ -29,6 +29,12 @@ The entry point `src/index.tsx` renders a showcase lander (`src/components/showc
 
 ### Data Flow
 
+- **h5ad (AnnData) mode**: Users can import `.h5ad` files via the UI. The loader (`src/lib/h5ad-loader.ts`) reads all data from a single file using h5wasm. The expected format follows the [valency-anndata data model](https://github.com/patcon/valency-anndata/blob/main/.claude/skills/valency-anndata/references/data-model.md). Key fields consumed:
+  - **obs (participants)**: Index used as participant IDs. All metadata columns are read and exposed for metrics layers.
+  - **var (statements)**: Index used as statement IDs. Reads `content` (or `txt`) for statement text, `moderation_state` (or `moderated`) for filtering.
+  - **obsm (embeddings)**: All 2D+ embeddings are loaded. The app prefers `X_localmap` > `X_umap` > `X_pacmap` as default, with a dropdown to switch. Higher-dimensional embeddings (e.g. PCA) are also stored for metrics.
+  - **uns/votes**: Raw vote events DataFrame with columns `voter-id`/`voter_id`, `comment-id`/`comment_id`, and `vote`. Values: -1=disagree, 0=pass, +1=agree.
+  - **X matrix**: Not read directly by the app (votes come from `uns/votes`).
 - **Local mode**: Loads `public/projections.json` and `public/statements.json` at startup.
 - **Kedro mode**: Fetches projection/statement data from a Kedro API (`src/lib/kedro-api.ts`). Stories pass `kedroBaseUrl` prop. URL args are encoded/decoded via helpers in `.storybook/preview.ts` to work around Storybook URL parameter limitations.
 - **DuckDB-WASM** (`src/lib/duckdb.ts`): Initialized on mount, loads votes from Parquet files, provides SQL queries for vote counts and per-participant vote data.
