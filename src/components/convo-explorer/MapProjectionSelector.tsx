@@ -1,16 +1,22 @@
 import * as React from "react";
-import { Combobox, type ComboboxOption } from "../ui/combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Button } from "../ui/button";
 import { Repeat1, Repeat, Import } from "lucide-react";
 
-interface PipelineOption {
+interface ProjectionOption {
   id: string;
   name: string;
 }
 
-interface PipelineSelectorProps {
+interface MapProjectionSelectorProps {
   /** Available pipelines for selection */
-  availablePipelines: PipelineOption[];
+  availablePipelines: ProjectionOption[];
   /** Currently selected pipeline ID */
   selectedPipeline: string;
   /** Callback when pipeline selection changes */
@@ -41,7 +47,7 @@ interface PipelineSelectorProps {
   onLoadFile?: () => void;
 }
 
-export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
+export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
   availablePipelines,
   selectedPipeline,
   onPipelineChange,
@@ -58,7 +64,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   bottom,
   onLoadFile,
 }) => {
-  // Measure the longest pipeline label to set a stable combobox width
+  // Measure the longest pipeline label to set a stable select width
   const longestLabel = React.useMemo(() => {
     return availablePipelines.reduce((longest, p) => {
       const label = `${p.name}${pipelineLoadingStates[p.id] ? " (Loading...)" : ""}`;
@@ -85,19 +91,26 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         </h3>
         <div className="flex items-center gap-2">
           <div style={{ minWidth: `${longestLabel.length + 4}ch` }}>
-          <Combobox
-            value={selectedPipeline}
-            onValueChange={onPipelineChange}
-            disabled={isAnimating}
-            options={availablePipelines.map((pipeline): ComboboxOption => ({
-              value: pipeline.id,
-              label: `${pipeline.name}${pipelineLoadingStates[pipeline.id] ? " (Loading...)" : ""}`,
-              disabled: pipelineLoadingStates[pipeline.id]
-            }))}
-            placeholder="Select pipeline..."
-            searchPlaceholder="Search pipelines..."
-            emptyMessage="No pipeline found."
-          />
+            <Select
+              value={selectedPipeline}
+              onValueChange={onPipelineChange}
+              disabled={isAnimating}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select projection..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePipelines.map((pipeline) => (
+                  <SelectItem
+                    key={pipeline.id}
+                    value={pipeline.id}
+                    disabled={pipelineLoadingStates[pipeline.id]}
+                  >
+                    {pipeline.name}{pipelineLoadingStates[pipeline.id] ? " (Loading...)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button
             variant="outline"

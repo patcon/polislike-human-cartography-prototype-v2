@@ -5,7 +5,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
-import { Combobox } from "@/components/ui/combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type MetricConfig =
   | { type: "vote-count"; style: "color" | "opacity" }
@@ -96,17 +102,22 @@ export function MetricsLayerConfig({
               <Label htmlFor="obs-column" className="text-sm">
                 Other
               </Label>
-              <Combobox
-                options={obsColumnKeys.map((key) => ({ value: key, label: key }))}
+              <Select
                 value={config.type === "obs-column" ? config.column : ""}
                 onValueChange={handleObsColumnChange}
-                placeholder="Select column..."
-                searchPlaceholder="Search columns..."
-                emptyMessage="No columns found."
                 disabled={config.type !== "obs-column"}
-                className="ml-2 w-48"
-                triggerClassName="h-7 text-xs"
-              />
+              >
+                <SelectTrigger className="ml-2 w-48 h-7 text-xs">
+                  <SelectValue placeholder="Select column..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {obsColumnKeys.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {key}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </RadioGroup>

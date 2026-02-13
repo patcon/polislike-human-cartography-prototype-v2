@@ -4,7 +4,7 @@ import * as React from "react";
 import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
-import { PipelineSelector } from "./PipelineSelector";
+import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
 import { Import, Info } from "lucide-react";
 
@@ -46,7 +46,7 @@ type D3MapProps = {
   onPipelineChange?: (pipelineId: string) => void;
   /** Preloaded pipeline data (e.g. from h5ad file) — bypasses fetch-based loading */
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
-  /** Callback to trigger loading a new file (shown as button in PipelineSelector) */
+  /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
 };
 
@@ -767,7 +767,7 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       {/* Pipeline Selector - unified for both Kedro and static projections */}
       {testAnimation && currentPipelineOptions.length > 0 && Object.values(pipelineData).some(data => data !== null) ? (
-        <PipelineSelector
+        <MapProjectionSelector
           availablePipelines={currentPipelineOptions}
           selectedPipeline={selectedPipeline}
           onPipelineChange={handlePipelineChange}

@@ -7,7 +7,7 @@ import { loadH5adFile } from '../../lib/h5ad-loader';
 /**
  * Wrapper component that provides a file picker for loading h5ad files,
  * parses them with h5wasm, and renders the App with preloaded data.
- * Embedding switching is handled by D3Map's PipelineSelector with animation.
+ * Embedding switching is handled by D3Map's MapProjectionSelector with animation.
  */
 function H5adFileLoader() {
   const [preloadedData, setPreloadedData] = React.useState<PreloadedData | null>(null);
