@@ -134,16 +134,17 @@ function readObsColumn(parentGroup: Group, name: string): ObsColumnInfo {
     }
   }
 
-  // Plain dataset — inspect dtype to determine type
+  // Plain dataset — inspect dtype and values to determine type
   if ('json_value' in item) {
     const ds = item as Dataset;
     const val = ds.json_value;
     if (Array.isArray(val)) {
-      // Check for boolean dtype
-      const dtype = ds.dtype;
-      if (dtype === '<b1' || dtype === '|b1' || dtype === 'bool') {
+      // Detect booleans: h5wasm reports dtype "unknown" for HDF5 ENUM bools,
+      // but json_value returns actual JS booleans (typeof === 'boolean')
+      const firstDefined = val.find((v: unknown) => v != null);
+      if (typeof firstDefined === 'boolean') {
         return {
-          values: val.map(v => (v ? 1 : 0)),
+          values: val.map((v: unknown) => (v ? 1 : 0)),
           type: 'boolean',
         };
       }
