@@ -565,10 +565,16 @@ export const D3Map: React.FC<D3MapProps> = ({
             lassoStateRef.current.cleanup();
           }
         }
+        // Suspend shadow filter during interaction for performance
+        container.attr("filter", null);
       })
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
         container.selectAll("circle").attr("r", BASE_RADIUS / (FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1) );
+      })
+      .on("end", () => {
+        // Restore shadow filter after interaction ends
+        container.attr("filter", "url(#softShadow)");
       });
 
     svg.call(zoom);
