@@ -48,3 +48,7 @@ export const VOTE_COLORS_HIGHLIGHT_PASS = {
     disagree: "#e74c3c",
     pass: "#f1c40f", // Yellow for highlighted pass votes
 };
+
+// Drop shadow applied to the SVG point cluster group
+export const SHADOW_BLUR = 5; // feGaussianBlur stdDeviation
+export const SHADOW_OPACITY = 0.4; // alpha channel in feColorMatrix

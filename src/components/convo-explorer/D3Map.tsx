@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, SHADOW_BLUR, SHADOW_OPACITY } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
 import { BOOLEAN_COLORS, NULL_COLOR, HIDE_NULL_POINTS, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
@@ -375,12 +375,12 @@ export const D3Map: React.FC<D3MapProps> = ({
         .attr("width", "200%").attr("height", "200%");
       filter.append("feGaussianBlur")
         .attr("in", "SourceAlpha")
-        .attr("stdDeviation", 10)
+        .attr("stdDeviation", SHADOW_BLUR)
         .attr("result", "blur");
       filter.append("feColorMatrix")
         .attr("in", "blur")
         .attr("type", "matrix")
-        .attr("values", "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0")
+        .attr("values", `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${SHADOW_OPACITY} 0`)
         .attr("result", "shadow");
       const merge = filter.append("feMerge");
       merge.append("feMergeNode").attr("in", "shadow");
