@@ -366,8 +366,29 @@ export const D3Map: React.FC<D3MapProps> = ({
     const svg = d3.select(svgRef.current);
     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
 
+    // Add shadow filter definition
+    if (!svg.select("defs#shadow-defs").node()) {
+      const defs = svg.append("defs").attr("id", "shadow-defs");
+      const filter = defs.append("filter")
+        .attr("id", "softShadow")
+        .attr("x", "-50%").attr("y", "-50%")
+        .attr("width", "200%").attr("height", "200%");
+      filter.append("feGaussianBlur")
+        .attr("in", "SourceAlpha")
+        .attr("stdDeviation", 10)
+        .attr("result", "blur");
+      filter.append("feColorMatrix")
+        .attr("in", "blur")
+        .attr("type", "matrix")
+        .attr("values", "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0")
+        .attr("result", "shadow");
+      const merge = filter.append("feMerge");
+      merge.append("feMergeNode").attr("in", "shadow");
+      merge.append("feMergeNode").attr("in", "SourceGraphic");
+    }
+
     if (!containerRef.current) {
-      containerRef.current = svg.append("g");
+      containerRef.current = svg.append("g").attr("filter", "url(#softShadow)");
     }
   }, []);
 

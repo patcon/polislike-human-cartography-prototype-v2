@@ -13,6 +13,7 @@ vi.mock('d3', () => {
       data: vi.fn().mockReturnThis(),
       enter: vi.fn(() => mockSelection),
       exit: vi.fn(() => mockSelection),
+      select: vi.fn(() => mockSelection),
       selectAll: vi.fn(() => mockSelection),
       node: vi.fn(() => null),
       on: vi.fn().mockReturnThis(),
