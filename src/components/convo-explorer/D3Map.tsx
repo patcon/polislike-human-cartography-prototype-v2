@@ -425,6 +425,9 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
 
     if (isAnimating) {
+      // Suspend shadow filter during animation for performance
+      container.attr("filter", null);
+
       const transition = updateSelection
         .transition()
         .duration(1000)
@@ -435,9 +438,11 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
         setIsAnimating(false);
+        container.attr("filter", "url(#softShadow)");
       }).catch(() => {
         // Handle case where transition is interrupted
         setIsAnimating(false);
+        container.attr("filter", "url(#softShadow)");
       });
     } else {
       updateSelection
