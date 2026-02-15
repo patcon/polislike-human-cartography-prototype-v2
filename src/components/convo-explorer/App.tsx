@@ -803,13 +803,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       translate="no"
       data-notranslate="true"
     >
-      {/* WebAssembly unavailable warning */}
-      {!wasmSupported && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-100 border-b border-amber-300 px-4 py-2 text-center text-sm text-amber-900">
-          Some features are unavailable because WebAssembly is disabled in this browser.
-          This can happen when Lockdown Mode is enabled (check both browser and device security settings).
-        </div>
-      )}
       {/* D3Map: absolutely positioned to fill parent */}
       <div className="absolute inset-0 z-0">
         <div
@@ -892,6 +885,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           // Kedro configuration props
           kedroBaseUrl={kedroBaseUrl}
           pipelineId={currentPipelineId}
+          wasmSupported={wasmSupported}
         />
       </div>
 

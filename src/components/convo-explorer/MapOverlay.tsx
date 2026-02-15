@@ -54,6 +54,9 @@ type MapOverlayProps = {
   // Kedro configuration props
   kedroBaseUrl?: string;
   pipelineId?: string;
+
+  /** Whether WebAssembly is available (false when Lockdown Mode is active) */
+  wasmSupported?: boolean;
 };
 
 export function MapOverlay({
@@ -97,6 +100,8 @@ export function MapOverlay({
   // Kedro configuration props
   kedroBaseUrl,
   pipelineId,
+
+  wasmSupported = true,
 }: MapOverlayProps) {
   // if no props passed, create local state
   const [internalAction, setInternalAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
@@ -186,6 +191,7 @@ export function MapOverlay({
           dataset={dataset}
           kedroBaseUrl={kedroBaseUrl}
           pipelineId={pipelineId}
+          wasmSupported={wasmSupported}
         />
         <AboutDialog autoOpen />
       </div>

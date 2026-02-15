@@ -75,6 +75,9 @@ type StatementExplorerDrawerProps = {
   // Kedro configuration props
   kedroBaseUrl?: string;
   pipelineId?: string;
+
+  /** Whether WebAssembly is available (false when Lockdown Mode is active) */
+  wasmSupported?: boolean;
 };
 
 export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = ({
@@ -107,6 +110,8 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Kedro configuration props
   kedroBaseUrl,
   pipelineId,
+
+  wasmSupported = true,
 }) => {
   const [internalOpen, setInternalOpen] = React.useState<boolean>(defaultOpen);
   const [internalTab, setInternalTab] = React.useState<string>(defaultTab);
@@ -398,6 +403,11 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
           </DrawerHeader>
 
           <div className="flex-1 overflow-y-auto flex flex-col">
+            {!wasmSupported && (
+              <div className="mx-4 mb-2 rounded-md bg-amber-100 border border-amber-300 px-3 py-2 text-sm text-amber-900">
+                Some features unavailable — check both browser and device Lockdown Mode.
+              </div>
+            )}
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               {/* Sticky tabs container */}
               <div className="sticky top-0 z-10 bg-white shadow-md">
