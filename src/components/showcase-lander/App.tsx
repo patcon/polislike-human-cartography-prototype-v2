@@ -3,6 +3,7 @@ import HomePage from './HomePage';
 import ParameterExplorerApp from '@/components/param-explorer/ParameterExplorerApp';
 import { App as PerspectiveMapApp } from '@/components/convo-explorer/App';
 import type { PreloadedData } from '@/components/convo-explorer/App';
+import { isWebAssemblySupported } from '@/lib/wasm-detect';
 
 type CurrentPage = 'home' | 'parameter-explorer' | 'perspective-explorer';
 
@@ -42,6 +43,14 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLoadFile = useCallback(() => {
+    if (!isWebAssemblySupported()) {
+      alert(
+        'Cannot load h5ad files because WebAssembly is disabled in this browser.\n\n' +
+        'This can happen when Lockdown Mode is enabled. ' +
+        'Please check both your browser and device security settings.'
+      );
+      return;
+    }
     fileInputRef.current?.click();
   }, []);
 
