@@ -60,6 +60,7 @@ vi.mock('d3', () => {
       return scale;
     }),
     interpolateBlues: vi.fn((t) => `rgb(0, 0, ${Math.round(t * 255)})`),
+    interpolateViridis: vi.fn((t) => `rgb(${Math.round(t * 68)}, ${Math.round(t * 1 + 84)}, ${Math.round(130 - t * 60)})`),
   };
 });
 

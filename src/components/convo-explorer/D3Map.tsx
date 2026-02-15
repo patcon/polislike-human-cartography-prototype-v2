@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, SHADOW_BLUR, SHADOW_OPACITY } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION, FEATURE_HIDE_NULL_METRICS } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
 import { BOOLEAN_COLORS, NULL_COLOR, HIDE_NULL_POINTS, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
@@ -280,7 +280,7 @@ export const D3Map: React.FC<D3MapProps> = ({
 
   // --- Point opacity helper for null hiding in metrics mode ---
   const getPointOpacity = React.useCallback((colorValue: number | null) => {
-    if (layerMode === "metrics" && colorValue == null && HIDE_NULL_POINTS) {
+    if (FEATURE_HIDE_NULL_METRICS && layerMode === "metrics" && colorValue == null && HIDE_NULL_POINTS) {
       return 0;
     }
     return 0.9;
@@ -366,29 +366,34 @@ export const D3Map: React.FC<D3MapProps> = ({
     const svg = d3.select(svgRef.current);
     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
 
-    // Add shadow filter definition
+    // Add outline filter definition (feMorphology dilate — much cheaper than blur)
     if (!svg.select("defs#shadow-defs").node()) {
       const defs = svg.append("defs").attr("id", "shadow-defs");
       const filter = defs.append("filter")
-        .attr("id", "softShadow")
-        .attr("x", "-50%").attr("y", "-50%")
-        .attr("width", "200%").attr("height", "200%");
-      filter.append("feGaussianBlur")
+        .attr("id", "clusterOutline")
+        .attr("x", "-5%").attr("y", "-5%")
+        .attr("width", "110%").attr("height", "110%");
+      filter.append("feMorphology")
         .attr("in", "SourceAlpha")
-        .attr("stdDeviation", SHADOW_BLUR)
-        .attr("result", "blur");
-      filter.append("feColorMatrix")
-        .attr("in", "blur")
-        .attr("type", "matrix")
-        .attr("values", `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${SHADOW_OPACITY} 0`)
-        .attr("result", "shadow");
+        .attr("operator", "dilate")
+        .attr("radius", OUTLINE_RADIUS)
+        .attr("result", "expanded");
+      filter.append("feFlood")
+        .attr("flood-color", "#000")
+        .attr("flood-opacity", OUTLINE_OPACITY)
+        .attr("result", "color");
+      filter.append("feComposite")
+        .attr("in", "color")
+        .attr("in2", "expanded")
+        .attr("operator", "in")
+        .attr("result", "outline");
       const merge = filter.append("feMerge");
-      merge.append("feMergeNode").attr("in", "shadow");
+      merge.append("feMergeNode").attr("in", "outline");
       merge.append("feMergeNode").attr("in", "SourceGraphic");
     }
 
     if (!containerRef.current) {
-      containerRef.current = svg.append("g").attr("filter", "url(#softShadow)");
+      containerRef.current = svg.append("g").attr("filter", "url(#clusterOutline)");
     }
   }, []);
 
@@ -421,12 +426,13 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      })
-      .attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
+      });
+    if (FEATURE_HIDE_NULL_METRICS) {
+      updateSelection.attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
+    }
 
     if (isAnimating) {
-      // Suspend shadow filter during animation for performance
-      container.attr("filter", null);
+      if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", null);
 
       const transition = updateSelection
         .transition()
@@ -438,11 +444,11 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
         setIsAnimating(false);
-        container.attr("filter", "url(#softShadow)");
+        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       }).catch(() => {
         // Handle case where transition is interrupted
         setIsAnimating(false);
-        container.attr("filter", "url(#softShadow)");
+        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       });
     } else {
       updateSelection
@@ -461,7 +467,9 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
+      .attr("opacity", FEATURE_HIDE_NULL_METRICS
+        ? (d) => getPointOpacity(pointColors[d.originalIndex])
+        : 0.9);
 
     // EXIT
     circles.exit().remove();
@@ -570,16 +578,13 @@ export const D3Map: React.FC<D3MapProps> = ({
             lassoStateRef.current.cleanup();
           }
         }
-        // Suspend shadow filter during interaction for performance
-        container.attr("filter", null);
       })
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
-        container.selectAll("circle").attr("r", BASE_RADIUS / (FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1) );
-      })
-      .on("end", () => {
-        // Restore shadow filter after interaction ends
-        container.attr("filter", "url(#softShadow)");
+        const k = FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1;
+        container.selectAll("circle").attr("r", BASE_RADIUS / k);
+        // Scale outline radius with zoom so it stays proportional to circle size
+        svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
 
     svg.call(zoom);
@@ -780,7 +785,9 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", (d: any) => getPointOpacity(pointColors[d.originalIndex]));
+      .attr("opacity", FEATURE_HIDE_NULL_METRICS
+        ? (d: any) => getPointOpacity(pointColors[d.originalIndex])
+        : 0.9);
   }, [pointColors, palette, layerMode, getPointColor, getPointOpacity]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {

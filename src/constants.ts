@@ -49,6 +49,11 @@ export const VOTE_COLORS_HIGHLIGHT_PASS = {
     pass: "#f1c40f", // Yellow for highlighted pass votes
 };
 
-// Drop shadow applied to the SVG point cluster group
-export const SHADOW_BLUR = 5; // feGaussianBlur stdDeviation
-export const SHADOW_OPACITY = 0.4; // alpha channel in feColorMatrix
+// When true, null/missing metric points get opacity 0 (hidden) instead of constant 0.9.
+// This causes per-element opacity computation which can hurt animation performance.
+export const FEATURE_HIDE_NULL_METRICS = true;
+
+// Outline applied to the SVG point cluster group (uses feMorphology dilate, not blur)
+export const OUTLINE_RADIUS = 0; // feMorphology dilate radius in px
+export const OUTLINE_OPACITY = 1; // alpha of the outline fill
+export const OUTLINE_SUSPEND_DURING_ANIMATION = true; // disable filter during projection animation for performance

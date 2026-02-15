@@ -12,7 +12,7 @@ export const HIDE_NULL_POINTS = true; // true = opacity 0, false = light gray
 
 // Continuous: light-to-dark blue
 export function createContinuousScale() {
-  return d3.scaleSequential(d3.interpolateBlues).domain([0, 1]);
+  return d3.scaleSequential(d3.interpolateViridis).domain([0, 1]);
 }
 
 // Categorical: reuses PALETTE_COLORS indexed by category code
