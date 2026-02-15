@@ -1,6 +1,7 @@
 // MetricsLayerConfig.tsx
 "use client";
 
+import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -35,13 +36,25 @@ export function MetricsLayerConfig({
 }: MetricsLayerConfigProps) {
   const hasObsColumns = obsColumnKeys && obsColumnKeys.length > 0;
 
+  // Remember the last selected obs column so it persists when switching away and back
+  const [lastObsColumn, setLastObsColumn] = React.useState<string | null>(
+    config.type === "obs-column" ? config.column : null
+  );
+
+  // Keep lastObsColumn in sync when parent changes the config to obs-column
+  React.useEffect(() => {
+    if (config.type === "obs-column") {
+      setLastObsColumn(config.column);
+    }
+  }, [config]);
+
   const handleMetricTypeChange = (newType: string) => {
     if (newType === "vote-count") {
       onConfigChange?.({ type: "vote-count", style: "color" });
     } else if (newType === "principal-components") {
       onConfigChange?.({ type: "principal-components", component: 3 });
     } else if (newType === "obs-column" && hasObsColumns) {
-      onConfigChange?.({ type: "obs-column", column: obsColumnKeys[0] });
+      onConfigChange?.({ type: "obs-column", column: lastObsColumn ?? obsColumnKeys[0] });
     }
   };
 
@@ -58,6 +71,7 @@ export function MetricsLayerConfig({
   };
 
   const handleObsColumnChange = (column: string) => {
+    setLastObsColumn(column);
     onConfigChange?.({ type: "obs-column", column });
   };
 
@@ -106,22 +120,30 @@ export function MetricsLayerConfig({
               <Label htmlFor="obs-column" className="text-sm">
                 Other
               </Label>
-              <Select
-                value={config.type === "obs-column" ? config.column : ""}
-                onValueChange={handleObsColumnChange}
-                disabled={config.type !== "obs-column"}
+              <div
+                onPointerDown={() => {
+                  if (config.type !== "obs-column") {
+                    handleMetricTypeChange("obs-column");
+                  }
+                }}
               >
-                <SelectTrigger className="ml-2 w-48 h-7 text-xs">
-                  <SelectValue placeholder="Select column..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {obsColumnKeys.map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {key}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Select
+                  value={config.type === "obs-column" ? config.column : (lastObsColumn ?? "")}
+                  onValueChange={handleObsColumnChange}
+                  disabled={config.type !== "obs-column"}
+                >
+                  <SelectTrigger className="ml-2 w-48 h-7 text-xs">
+                    <SelectValue placeholder="Select column..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {obsColumnKeys.map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {key}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </RadioGroup>
