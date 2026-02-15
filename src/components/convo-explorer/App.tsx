@@ -70,6 +70,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Current pipeline ID state - can be updated by D3Map pipeline selector
   const [currentPipelineId, setCurrentPipelineId] = React.useState<string>(initialPipelineId || 'default');
+  // Ref to read currentPipelineId without adding it to effect dependency arrays
+  // (prevents metrics/votes effects from re-running mid-animation when pipeline changes)
+  const currentPipelineIdRef = React.useRef(currentPipelineId);
+  React.useEffect(() => { currentPipelineIdRef.current = currentPipelineId; }, [currentPipelineId]);
 
   // Colors to front toggle state
   const colorsToFront = toggles.includes("colors-to-front");
@@ -357,7 +361,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         try {
           // Use the current dataset instead of loading projections from file
           const participantIds = dataset.map(([id]) => id);
-          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineId);
+          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineIdRef.current);
 
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
@@ -384,7 +388,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadVotes();
     }
-  }, [layerMode, statementId, dataset, kedroBaseUrl, currentPipelineId]);
+  }, [layerMode, statementId, dataset, kedroBaseUrl]);
 
   // Load metrics data when switching to metrics mode or when metric config changes
   React.useEffect(() => {
@@ -405,7 +409,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             const voteCounts = await getVoteCountsForAllParticipants({
               kedroBaseUrl,
-              pipelineId: currentPipelineId,
+              pipelineId: currentPipelineIdRef.current,
               statementIds
             });
 
@@ -514,7 +518,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
               }
             } else {
               // Kedro/static mode: derive PCA pipeline ID from current pipeline
-              const pipelineParts = currentPipelineId.split('_');
+              const pipelineParts = currentPipelineIdRef.current.split('_');
               let pcaPipelineId = 'mean_pca_bestkmeans'; // fallback default
 
               if (pipelineParts.length >= 3) {
@@ -523,7 +527,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
                 pcaPipelineId = `${imputer}_pca_${clustering}`;
               }
 
-              console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineId}"`);
+              console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineIdRef.current}"`);
 
               const componentValues = await getPrincipalComponentValues(componentIndex, {
                 kedroBaseUrl,
@@ -544,7 +548,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements, metricConfig, preloadedData]);
+  }, [layerMode, dataset, kedroBaseUrl, statements, metricConfig, preloadedData]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
