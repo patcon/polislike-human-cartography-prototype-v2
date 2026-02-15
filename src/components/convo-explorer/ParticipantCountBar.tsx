@@ -19,6 +19,8 @@ type ParticipantCountBarProps = {
   onUnpaintedGroupedChange?: (isGrouped: boolean) => void;
   isProportional?: boolean;
   className?: string;
+  /** Display mask parallel to pointGroups: true = visible, false = hidden. When undefined, all points counted. */
+  displayMask?: boolean[];
 };
 
 export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
@@ -27,6 +29,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   onUnpaintedGroupedChange,
   isProportional = true,
   className,
+  displayMask,
 }) => {
   // Internal state for uncontrolled mode
   const [internalIsUnpaintedGrouped, setInternalIsUnpaintedGrouped] = React.useState(false);
@@ -41,14 +44,16 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     let unpaintedGroup: PointGroupData | null = null;
     const groupCounts = new Map<number, number>();
 
-    // Count occurrences of each group
-    pointGroups.forEach(group => {
+    // Count occurrences of each group (skip masked participants)
+    pointGroups.forEach((group, i) => {
+      if (displayMask && !displayMask[i]) return;
       groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
     });
 
     // Handle unpainted group separately
     let unpaintedCount = 0;
-    pointGroups.forEach(group => {
+    pointGroups.forEach((group, i) => {
+      if (displayMask && !displayMask[i]) return;
       if (group === UNPAINTED_VALUE) {
         unpaintedCount++;
       }
@@ -75,13 +80,15 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     }
 
     return { coloredGroups, unpaintedGroup };
-  }, [pointGroups]);
+  }, [pointGroups, displayMask]);
 
   // Calculate proportional widths if needed
   const proportionalData = React.useMemo(() => {
     if (!isProportional) return null;
 
-    const totalPoints = pointGroups.length;
+    const totalPoints = displayMask
+      ? displayMask.filter(Boolean).length
+      : pointGroups.length;
     if (totalPoints === 0) return null;
 
     // Calculate total number of badges - no gaps between colored badges now
@@ -99,7 +106,9 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     } else {
       // All badges (including unpainted if grouped) share space proportionally
       // Calculate total excluding unpainted points when they're not grouped
-      const unpaintedPoints = pointGroups.filter(group => group === UNPAINTED_VALUE).length;
+      const unpaintedPoints = pointGroups.filter((group, i) =>
+        group === UNPAINTED_VALUE && (!displayMask || displayMask[i])
+      ).length;
       coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? unpaintedPoints : 0);
       availableWidthPercent = 100;
     }
@@ -122,7 +131,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
       totalBadges,
       gapWidth
     };
-  }, [groupData, isProportional, pointGroups.length, isUnpaintedGrouped]);
+  }, [groupData, isProportional, pointGroups, isUnpaintedGrouped, displayMask]);
 
   const handleUnpaintedClick = () => {
     const newValue = !isUnpaintedGrouped;

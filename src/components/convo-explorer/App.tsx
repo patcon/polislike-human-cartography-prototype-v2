@@ -868,6 +868,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           showFilteredParticipants={showFilteredParticipants}
           onShowFilteredParticipantsChange={setShowFilteredParticipants}
           onClearAllColors={handleOpenClearDialog}
+          displayMask={effectiveDisplayMask}
           // Representative statements props
           representativeStatements={representativeStatements}
           consensusStatements={consensusStatements}
@@ -890,6 +891,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             pointGroups={pointGroups}
             isProportional={true}
             isUnpaintedGrouped={isUnpaintedGrouped}
+            displayMask={effectiveDisplayMask}
             onUnpaintedGroupedChange={(newValue) => {
               setIsUnpaintedGrouped(newValue);
               // Trigger recalculation of representative statements when grouping changes

@@ -26,6 +26,8 @@ type StatementTableProps = {
   dataset?: [string, [number, number]][];
   pointGroups?: number[];
   activeColors?: number[];
+  /** Display mask parallel to pointGroups: true = visible, false = hidden. When undefined, all points counted. */
+  displayMask?: boolean[];
 
   // Vote stats props (calculated at App level)
   voteStats?: Record<number, StatementVoteStats>;
@@ -53,6 +55,7 @@ export const StatementTable: React.FC<StatementTableProps> = ({
   dataset = [],
   pointGroups = [],
   activeColors = [],
+  displayMask,
 
   // Vote stats props
   voteStats = {},
@@ -86,9 +89,10 @@ export const StatementTable: React.FC<StatementTableProps> = ({
       return undefined;
     }
 
-    // Calculate actual group sizes from pointGroups
+    // Calculate actual group sizes from pointGroups (skip masked participants)
     const groupSizes: Record<number, number> = {};
-    pointGroups.forEach(group => {
+    pointGroups.forEach((group, i) => {
+      if (displayMask && !displayMask[i]) return;
       groupSizes[group] = (groupSizes[group] || 0) + 1;
     });
 
@@ -110,7 +114,7 @@ export const StatementTable: React.FC<StatementTableProps> = ({
     });
 
     return groupVotes.length > 1 ? groupVotes : undefined;
-  }, [voteStats, dataset, pointGroups, activeColors]);
+  }, [voteStats, dataset, pointGroups, activeColors, displayMask]);
 
 
   const insertBreaks = (val: string | null | undefined) => {

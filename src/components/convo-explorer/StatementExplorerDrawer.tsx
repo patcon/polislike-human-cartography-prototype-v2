@@ -53,6 +53,8 @@ type StatementExplorerDrawerProps = {
   repStatementsError?: string | null;
   isUnpaintedGrouped?: boolean;
   pointGroups?: number[]; // Add pointGroups to check for unpainted participants
+  /** Display mask parallel to pointGroups: true = visible, false = hidden. When undefined, all points counted. */
+  displayMask?: boolean[];
 
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -84,6 +86,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   repStatementsError = null,
   isUnpaintedGrouped = false,
   pointGroups = [],
+  displayMask,
 
   open,
   onOpenChange,
@@ -230,11 +233,12 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Calculate group member counts from pointGroups (shared with convertVoteStatsToGroupVoteData)
   const groupMemberCounts = React.useMemo(() => {
     const counts: Record<number, number> = {};
-    pointGroups.forEach(group => {
+    pointGroups.forEach((group, i) => {
+      if (displayMask && !displayMask[i]) return;
       counts[group] = (counts[group] || 0) + 1;
     });
     return counts;
-  }, [pointGroups]);
+  }, [pointGroups, displayMask]);
 
   // Check if unpainted group should be shown as a tab
   const hasUnpaintedGroup = React.useMemo(() => {
@@ -485,6 +489,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                   dataset={dataset}
                   pointGroups={pointGroups}
                   activeColors={sortedColors}
+                  displayMask={displayMask}
                   // Optimization: Don't pass vote stats props to avoid calculating stats for all statements
                   // Vote stats are only needed for group tabs (representative statements) and consensus tab
                 />
@@ -543,6 +548,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               dataset={dataset}
                               pointGroups={pointGroups}
                               activeColors={sortedColors}
+                              displayMask={displayMask}
                               voteStats={voteStats}
                               loadingVoteStats={loadingVoteStats}
                               calculateVoteStatsForStatements={calculateVoteStatsForStatements}
@@ -570,6 +576,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                               dataset={dataset}
                               pointGroups={pointGroups}
                               activeColors={sortedColors}
+                              displayMask={displayMask}
                               voteStats={voteStats}
                               loadingVoteStats={loadingVoteStats}
                               calculateVoteStatsForStatements={calculateVoteStatsForStatements}
@@ -660,6 +667,7 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
                           dataset={dataset}
                           pointGroups={pointGroups}
                           activeColors={sortedColors}
+                          displayMask={displayMask}
                           voteStats={voteStats}
                           loadingVoteStats={loadingVoteStats}
                           calculateVoteStatsForStatements={calculateVoteStatsForStatements}
