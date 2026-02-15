@@ -22,12 +22,16 @@ type MetricsLayerConfigProps = {
   config?: MetricConfig;
   onConfigChange?: (config: MetricConfig) => void;
   obsColumnKeys?: string[];
+  showFilteredParticipants?: boolean;
+  onShowFilteredParticipantsChange?: (value: boolean) => void;
 };
 
 export function MetricsLayerConfig({
   config = { type: "vote-count", style: "color" },
   onConfigChange,
   obsColumnKeys,
+  showFilteredParticipants = false,
+  onShowFilteredParticipantsChange,
 }: MetricsLayerConfigProps) {
   const hasObsColumns = obsColumnKeys && obsColumnKeys.length > 0;
 
@@ -138,6 +142,17 @@ export function MetricsLayerConfig({
             Color
           </ToggleGroupItem>
         </ToggleGroup>
+        <div className="flex items-center space-x-2 mt-2">
+          <input
+            type="checkbox"
+            id="show-filtered"
+            checked={showFilteredParticipants}
+            onChange={(e) => onShowFilteredParticipantsChange?.(e.target.checked)}
+          />
+          <Label htmlFor="show-filtered" className="text-sm">
+            Show filtered participants
+          </Label>
+        </div>
       </div>
     </div>
   );

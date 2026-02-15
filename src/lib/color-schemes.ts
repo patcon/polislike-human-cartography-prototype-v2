@@ -8,7 +8,6 @@ export const BOOLEAN_COLORS = { true: "#1f77b4", false: "#d3d3d3" } as const;
 
 // Null/missing points
 export const NULL_COLOR = "#d3d3d3";
-export const HIDE_NULL_POINTS = true; // true = opacity 0, false = light gray
 
 // Continuous: light-to-dark blue
 export function createContinuousScale() {

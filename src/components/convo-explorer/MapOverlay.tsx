@@ -34,6 +34,8 @@ type MapOverlayProps = {
   metricConfig?: MetricConfig;
   onMetricConfigChange?: (config: MetricConfig) => void;
   obsColumnKeys?: string[];
+  showFilteredParticipants?: boolean;
+  onShowFilteredParticipantsChange?: (value: boolean) => void;
   isUnpaintedGrouped?: boolean;
   onClearAllColors?: () => void;
 
@@ -74,6 +76,8 @@ export function MapOverlay({
   metricConfig,
   onMetricConfigChange,
   obsColumnKeys,
+  showFilteredParticipants,
+  onShowFilteredParticipantsChange,
   isUnpaintedGrouped = false,
   onClearAllColors,
 
@@ -153,6 +157,8 @@ export function MapOverlay({
           metricConfig={metricConfig}
           onMetricConfigChange={onMetricConfigChange}
           obsColumnKeys={obsColumnKeys}
+          showFilteredParticipants={showFilteredParticipants}
+          onShowFilteredParticipantsChange={onShowFilteredParticipantsChange}
         />
         <StatementExplorerDrawer
           statements={statements}

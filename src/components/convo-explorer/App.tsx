@@ -6,7 +6,7 @@ import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
 import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
@@ -98,6 +98,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Metric configuration state
   const [metricConfig, setMetricConfig] = React.useState<MetricConfig>({ type: "vote-count", style: "color" });
+
+  // Show filtered participants toggle (display mask)
+  const [showFilteredParticipants, setShowFilteredParticipants] = React.useState(false);
 
   // Type of the current metric (drives color scheme in D3Map)
   const [metricsType, setMetricsType] = React.useState<ObsColumnType>('continuous');
@@ -624,11 +627,26 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // This avoids calculating stats for all statements when only group tab statements need them
 
   // Derive obs column keys from preloaded data for the "Other" metrics option
+  // Exclude the display mask column so it doesn't appear in the dropdown
   const obsColumnKeys = React.useMemo(() => {
     if (!preloadedData?.obsColumns) return undefined;
-    const keys = Object.keys(preloadedData.obsColumns);
+    const keys = Object.keys(preloadedData.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
     return keys.length > 0 ? keys : undefined;
   }, [preloadedData?.obsColumns]);
+
+  // Derive display mask array (parallel to dataset) from obs column
+  const displayMask = React.useMemo(() => {
+    if (!preloadedData?.obsColumns) return undefined;
+    const maskCol = preloadedData.obsColumns[DISPLAY_MASK_COLUMN];
+    if (!maskCol || maskCol.type !== 'boolean') return undefined;
+    // Build map from participant ID to mask value
+    const obsNames = preloadedData.dataset.map(([id]) => id);
+    const maskMap = new Map<string, boolean>();
+    for (let i = 0; i < obsNames.length; i++) {
+      maskMap.set(obsNames[i], maskCol.values[i] === 1);
+    }
+    return dataset.map(([id]) => maskMap.get(id) ?? false);
+  }, [preloadedData, dataset]);
 
   // Detect if we're on a mobile device
   const isMobile = React.useMemo(() => {
@@ -814,6 +832,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             onPipelineChange={handlePipelineChange}
             preloadedPipelineData={preloadedData?.pipelineData}
             onLoadFile={onLoadFile}
+            displayMask={showFilteredParticipants ? undefined : displayMask}
           />
         </div>
       </div>
@@ -842,6 +861,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           metricConfig={metricConfig}
           onMetricConfigChange={setMetricConfig}
           obsColumnKeys={obsColumnKeys}
+          showFilteredParticipants={showFilteredParticipants}
+          onShowFilteredParticipantsChange={setShowFilteredParticipants}
           onClearAllColors={handleOpenClearDialog}
           // Representative statements props
           representativeStatements={representativeStatements}

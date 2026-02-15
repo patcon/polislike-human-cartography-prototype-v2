@@ -27,6 +27,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
     metricConfig?: MetricConfig;
     onMetricConfigChange?: (config: MetricConfig) => void;
     obsColumnKeys?: string[];
+    showFilteredParticipants?: boolean;
+    onShowFilteredParticipantsChange?: (value: boolean) => void;
   };
 
   export function LayerConfigDrawer({
@@ -39,6 +41,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
     metricConfig,
     onMetricConfigChange,
     obsColumnKeys,
+    showFilteredParticipants,
+    onShowFilteredParticipantsChange,
   }: LayerConfigDrawerProps = {}) {
     // Use controlled state if provided, otherwise use internal state
     const [internalSelected, setInternalSelected] = React.useState<string>("groups");
@@ -128,6 +132,8 @@ import { SelectLayerButton } from "./SelectLayerButton";
                 config={metricConfig}
                 onConfigChange={onMetricConfigChange}
                 obsColumnKeys={obsColumnKeys}
+                showFilteredParticipants={showFilteredParticipants}
+                onShowFilteredParticipantsChange={onShowFilteredParticipantsChange}
               />
             )}
           </div>

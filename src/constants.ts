@@ -49,9 +49,9 @@ export const VOTE_COLORS_HIGHLIGHT_PASS = {
     pass: "#f1c40f", // Yellow for highlighted pass votes
 };
 
-// When true, null/missing metric points get opacity 0 (hidden) instead of constant 0.9.
-// This causes per-element opacity computation which can hurt animation performance.
-export const FEATURE_HIDE_NULL_METRICS = true;
+// Display mask: obs column name whose boolean values control point visibility
+// Points where this column is false (or missing) are hidden by default
+export const DISPLAY_MASK_COLUMN = "cluster_mask";
 
 // Outline applied to the SVG point cluster group (uses feMorphology dilate, not blur)
 export const OUTLINE_RADIUS = 0; // feMorphology dilate radius in px

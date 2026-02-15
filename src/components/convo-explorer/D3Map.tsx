@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION, FEATURE_HIDE_NULL_METRICS } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
-import { BOOLEAN_COLORS, NULL_COLOR, HIDE_NULL_POINTS, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
+import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
@@ -52,6 +52,8 @@ type D3MapProps = {
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
   /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
+  /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
+  displayMask?: boolean[];
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -77,6 +79,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   onPipelineChange,
   preloadedPipelineData,
   onLoadFile,
+  displayMask,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -257,7 +260,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   const getPointColor = React.useCallback((colorValue: number | null) => {
     if (layerMode === "metrics") {
       if (colorValue == null) {
-        return HIDE_NULL_POINTS ? NULL_COLOR : NULL_COLOR;
+        return NULL_COLOR;
       }
       switch (metricsType) {
         case "boolean":
@@ -278,13 +281,11 @@ export const D3Map: React.FC<D3MapProps> = ({
     return palette[colorValue % palette.length];
   }, [layerMode, metricsType, palette, continuousColorScale]);
 
-  // --- Point opacity helper for null hiding in metrics mode ---
-  const getPointOpacity = React.useCallback((colorValue: number | null) => {
-    if (FEATURE_HIDE_NULL_METRICS && layerMode === "metrics" && colorValue == null && HIDE_NULL_POINTS) {
-      return 0;
-    }
-    return 0.9;
-  }, [layerMode]);
+  // --- Point opacity helper for display mask ---
+  const getPointOpacity = React.useCallback((index: number) => {
+    if (displayMask && !displayMask[index]) return 0;
+    return 1;
+  }, [displayMask]);
 
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
@@ -426,10 +427,10 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      });
-    if (FEATURE_HIDE_NULL_METRICS) {
-      updateSelection.attr("opacity", (d) => getPointOpacity(pointColors[d.originalIndex]));
-    }
+      })
+      .attr("opacity", displayMask
+        ? (d) => getPointOpacity(d.originalIndex)
+        : 1);
 
     if (isAnimating) {
       if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", null);
@@ -467,9 +468,9 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", FEATURE_HIDE_NULL_METRICS
-        ? (d) => getPointOpacity(pointColors[d.originalIndex])
-        : 0.9);
+      .attr("opacity", displayMask
+        ? (d) => getPointOpacity(d.originalIndex)
+        : 1);
 
     // EXIT
     circles.exit().remove();
@@ -482,7 +483,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     } else {
       container.selectAll("circle[class^='sorted-']").remove();
     }
-  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront, BASE_RADIUS]);
+  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront, BASE_RADIUS, displayMask, getPointOpacity]);
 
   // Update existing circle radii when BASE_RADIUS changes
   React.useEffect(() => {
@@ -785,10 +786,10 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", FEATURE_HIDE_NULL_METRICS
-        ? (d: any) => getPointOpacity(pointColors[d.originalIndex])
-        : 0.9);
-  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity]);
+      .attr("opacity", displayMask
+        ? (d: any) => getPointOpacity(d.originalIndex)
+        : 1);
+  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
     let inside = false;
