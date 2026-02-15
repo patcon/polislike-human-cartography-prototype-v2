@@ -6,7 +6,7 @@ import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { FloatingModal } from "./FloatingModal";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
 import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { Spinner } from "../ui/spinner";
@@ -21,6 +21,8 @@ import { useDebugMode } from "../../hooks/useDebugMode";
 import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 import type { MetricConfig } from "./MetricsLayerConfig";
+import type { ObsColumnType } from "@/lib/color-schemes";
+import type { ObsColumnInfo } from "@/lib/h5ad-loader";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -37,8 +39,8 @@ export type PreloadedData = {
   pipelineData?: Record<string, [string, [number, number]][]>;
   /** Full-dimension embeddings (>2D, e.g. PCA) for metrics layer */
   fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
-  /** Per-participant metadata columns from obs/ */
-  obsColumns?: Record<string, (string | number)[]>;
+  /** Per-participant metadata columns from obs/ with type metadata */
+  obsColumns?: Record<string, ObsColumnInfo>;
 };
 
 type AppProps = {
@@ -68,6 +70,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Current pipeline ID state - can be updated by D3Map pipeline selector
   const [currentPipelineId, setCurrentPipelineId] = React.useState<string>(initialPipelineId || 'default');
+  // Ref to read currentPipelineId without adding it to effect dependency arrays
+  // (prevents metrics/votes effects from re-running mid-animation when pipeline changes)
+  const currentPipelineIdRef = React.useRef(currentPipelineId);
+  React.useEffect(() => { currentPipelineIdRef.current = currentPipelineId; }, [currentPipelineId]);
 
   // Colors to front toggle state
   const colorsToFront = toggles.includes("colors-to-front");
@@ -92,6 +98,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Metric configuration state
   const [metricConfig, setMetricConfig] = React.useState<MetricConfig>({ type: "vote-count", style: "color" });
+
+  // Show filtered participants toggle (display mask)
+  const [showFilteredParticipants, setShowFilteredParticipants] = React.useState(false);
+
+  // Type of the current metric (drives color scheme in D3Map)
+  const [metricsType, setMetricsType] = React.useState<ObsColumnType>('continuous');
 
   // Debug mode state
   const debugMode = useDebugMode();
@@ -352,7 +364,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         try {
           // Use the current dataset instead of loading projections from file
           const participantIds = dataset.map(([id]) => id);
-          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineId);
+          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineIdRef.current);
 
           // Create votes color indices array parallel to dataset
           const newPointVotes = dataset.map(([participantId]) => {
@@ -379,7 +391,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadVotes();
     }
-  }, [layerMode, statementId, dataset, kedroBaseUrl, currentPipelineId]);
+  }, [layerMode, statementId, dataset, kedroBaseUrl]);
 
   // Load metrics data when switching to metrics mode or when metric config changes
   React.useEffect(() => {
@@ -387,6 +399,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       const loadMetrics = async () => {
         try {
           if (metricConfig.type === "vote-count") {
+            setMetricsType('continuous');
+
             // Load vote count metrics (existing logic)
             const EXCLUDE_MODERATED_STATEMENTS = true;
             let statementIds: string[] | undefined;
@@ -398,7 +412,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             const voteCounts = await getVoteCountsForAllParticipants({
               kedroBaseUrl,
-              pipelineId: currentPipelineId,
+              pipelineId: currentPipelineIdRef.current,
               statementIds
             });
 
@@ -408,67 +422,64 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             setPointMetrics(newPointMetrics);
           } else if (metricConfig.type === "obs-column") {
-            // Load obs column metrics from preloaded data
+            // Load obs column metrics from preloaded data using type metadata
             if (preloadedData?.obsColumns) {
-              const columnValues = preloadedData.obsColumns[metricConfig.column];
-              if (columnValues) {
-                // Build a map from participant ID (obsNames) to value
-                // obsColumns arrays are parallel to dataset rows via obsNames ordering
+              const columnInfo = preloadedData.obsColumns[metricConfig.column];
+              if (columnInfo) {
+                setMetricsType(columnInfo.type);
+
                 const obsNames = preloadedData.dataset.map(([id]) => id);
-                const valueMap = new Map<string, string | number>();
+                const valueMap = new Map<string, string | number | null>();
                 for (let i = 0; i < obsNames.length; i++) {
-                  if (i < columnValues.length) {
-                    valueMap.set(obsNames[i], columnValues[i]);
+                  if (i < columnInfo.values.length) {
+                    valueMap.set(obsNames[i], columnInfo.values[i]);
                   }
                 }
 
-                // Determine if numeric or categorical
-                const numericValues: number[] = [];
-                let isNumeric = true;
-                for (const v of columnValues) {
-                  if (typeof v === 'number' && !isNaN(v)) {
-                    numericValues.push(v);
-                  } else if (typeof v === 'string') {
-                    const parsed = parseFloat(v);
-                    if (!isNaN(parsed)) {
-                      numericValues.push(parsed);
-                    } else {
-                      isNumeric = false;
-                      break;
+                if (columnInfo.type === 'boolean') {
+                  // Boolean: true(1)→1, false(0)→0, null→null
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === null || raw === undefined) return null;
+                    return Number(raw) ? 1 : 0;
+                  });
+                  setPointMetrics(newPointMetrics);
+                } else if (columnInfo.type === 'categorical') {
+                  // Categorical: map value to its index in categories array
+                  const categories = columnInfo.categories ?? [];
+                  const categoryIndex = new Map(categories.map((c, i) => [String(c), i]));
+
+                  const newPointMetrics = dataset.map(([participantId]) => {
+                    const raw = valueMap.get(participantId);
+                    if (raw === null || raw === undefined) return null;
+                    return categoryIndex.get(String(raw)) ?? null;
+                  });
+                  setPointMetrics(newPointMetrics);
+                } else {
+                  // Continuous: min-max normalize to 0-1
+                  const numericValues: number[] = [];
+                  for (const v of columnInfo.values) {
+                    if (v !== null && typeof v === 'number' && !isNaN(v)) {
+                      numericValues.push(v);
                     }
                   }
-                }
-
-                if (isNumeric && numericValues.length > 0) {
-                  // Numeric: normalize min-max to 0-1
-                  const min = Math.min(...numericValues);
-                  const max = Math.max(...numericValues);
+                  const min = numericValues.length > 0 ? Math.min(...numericValues) : 0;
+                  const max = numericValues.length > 0 ? Math.max(...numericValues) : 1;
                   const range = max - min;
 
                   const newPointMetrics = dataset.map(([participantId]) => {
                     const raw = valueMap.get(participantId);
-                    if (raw === undefined) return null;
+                    if (raw === null || raw === undefined) return null;
                     const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+                    if (isNaN(num)) return null;
                     return range > 0 ? (num - min) / range : 0.5;
-                  });
-                  setPointMetrics(newPointMetrics);
-                } else {
-                  // Categorical: assign unique integer indices, then normalize to 0-1
-                  const uniqueValues = [...new Set(columnValues.map(String))];
-                  const valueToIndex = new Map(uniqueValues.map((v, i) => [v, i]));
-                  const maxIndex = Math.max(uniqueValues.length - 1, 1);
-
-                  const newPointMetrics = dataset.map(([participantId]) => {
-                    const raw = valueMap.get(participantId);
-                    if (raw === undefined) return null;
-                    const idx = valueToIndex.get(String(raw)) ?? 0;
-                    return idx / maxIndex;
                   });
                   setPointMetrics(newPointMetrics);
                 }
               }
             }
           } else if (metricConfig.type === "principal-components") {
+            setMetricsType('continuous');
             // Load principal component metrics
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
 
@@ -510,7 +521,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
               }
             } else {
               // Kedro/static mode: derive PCA pipeline ID from current pipeline
-              const pipelineParts = currentPipelineId.split('_');
+              const pipelineParts = currentPipelineIdRef.current.split('_');
               let pcaPipelineId = 'mean_pca_bestkmeans'; // fallback default
 
               if (pipelineParts.length >= 3) {
@@ -519,7 +530,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
                 pcaPipelineId = `${imputer}_pca_${clustering}`;
               }
 
-              console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineId}"`);
+              console.log(`Using PCA pipeline "${pcaPipelineId}" derived from current pipeline "${currentPipelineIdRef.current}"`);
 
               const componentValues = await getPrincipalComponentValues(componentIndex, {
                 kedroBaseUrl,
@@ -540,12 +551,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       loadMetrics();
     }
-  }, [layerMode, dataset, kedroBaseUrl, currentPipelineId, statements, metricConfig, preloadedData]);
+  }, [layerMode, dataset, kedroBaseUrl, statements, metricConfig, preloadedData]);
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
   // Calculate representative statements
-  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean) => {
+  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean, mask?: boolean[]) => {
     if (isCalculatingRepStatements) return;
 
     // Use the provided updated groups or fall back to current state
@@ -558,7 +569,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     const statementTextMap = createStatementTextMap(statements);
 
     // Get label array for analysis - include unpainted as a group if isUnpaintedGrouped is true
-    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse);
+    // Pass display mask to exclude masked participants from analysis
+    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse, mask);
 
     // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
@@ -616,11 +628,29 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // This avoids calculating stats for all statements when only group tab statements need them
 
   // Derive obs column keys from preloaded data for the "Other" metrics option
+  // Exclude the display mask column so it doesn't appear in the dropdown
   const obsColumnKeys = React.useMemo(() => {
     if (!preloadedData?.obsColumns) return undefined;
-    const keys = Object.keys(preloadedData.obsColumns);
+    const keys = Object.keys(preloadedData.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
     return keys.length > 0 ? keys : undefined;
   }, [preloadedData?.obsColumns]);
+
+  // Derive display mask array (parallel to dataset) from obs column
+  const displayMask = React.useMemo(() => {
+    if (!preloadedData?.obsColumns) return undefined;
+    const maskCol = preloadedData.obsColumns[DISPLAY_MASK_COLUMN];
+    if (!maskCol || maskCol.type !== 'boolean') return undefined;
+    // Build map from participant ID to mask value
+    const obsNames = preloadedData.dataset.map(([id]) => id);
+    const maskMap = new Map<string, boolean>();
+    for (let i = 0; i < obsNames.length; i++) {
+      maskMap.set(obsNames[i], maskCol.values[i] === 1);
+    }
+    return dataset.map(([id]) => maskMap.get(id) ?? false);
+  }, [preloadedData, dataset]);
+
+  // Effective display mask: respects the "show filtered participants" toggle
+  const effectiveDisplayMask = showFilteredParticipants ? undefined : displayMask;
 
   // Detect if we're on a mobile device
   const isMobile = React.useMemo(() => {
@@ -668,7 +698,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       // Only trigger representative statements calculation when actual changes were made
       if (hasChanges) {
         setTimeout(() => {
-          calculateRepStatements(next);
+          calculateRepStatements(next, undefined, effectiveDisplayMask);
         }, 50);
       }
 
@@ -791,6 +821,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
               ) :
               PALETTE_COLORS}
             layerMode={effectiveLayerMode}
+            metricsType={metricsType}
             onSelectionChange={handleSelectionChange}
             onQuickSelect={handleQuickSelect}
             onLassoStart={handleLassoStart}
@@ -805,6 +836,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             onPipelineChange={handlePipelineChange}
             preloadedPipelineData={preloadedData?.pipelineData}
             onLoadFile={onLoadFile}
+            displayMask={showFilteredParticipants ? undefined : displayMask}
+            unpaintedColor={isUnpaintedGrouped ? undefined : "#cccccc"}
           />
         </div>
       </div>
@@ -833,7 +866,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           metricConfig={metricConfig}
           onMetricConfigChange={setMetricConfig}
           obsColumnKeys={obsColumnKeys}
+          showFilteredParticipants={showFilteredParticipants}
+          onShowFilteredParticipantsChange={setShowFilteredParticipants}
           onClearAllColors={handleOpenClearDialog}
+          displayMask={effectiveDisplayMask}
           // Representative statements props
           representativeStatements={representativeStatements}
           consensusStatements={consensusStatements}
@@ -856,13 +892,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             pointGroups={pointGroups}
             isProportional={true}
             isUnpaintedGrouped={isUnpaintedGrouped}
+            displayMask={effectiveDisplayMask}
             onUnpaintedGroupedChange={(newValue) => {
               setIsUnpaintedGrouped(newValue);
               // Trigger recalculation of representative statements when grouping changes
               if (pointGroups.length > 0) {
                 // Use setTimeout to ensure state update has been processed
                 setTimeout(() => {
-                  calculateRepStatements(undefined, newValue);
+                  calculateRepStatements(undefined, newValue, effectiveDisplayMask);
                 }, 50);
               }
             }}

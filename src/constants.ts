@@ -48,3 +48,12 @@ export const VOTE_COLORS_HIGHLIGHT_PASS = {
     disagree: "#e74c3c",
     pass: "#f1c40f", // Yellow for highlighted pass votes
 };
+
+// Display mask: obs column name whose boolean values control point visibility
+// Points where this column is false (or missing) are hidden by default
+export const DISPLAY_MASK_COLUMN = "cluster_mask";
+
+// Outline applied to the SVG point cluster group (uses feMorphology dilate, not blur)
+export const OUTLINE_RADIUS = 0; // feMorphology dilate radius in px
+export const OUTLINE_OPACITY = 1; // alpha of the outline fill
+export const OUTLINE_SUSPEND_DURING_ANIMATION = true; // disable filter during projection animation for performance

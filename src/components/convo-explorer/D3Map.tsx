@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import * as d3 from "d3";
-import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE } from "@/constants";
+import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION } from "@/constants";
+import type { ObsColumnType } from "@/lib/color-schemes";
+import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
@@ -23,6 +25,8 @@ type D3MapProps = {
   palette?: string[];
   /** Current layer mode for determining coloring strategy */
   layerMode?: "groups" | "votes" | "metrics";
+  /** Type of the current metric, controls color scheme in metrics mode */
+  metricsType?: ObsColumnType;
   onSelectionChange?: (ids: (number | string)[]) => void;
   /** Called when exactly one point is clicked/tapped. Return false to allow event propagation. */
   onQuickSelect?: (id: string) => boolean | void;
@@ -48,6 +52,10 @@ type D3MapProps = {
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
   /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
+  /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
+  displayMask?: boolean[];
+  /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
+  unpaintedColor?: string;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -58,6 +66,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   pointColors = [],
   palette = PALETTE_COLORS,
   layerMode = "groups",
+  metricsType = "continuous",
   onSelectionChange,
   onQuickSelect,
   onLassoStart,
@@ -72,6 +81,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   onPipelineChange,
   preloadedPipelineData,
   onLoadFile,
+  displayMask,
+  unpaintedColor = UNPAINTED_COLOR,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -245,48 +256,39 @@ export const D3Map: React.FC<D3MapProps> = ({
     return radiusMultiplier * devicePixelRatio;
   }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
 
-  // --- Color scale for metrics mode ---
-  const metricsColorScale = React.useMemo(() => {
-    const createColorScale = (
-      scheme: "gold-darkred" | "viridis" | "plasma" | "inferno" | "magma" = "gold-darkred",
-      inverse: boolean = false
-    ) => {
-      const domain = inverse ? [1, 0] : [0, 1];
-      const scale = d3.scaleSequential().domain(domain);
-
-      switch (scheme) {
-        case "viridis":
-          return scale.interpolator(d3.interpolateViridis);
-        case "plasma":
-          return scale.interpolator(d3.interpolatePlasma);
-        case "inferno":
-          return scale.interpolator(d3.interpolateInferno);
-        case "magma":
-          return scale.interpolator(d3.interpolateMagma);
-        case "gold-darkred":
-        default:
-          return scale.interpolator(d3.interpolateHcl('gold', 'darkred'));
-      }
-    };
-
-    // Change these parameters to switch color schemes and/or reverse
-    return createColorScale("plasma", true);
-  }, []);
+  // --- Color scale for continuous metrics mode ---
+  const continuousColorScale = React.useMemo(() => createContinuousScale(), []);
 
   // --- Color helper function ---
   const getPointColor = React.useCallback((colorValue: number | null) => {
-    if (colorValue == null) {
-      return UNPAINTED_COLOR;
+    if (layerMode === "metrics") {
+      if (colorValue == null) {
+        return NULL_COLOR;
+      }
+      switch (metricsType) {
+        case "boolean":
+          return colorValue ? BOOLEAN_COLORS.true : BOOLEAN_COLORS.false;
+        case "categorical":
+          return getCategoricalColor(colorValue);
+        case "continuous":
+        default:
+          return continuousColorScale(colorValue);
+      }
     }
 
-    if (layerMode === "metrics") {
-      // For metrics mode, treat colorValue as 0-1 and use custom color scale
-      return metricsColorScale(colorValue);
-    } else {
-      // For groups/votes mode, treat colorValue as palette index
-      return palette[colorValue % palette.length];
+    if (colorValue == null || colorValue === UNPAINTED_VALUE) {
+      return unpaintedColor;
     }
-  }, [layerMode, palette, metricsColorScale]);
+
+    // For groups/votes mode, treat colorValue as palette index
+    return palette[colorValue % palette.length];
+  }, [layerMode, metricsType, palette, continuousColorScale, unpaintedColor]);
+
+  // --- Point opacity helper for display mask ---
+  const getPointOpacity = React.useCallback((index: number) => {
+    if (displayMask && !displayMask[index]) return 0;
+    return 1;
+  }, [displayMask]);
 
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
@@ -368,8 +370,34 @@ export const D3Map: React.FC<D3MapProps> = ({
     const svg = d3.select(svgRef.current);
     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
 
+    // Add outline filter definition (feMorphology dilate — much cheaper than blur)
+    if (!svg.select("defs#shadow-defs").node()) {
+      const defs = svg.append("defs").attr("id", "shadow-defs");
+      const filter = defs.append("filter")
+        .attr("id", "clusterOutline")
+        .attr("x", "-5%").attr("y", "-5%")
+        .attr("width", "110%").attr("height", "110%");
+      filter.append("feMorphology")
+        .attr("in", "SourceAlpha")
+        .attr("operator", "dilate")
+        .attr("radius", OUTLINE_RADIUS)
+        .attr("result", "expanded");
+      filter.append("feFlood")
+        .attr("flood-color", "#000")
+        .attr("flood-opacity", OUTLINE_OPACITY)
+        .attr("result", "color");
+      filter.append("feComposite")
+        .attr("in", "color")
+        .attr("in2", "expanded")
+        .attr("operator", "in")
+        .attr("result", "outline");
+      const merge = filter.append("feMerge");
+      merge.append("feMergeNode").attr("in", "outline");
+      merge.append("feMergeNode").attr("in", "SourceGraphic");
+    }
+
     if (!containerRef.current) {
-      containerRef.current = svg.append("g");
+      containerRef.current = svg.append("g").attr("filter", "url(#clusterOutline)");
     }
   }, []);
 
@@ -402,9 +430,14 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      });
+      })
+      .attr("opacity", displayMask
+        ? (d) => getPointOpacity(d.originalIndex)
+        : 1);
 
     if (isAnimating) {
+      if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", null);
+
       const transition = updateSelection
         .transition()
         .duration(1000)
@@ -415,9 +448,11 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
         setIsAnimating(false);
+        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       }).catch(() => {
         // Handle case where transition is interrupted
         setIsAnimating(false);
+        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       });
     } else {
       updateSelection
@@ -436,7 +471,9 @@ export const D3Map: React.FC<D3MapProps> = ({
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
-      .attr("opacity", 0.9);
+      .attr("opacity", displayMask
+        ? (d) => getPointOpacity(d.originalIndex)
+        : 1);
 
     // EXIT
     circles.exit().remove();
@@ -449,7 +486,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     } else {
       container.selectAll("circle[class^='sorted-']").remove();
     }
-  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront, BASE_RADIUS]);
+  }, [points, xScale, yScale, pointColors, palette, isAnimating, colorsToFront, BASE_RADIUS, displayMask, getPointOpacity]);
 
   // Update existing circle radii when BASE_RADIUS changes
   React.useEffect(() => {
@@ -548,7 +585,10 @@ export const D3Map: React.FC<D3MapProps> = ({
       })
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
-        container.selectAll("circle").attr("r", BASE_RADIUS / (FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1) );
+        const k = FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1;
+        container.selectAll("circle").attr("r", BASE_RADIUS / k);
+        // Scale outline radius with zoom so it stays proportional to circle size
+        svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
 
     svg.call(zoom);
@@ -590,6 +630,13 @@ export const D3Map: React.FC<D3MapProps> = ({
         const p = quadtree.find(x, y, radius);
 
         if (p) {
+          // Skip masked points
+          if (displayMask && !displayMask[p.originalIndex]) {
+            startPos = null;
+            startTime = 0;
+            return;
+          }
+
           console.log('🎯 Quick select found point:', p.i);
 
           // Call the quick select callback
@@ -618,7 +665,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       svgNode.removeEventListener("pointerdown", handlePointerDown, true);
       svgNode.removeEventListener("pointerup", handlePointerUp, true);
     };
-  }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect]);
+  }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect, displayMask]);
 
   // --- Lasso painting ---
   React.useEffect(() => {
@@ -697,6 +744,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         const transform = d3.zoomTransform(container.node()!);
         const circles = container.selectAll("circle");
         const selected = circles.data().filter((d: any) => {
+          if (displayMask && !displayMask[d.originalIndex]) return false;
           const sx = transform.applyX((container as any).xScale(d.x));
           const sy = transform.applyY((container as any).yScale(d.y));
           return pointInPolygon([sx, sy], lassoStateRef.current.coords);
@@ -738,7 +786,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Clear cleanup function when not in paint mode
       lassoStateRef.current.cleanup = null;
     }
-  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd]);
+  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {
@@ -748,8 +796,11 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("fill", (d: any) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
-      });
-  }, [pointColors, palette, layerMode, getPointColor]);
+      })
+      .attr("opacity", displayMask
+        ? (d: any) => getPointOpacity(d.originalIndex)
+        : 1);
+  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask, unpaintedColor]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
     let inside = false;

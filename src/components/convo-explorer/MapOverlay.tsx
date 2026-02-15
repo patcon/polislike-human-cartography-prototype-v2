@@ -34,7 +34,11 @@ type MapOverlayProps = {
   metricConfig?: MetricConfig;
   onMetricConfigChange?: (config: MetricConfig) => void;
   obsColumnKeys?: string[];
+  showFilteredParticipants?: boolean;
+  onShowFilteredParticipantsChange?: (value: boolean) => void;
   isUnpaintedGrouped?: boolean;
+  /** Display mask parallel to pointGroups for filtering counts */
+  displayMask?: boolean[];
   onClearAllColors?: () => void;
 
   // Representative statements props
@@ -74,7 +78,10 @@ export function MapOverlay({
   metricConfig,
   onMetricConfigChange,
   obsColumnKeys,
+  showFilteredParticipants,
+  onShowFilteredParticipantsChange,
   isUnpaintedGrouped = false,
+  displayMask,
   onClearAllColors,
 
   // Representative statements props
@@ -117,13 +124,17 @@ export function MapOverlay({
 
   // --- NEW: compute activeColors from pointGroups ---
   const activeColors = React.useMemo(() => {
-    const filtered = pointGroups.filter((x): x is number => x !== UNPAINTED_VALUE);
+    const filtered = pointGroups.filter((x, i): x is number =>
+      x !== UNPAINTED_VALUE && (!displayMask || displayMask[i])
+    );
     const unique = [...new Set(filtered)];
-    const hasUnpainted = pointGroups.some(group => group === UNPAINTED_VALUE);
+    const hasUnpainted = pointGroups.some((group, i) =>
+      group === UNPAINTED_VALUE && (!displayMask || displayMask[i])
+    );
 
-    // Include UNPAINTED_VALUE in activeColors if there are unpainted points
+    // Include UNPAINTED_VALUE in activeColors if there are visible unpainted points
     return hasUnpainted ? [...unique, UNPAINTED_VALUE] : unique;
-  }, [pointGroups]);
+  }, [pointGroups, displayMask]);
 
   // Handle statement row click
   const handleStatementClick = React.useCallback((statementId: number) => {
@@ -153,6 +164,8 @@ export function MapOverlay({
           metricConfig={metricConfig}
           onMetricConfigChange={onMetricConfigChange}
           obsColumnKeys={obsColumnKeys}
+          showFilteredParticipants={showFilteredParticipants}
+          onShowFilteredParticipantsChange={onShowFilteredParticipantsChange}
         />
         <StatementExplorerDrawer
           statements={statements}
@@ -163,6 +176,7 @@ export function MapOverlay({
           repStatementsError={repStatementsError}
           isUnpaintedGrouped={isUnpaintedGrouped}
           pointGroups={pointGroups}
+          displayMask={displayMask}
           open={drawerOpen}
           onOpenChange={handleDrawerOpenChange}
           tabValue={drawerTab}

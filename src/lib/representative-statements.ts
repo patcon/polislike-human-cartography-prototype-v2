@@ -97,11 +97,17 @@ export function createStatementTextMap(
  */
 export function getLabelArrayWithOptionalUngrouped(
   colorByIndex: number[],
-  includeUnpainted: boolean = false
+  includeUnpainted: boolean = false,
+  displayMask?: boolean[]
 ): (string | null)[] {
   const labels: (string | null)[] = [];
 
   for (let i = 0; i < colorByIndex.length; i++) {
+    // Exclude masked participants from analysis
+    if (displayMask && !displayMask[i]) {
+      labels.push(null);
+      continue;
+    }
     const colorIndex = colorByIndex[i];
     // Include unpainted points as a group if requested, otherwise exclude them
     if (colorIndex === UNPAINTED_VALUE && !includeUnpainted) {

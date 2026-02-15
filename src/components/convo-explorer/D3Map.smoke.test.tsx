@@ -13,6 +13,7 @@ vi.mock('d3', () => {
       data: vi.fn().mockReturnThis(),
       enter: vi.fn(() => mockSelection),
       exit: vi.fn(() => mockSelection),
+      select: vi.fn(() => mockSelection),
       selectAll: vi.fn(() => mockSelection),
       node: vi.fn(() => null),
       on: vi.fn().mockReturnThis(),
@@ -52,6 +53,14 @@ vi.mock('d3', () => {
       on: vi.fn().mockReturnThis(),
     })),
     line: vi.fn(() => vi.fn()),
+    scaleSequential: vi.fn(() => {
+      const scale = (v: number) => `rgb(${Math.round(v * 255)}, ${Math.round(v * 255)}, 255)`;
+      scale.domain = vi.fn().mockReturnValue(scale);
+      scale.interpolator = vi.fn().mockReturnValue(scale);
+      return scale;
+    }),
+    interpolateBlues: vi.fn((t) => `rgb(0, 0, ${Math.round(t * 255)})`),
+    interpolateViridis: vi.fn((t) => `rgb(${Math.round(t * 68)}, ${Math.round(t * 1 + 84)}, ${Math.round(130 - t * 60)})`),
   };
 });
 
