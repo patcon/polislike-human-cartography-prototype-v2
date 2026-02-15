@@ -54,6 +54,8 @@ type D3MapProps = {
   onLoadFile?: () => void;
   /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
   displayMask?: boolean[];
+  /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
+  unpaintedColor?: string;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -80,6 +82,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   preloadedPipelineData,
   onLoadFile,
   displayMask,
+  unpaintedColor = UNPAINTED_COLOR,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -273,13 +276,13 @@ export const D3Map: React.FC<D3MapProps> = ({
       }
     }
 
-    if (colorValue == null) {
-      return UNPAINTED_COLOR;
+    if (colorValue == null || colorValue === UNPAINTED_VALUE) {
+      return unpaintedColor;
     }
 
     // For groups/votes mode, treat colorValue as palette index
     return palette[colorValue % palette.length];
-  }, [layerMode, metricsType, palette, continuousColorScale]);
+  }, [layerMode, metricsType, palette, continuousColorScale, unpaintedColor]);
 
   // --- Point opacity helper for display mask ---
   const getPointOpacity = React.useCallback((index: number) => {
@@ -797,7 +800,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("opacity", displayMask
         ? (d: any) => getPointOpacity(d.originalIndex)
         : 1);
-  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask]);
+  }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask, unpaintedColor]);
 
   function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
     let inside = false;

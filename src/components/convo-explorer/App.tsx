@@ -837,6 +837,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             preloadedPipelineData={preloadedData?.pipelineData}
             onLoadFile={onLoadFile}
             displayMask={showFilteredParticipants ? undefined : displayMask}
+            unpaintedColor={isUnpaintedGrouped ? undefined : "#cccccc"}
           />
         </div>
       </div>
