@@ -627,6 +627,13 @@ export const D3Map: React.FC<D3MapProps> = ({
         const p = quadtree.find(x, y, radius);
 
         if (p) {
+          // Skip masked points
+          if (displayMask && !displayMask[p.originalIndex]) {
+            startPos = null;
+            startTime = 0;
+            return;
+          }
+
           console.log('🎯 Quick select found point:', p.i);
 
           // Call the quick select callback
@@ -655,7 +662,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       svgNode.removeEventListener("pointerdown", handlePointerDown, true);
       svgNode.removeEventListener("pointerup", handlePointerUp, true);
     };
-  }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect]);
+  }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect, displayMask]);
 
   // --- Lasso painting ---
   React.useEffect(() => {
@@ -734,6 +741,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         const transform = d3.zoomTransform(container.node()!);
         const circles = container.selectAll("circle");
         const selected = circles.data().filter((d: any) => {
+          if (displayMask && !displayMask[d.originalIndex]) return false;
           const sx = transform.applyX((container as any).xScale(d.x));
           const sy = transform.applyY((container as any).yScale(d.y));
           return pointInPolygon([sx, sy], lassoStateRef.current.coords);
@@ -775,7 +783,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Clear cleanup function when not in paint mode
       lassoStateRef.current.cleanup = null;
     }
-  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd]);
+  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {

@@ -556,7 +556,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
   // Calculate representative statements
-  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean) => {
+  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean, mask?: boolean[]) => {
     if (isCalculatingRepStatements) return;
 
     // Use the provided updated groups or fall back to current state
@@ -569,7 +569,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     const statementTextMap = createStatementTextMap(statements);
 
     // Get label array for analysis - include unpainted as a group if isUnpaintedGrouped is true
-    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse);
+    // Pass display mask to exclude masked participants from analysis
+    const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse, mask);
 
     // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
@@ -648,6 +649,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     return dataset.map(([id]) => maskMap.get(id) ?? false);
   }, [preloadedData, dataset]);
 
+  // Effective display mask: respects the "show filtered participants" toggle
+  const effectiveDisplayMask = showFilteredParticipants ? undefined : displayMask;
+
   // Detect if we're on a mobile device
   const isMobile = React.useMemo(() => {
     // Check for touch capability and mobile user agents
@@ -694,7 +698,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       // Only trigger representative statements calculation when actual changes were made
       if (hasChanges) {
         setTimeout(() => {
-          calculateRepStatements(next);
+          calculateRepStatements(next, undefined, effectiveDisplayMask);
         }, 50);
       }
 
@@ -892,7 +896,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
               if (pointGroups.length > 0) {
                 // Use setTimeout to ensure state update has been processed
                 setTimeout(() => {
-                  calculateRepStatements(undefined, newValue);
+                  calculateRepStatements(undefined, newValue, effectiveDisplayMask);
                 }, 50);
               }
             }}
