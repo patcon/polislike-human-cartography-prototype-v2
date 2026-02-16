@@ -14,6 +14,7 @@ type ProjectionData = [string, [number, number]][];
 
 
 const FEATURE_SCALE_RADIUS_ON_ZOOM = true;
+const MIN_CIRCLE_RADIUS = 0.5; // prevent sub-pixel circles that vanish on mobile
 
 type D3MapProps = {
   /** Dataset points in the format [[i, [x, y]], ...] */
@@ -371,7 +372,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
 
     // Add outline filter definition (feMorphology dilate — much cheaper than blur)
-    if (!svg.select("defs#shadow-defs").node()) {
+    if (OUTLINE_RADIUS > 0 && !svg.select("defs#shadow-defs").node()) {
       const defs = svg.append("defs").attr("id", "shadow-defs");
       const filter = defs.append("filter")
         .attr("id", "clusterOutline")
@@ -397,7 +398,9 @@ export const D3Map: React.FC<D3MapProps> = ({
     }
 
     if (!containerRef.current) {
-      containerRef.current = svg.append("g").attr("filter", "url(#clusterOutline)");
+      const g = svg.append("g");
+      if (OUTLINE_RADIUS > 0) g.attr("filter", "url(#clusterOutline)");
+      containerRef.current = g;
     }
   }, []);
 
@@ -426,7 +429,7 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     // UPDATE with animation
     const updateSelection = circles
-      .attr("r", BASE_RADIUS / transformK)
+      .attr("r", Math.max(BASE_RADIUS / transformK, MIN_CIRCLE_RADIUS))
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
@@ -436,7 +439,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         : 1);
 
     if (isAnimating) {
-      if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", null);
+      if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", null);
 
       const transition = updateSelection
         .transition()
@@ -448,11 +451,11 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
         setIsAnimating(false);
-        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
+        if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       }).catch(() => {
         // Handle case where transition is interrupted
         setIsAnimating(false);
-        if (OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
+        if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       });
     } else {
       updateSelection
@@ -466,7 +469,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("class", colorsToFront ? `sorted-${pointColorsHash.length}` : "original")
       .attr("cx", d => xScale(d.x))
       .attr("cy", d => yScale(d.y))
-      .attr("r", BASE_RADIUS / transformK)
+      .attr("r", Math.max(BASE_RADIUS / transformK, MIN_CIRCLE_RADIUS))
       .attr("fill", (d) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
@@ -496,7 +499,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     const transformK = FEATURE_SCALE_RADIUS_ON_ZOOM ? transform.k : 1;
 
     containerRef.current.selectAll("circle")
-      .attr("r", BASE_RADIUS / transformK);
+      .attr("r", Math.max(BASE_RADIUS / transformK, MIN_CIRCLE_RADIUS));
   }, [BASE_RADIUS]);
 
   // Handle pipeline change with animation (works for both Kedro and static)
@@ -586,9 +589,9 @@ export const D3Map: React.FC<D3MapProps> = ({
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
         const k = FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1;
-        container.selectAll("circle").attr("r", BASE_RADIUS / k);
+        container.selectAll("circle").attr("r", Math.max(BASE_RADIUS / k, MIN_CIRCLE_RADIUS));
         // Scale outline radius with zoom so it stays proportional to circle size
-        svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
+        if (OUTLINE_RADIUS > 0) svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
 
     svg.call(zoom);
