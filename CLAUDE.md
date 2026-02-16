@@ -10,6 +10,7 @@ A map-like interface for exploring perspective maps built from polis-like opinio
 
 ```bash
 npm run dev          # Start Vite dev server
+npm run dev:tunnel   # Start Vite + localtunnel for mobile testing
 npm run build        # TypeScript check + Vite production build
 npm run lint         # ESLint (flat config, TS/TSX files)
 npm run test         # Vitest in watch mode (jsdom environment)

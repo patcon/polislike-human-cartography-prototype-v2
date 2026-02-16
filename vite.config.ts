@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    server: {
+      allowedHosts: ['polislike-human-cartography-prototype-v2.loca.lt'],
+    },
     test: {
       globals: true,
       environment: 'jsdom',
