@@ -9,6 +9,9 @@
   - Prev/next arrows (and ←/→ keyboard shortcuts) cycle through available obs columns, updating the active annotation.
   - X button returns to the groups layer, matching the statement-modal behavior.
   - Extended `FloatingModal` with optional `title` and `legendItems` props for the annotation rendering path; existing statement rendering is unchanged.
+  - Categorical annotation layers use a dedicated Tableau 20 palette (20 colors) separate from the 10-color painting palette, giving more range without affecting group colors.
+  - Legend is hidden for columns with >65 categories (e.g. timestamps, UUIDs) — only the column title is shown, matching continuous column behavior.
+  - Blank category labels are displayed as **N/A**.
 - Prev/next navigation buttons on `FloatingModal` for touch-friendly statement cycling in votes layer mode ([#27](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/27)).
   - Extracted shared `cycleStatement` callback so keyboard arrow keys and buttons use the same logic.
   - `onPrev` / `onNext` are optional injected props — buttons only render when provided, keeping the modal reusable for other contexts.
