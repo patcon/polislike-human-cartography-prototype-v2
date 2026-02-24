@@ -4,7 +4,6 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -64,11 +63,11 @@ export function MetricsLayerConfig({
     }
   };
 
-  const handleStyleChange = (style: string) => {
-    if (config.type === "vote-count" && (style === "color" || style === "opacity")) {
-      onConfigChange?.({ type: "vote-count", style });
-    }
-  };
+  // const handleStyleChange = (style: string) => {
+  //   if (config.type === "vote-count" && (style === "color" || style === "opacity")) {
+  //     onConfigChange?.({ type: "vote-count", style });
+  //   }
+  // };
 
   const handleObsColumnChange = (column: string) => {
     setLastObsColumn(column);
