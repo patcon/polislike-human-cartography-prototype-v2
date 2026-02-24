@@ -317,7 +317,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     if (!preloadedData?.obsColumns) return undefined;
     const columnInfo = preloadedData.obsColumns[metricConfig.column];
     if (!columnInfo || columnInfo.type !== 'categorical') return undefined;
-    return (columnInfo.categories ?? []).map((cat, i) => ({
+    const categories = columnInfo.categories ?? [];
+    // Hide legend when there are too many categories to be useful
+    if (categories.length > 65) return undefined;
+    return categories.map((cat, i) => ({
       label: String(cat),
       color: getCategoricalColor(i),
     }));
