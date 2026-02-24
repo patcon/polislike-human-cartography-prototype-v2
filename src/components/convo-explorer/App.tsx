@@ -23,7 +23,7 @@ import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 import type { MetricConfig } from "./MetricsLayerConfig";
 import type { ObsColumnType } from "@/lib/color-schemes";
-import { getCategoricalColor } from "@/lib/color-schemes";
+import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import type { ObsColumnInfo } from "@/lib/h5ad-loader";
 
 // Helper function for ID matching - can be optimized later for performance
@@ -322,7 +322,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     if (categories.length > 65) return undefined;
     return categories.map((cat, i) => ({
       label: String(cat),
-      color: getCategoricalColor(i),
+      color: getAnnotationCategoricalColor(i),
     }));
   }, [metricConfig, preloadedData?.obsColumns]);
 

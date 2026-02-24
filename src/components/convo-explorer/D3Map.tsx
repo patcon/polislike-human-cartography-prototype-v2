@@ -4,7 +4,7 @@ import * as React from "react";
 import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
-import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getCategoricalColor } from "@/lib/color-schemes";
+import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
@@ -270,7 +270,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         case "boolean":
           return colorValue ? BOOLEAN_COLORS.true : BOOLEAN_COLORS.false;
         case "categorical":
-          return getCategoricalColor(colorValue);
+          return getAnnotationCategoricalColor(colorValue);
         case "continuous":
         default:
           return continuousColorScale(colorValue);
