@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card } from "@/components/ui/card";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 type Statement = {
   txt: string;
@@ -14,10 +14,12 @@ type FloatingModalProps = {
   statement: Statement;
   isVisible?: boolean;
   onClose?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
 } & React.ComponentPropsWithoutRef<typeof Card>;
 
 export const FloatingModal = React.forwardRef<HTMLDivElement, FloatingModalProps>(
-  ({ statement, isVisible = true, onClose, className, ...props }, ref) => {
+  ({ statement, isVisible = true, onClose, onPrev, onNext, className, ...props }, ref) => {
     if (!isVisible) return null;
 
     const insertBreaks = (val: string | null | undefined) => {
@@ -46,8 +48,30 @@ export const FloatingModal = React.forwardRef<HTMLDivElement, FloatingModalProps
           </button>
         )}
 
+        {/* Prev button */}
+        {onPrev && (
+          <button
+            onClick={onPrev}
+            aria-label="Previous statement"
+            className="absolute left-2 top-10 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus:outline-none"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* Next button */}
+        {onNext && (
+          <button
+            onClick={onNext}
+            aria-label="Next statement"
+            className="absolute right-2 top-10 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus:outline-none"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+
         {/* Statement content */}
-        <div className={`flex items-start gap-3 ${onClose ? 'pr-8' : ''}`}>
+        <div className={`flex items-start gap-3 ${onPrev ? 'pl-8' : ''} ${(onClose || onNext) ? 'pr-8' : ''}`}>
           {/* Statement ID */}
           <div className="flex-shrink-0 pt-0.5">
             <span className="text-gray-400 text-[12px] font-mono w-10 inline-block text-right">

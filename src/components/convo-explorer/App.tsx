@@ -291,6 +291,16 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [currentDisplayState, currentPipelineId]);
 
+  const cycleStatement = React.useCallback((direction: 'prev' | 'next') => {
+    if (statements.length === 0) return;
+    const currentIndex = statements.findIndex(s => String(s.statement_id) === statementId);
+    if (currentIndex === -1) return;
+    const newIndex = direction === 'prev'
+      ? (currentIndex === 0 ? statements.length - 1 : currentIndex - 1)
+      : (currentIndex === statements.length - 1 ? 0 : currentIndex + 1);
+    setStatementId(String(statements[newIndex].statement_id));
+  }, [statements, statementId]);
+
   // Keyboard shortcuts for color selection and statement navigation
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -304,23 +314,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       // Handle left/right arrow keys for statement navigation when votes layer is active
       if (layerMode === "votes" && statements.length > 0) {
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-          // Find current statement index
-          const currentIndex = statements.findIndex(s => String(s.statement_id) === statementId);
-
-          if (currentIndex !== -1) {
-            let newIndex;
-            if (event.key === 'ArrowLeft') {
-              // Go to previous statement (wrap around to end if at beginning)
-              newIndex = currentIndex === 0 ? statements.length - 1 : currentIndex - 1;
-            } else {
-              // Go to next statement (wrap around to beginning if at end)
-              newIndex = currentIndex === statements.length - 1 ? 0 : currentIndex + 1;
-            }
-
-            const newStatementId = String(statements[newIndex].statement_id);
-            setStatementId(newStatementId);
-            event.preventDefault();
-          }
+          cycleStatement(event.key === 'ArrowLeft' ? 'prev' : 'next');
+          event.preventDefault();
           return;
         }
       }
@@ -347,7 +342,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [layerMode, statements, statementId]);
+  }, [layerMode, statements, statementId, cycleStatement]);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
@@ -928,6 +923,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           })()}
           isVisible={true}
           onClose={() => setLayerMode("groups")}
+          onPrev={() => cycleStatement('prev')}
+          onNext={() => cycleStatement('next')}
         />
       )}
 
