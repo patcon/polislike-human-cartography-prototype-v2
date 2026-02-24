@@ -151,8 +151,8 @@ export function MetricsLayerConfig({
 
       {/* Style toggle group */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Style</Label>
-        <ToggleGroup
+        <Label className="text-sm font-medium">Options</Label>
+        {/*<ToggleGroup
           type="single" // ensures only one at a time
           variant="outline"
           value={config.type === "vote-count" ? config.style : "color"}
@@ -163,7 +163,7 @@ export function MetricsLayerConfig({
           <ToggleGroupItem value="color">
             Color
           </ToggleGroupItem>
-        </ToggleGroup>
+        </ToggleGroup>*/}
         <div className="flex items-center space-x-2 mt-2">
           <input
             type="checkbox"
