@@ -82,7 +82,7 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
     return { coloredGroups, unpaintedGroup };
   }, [pointGroups, displayMask]);
 
-  // Calculate proportional widths if needed
+  // Calculate group data from pointGroups (kept for compatibility; widthPercent unused in proportional render)
   const proportionalData = React.useMemo(() => {
     if (!isProportional) return null;
 
@@ -91,47 +91,11 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
       : pointGroups.length;
     if (totalPoints === 0) return null;
 
-    // Calculate total number of badges - no gaps between colored badges now
-    const totalBadges = groupData.coloredGroups.length + (groupData.unpaintedGroup ? 1 : 0);
-    const gapWidth = 4; // gap-1 = 4px in Tailwind (only between colored group and unpainted group)
-
-    // When unpainted is not grouped, it takes minimal space, colored badges divide the rest
-    let coloredPointsTotal: number;
-    let availableWidthPercent: number;
-
-    if (groupData.unpaintedGroup && !isUnpaintedGrouped) {
-      // Unpainted badge takes minimal space, colored badges get proportional share of remaining space
-      coloredPointsTotal = groupData.coloredGroups.reduce((sum, group) => sum + group.count, 0);
-      availableWidthPercent = 100; // Colored badges will use flex-grow to fill remaining space
-    } else {
-      // All badges (including unpainted if grouped) share space proportionally
-      // Calculate total excluding unpainted points when they're not grouped
-      const unpaintedPoints = pointGroups.filter((group, i) =>
-        group === UNPAINTED_VALUE && (!displayMask || displayMask[i])
-      ).length;
-      coloredPointsTotal = totalPoints - (groupData.unpaintedGroup && !isUnpaintedGrouped ? unpaintedPoints : 0);
-      availableWidthPercent = 100;
-    }
-
-    const coloredGroupsWithWidth = groupData.coloredGroups.map(group => ({
-      ...group,
-      widthPercent: coloredPointsTotal > 0 ? (group.count / coloredPointsTotal) * availableWidthPercent : 0,
-      useFlexGrow: groupData.unpaintedGroup && !isUnpaintedGrouped, // Use flex-grow when unpainted is minimal
-    }));
-
-    const unpaintedGroupWithWidth = groupData.unpaintedGroup ? {
-      ...groupData.unpaintedGroup,
-      widthPercent: isUnpaintedGrouped ? (groupData.unpaintedGroup.count / totalPoints) * availableWidthPercent : 0,
-      useMinimalWidth: !isUnpaintedGrouped,
-    } : null;
-
     return {
-      coloredGroups: coloredGroupsWithWidth,
-      unpaintedGroup: unpaintedGroupWithWidth,
-      totalBadges,
-      gapWidth
+      coloredGroups: groupData.coloredGroups,
+      unpaintedGroup: groupData.unpaintedGroup,
     };
-  }, [groupData, isProportional, pointGroups, isUnpaintedGrouped, displayMask]);
+  }, [groupData, isProportional, pointGroups, displayMask]);
 
   const handleUnpaintedClick = () => {
     const newValue = !isUnpaintedGrouped;
@@ -148,8 +112,75 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
   }
 
   if (isProportional && proportionalData) {
-    // Proportional layout
+    // Proportional layout.
+    //
+    // The colored badge wrapper and the unpainted button are siblings in an outer flex row.
+    // When the button is inactive (gray): wrapper takes all remaining space (flex: 1 1 0),
+    //   button is fixed at content size (flex-shrink: 0) — always visible.
+    // When the button is active (black): both wrapper and button use flex-grow proportional
+    //   to their participant counts, so the button expands to its fair share. The button
+    //   still has minWidth: fit-content as a floor so it is never pushed off-screen even
+    //   when the container is very narrow.
     const hasColoredGroups = proportionalData.coloredGroups.length > 0;
+    const totalColoredCount = proportionalData.coloredGroups.reduce((sum, g) => sum + g.count, 0);
+    const unpaintedCount = proportionalData.unpaintedGroup?.count ?? 0;
+
+    const coloredBadges = proportionalData.coloredGroups.map((group, index) => {
+      const color = PALETTE_COLORS[group.colorIndex!];
+      const isFirst = index === 0;
+      const isLast = index === proportionalData.coloredGroups.length - 1;
+
+      // Determine border radius override classes and margin for continuous appearance
+      let borderRadiusOverride = '';
+      let marginClass = '';
+      if (isFirst && isLast) {
+        borderRadiusOverride = ''; // Single badge keeps default rounding
+      } else if (isFirst) {
+        borderRadiusOverride = 'rounded-r-none'; // First badge: remove right rounding
+      } else if (isLast) {
+        borderRadiusOverride = 'rounded-l-none'; // Last badge: remove left rounding
+      } else {
+        borderRadiusOverride = 'rounded-none'; // Middle badges: remove all rounding
+      }
+      if (!isFirst) {
+        marginClass = '-ml-1'; // Pull non-first badges left to close gaps
+      }
+
+      return (
+        <Badge
+          key={group.colorIndex}
+          className={cn(
+            "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2 overflow-hidden",
+            borderRadiusOverride,
+            marginClass
+          )}
+          style={{
+            backgroundColor: color,
+            flexGrow: group.count,  // proportional to participant count within wrapper
+            flexShrink: 1,
+            flexBasis: 0,
+            minWidth: 0,            // allow shrinking below label width at narrow sizes
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            textAlign: 'right',
+            transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
+          }}
+        >
+          {group.label}
+        </Badge>
+      );
+    });
+
+    // When active, wrapper and button share total width by participant count ratio.
+    // When inactive, wrapper takes all remaining space; button is fixed at content size.
+    const wrapperStyle: React.CSSProperties = isUnpaintedGrouped && unpaintedCount > 0
+      ? { flexGrow: totalColoredCount, flexShrink: 1, flexBasis: 0, minWidth: 0, display: 'flex' }
+      : { flex: '1 1 0', minWidth: 0, display: 'flex' };
+
+    const buttonFlexStyle: React.CSSProperties = isUnpaintedGrouped && unpaintedCount > 0
+      ? { flexGrow: unpaintedCount, flexShrink: 1, flexBasis: 0, minWidth: 'fit-content' }
+      : { flexShrink: 0, minWidth: 'fit-content' };
 
     return (
       <div className={cn(
@@ -157,116 +188,14 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
         !hasColoredGroups ? "justify-end" : "",
         className
       )}>
-        {/* Colored groups taking proportional space - continuous design using styled badges */}
-        {proportionalData.coloredGroups.map((group, index) => {
-          const color = PALETTE_COLORS[group.colorIndex!];
-          const isFirst = index === 0;
-          const isLast = index === proportionalData.coloredGroups.length - 1;
+        {/* Colored groups in a sub-container */}
+        {hasColoredGroups && (
+          <div style={wrapperStyle}>
+            {coloredBadges}
+          </div>
+        )}
 
-          // Determine border radius override classes and margin for continuous appearance
-          let borderRadiusOverride = '';
-          let marginClass = '';
-          if (isFirst && isLast) {
-            borderRadiusOverride = ''; // Single badge keeps default rounding
-          } else if (isFirst) {
-            borderRadiusOverride = 'rounded-r-none'; // First badge: remove right rounding
-          } else if (isLast) {
-            borderRadiusOverride = 'rounded-l-none'; // Last badge: remove left rounding
-          } else {
-            borderRadiusOverride = 'rounded-none'; // Middle badges: remove all rounding
-            marginClass = '-ml-1'; // Pull middle badges left to close gaps
-          }
-          if (!isFirst && !isLast && proportionalData.coloredGroups.length > 2) {
-            marginClass = '-ml-1'; // Pull non-first badges left to close gaps
-          } else if (!isFirst) {
-            marginClass = '-ml-1'; // Pull non-first badges left to close gaps
-          }
-
-          if (group.useFlexGrow) {
-            // When unpainted is minimal, use flex-grow for colored badges
-            return (
-              <Badge
-                key={group.colorIndex}
-                className={cn(
-                  "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2",
-                  borderRadiusOverride,
-                  marginClass
-                )}
-                style={{
-                  backgroundColor: color,
-                  flexGrow: group.count, // Flex-grow proportional to count
-                  minWidth: 'fit-content',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  textAlign: 'right',
-                  transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
-                }}
-              >
-                {group.label}
-              </Badge>
-            );
-          } else {
-            // When unpainted is grouped and large, use min-width approach for colored badges
-            const isUnpaintedGroupedAndLarge = proportionalData.unpaintedGroup &&
-              !proportionalData.unpaintedGroup.useMinimalWidth &&
-              proportionalData.unpaintedGroup.widthPercent > 80; // Large unpainted group threshold
-
-            if (isUnpaintedGroupedAndLarge) {
-              // Use min-width based on actual proportion, but allow shrinking
-              return (
-                <Badge
-                  key={group.colorIndex}
-                  className={cn(
-                    "text-white border-0 text-xs py-0.5 h-6 pl-2 pr-2",
-                    borderRadiusOverride,
-                    marginClass
-                  )}
-                  style={{
-                    backgroundColor: color,
-                    minWidth: `${group.widthPercent}%`, // Use actual proportion as min-width
-                    width: 'auto',
-                    flexShrink: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    textAlign: 'right',
-                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
-                  }}
-                >
-                  {group.label}
-                </Badge>
-              );
-            } else {
-              // Standard proportional width calculation
-              const totalGapWidth = (proportionalData.totalBadges - 1) * proportionalData.gapWidth;
-              return (
-                <Badge
-                  key={group.colorIndex}
-                  className={cn(
-                    "text-white border-0 text-xs py-0.5 h-6 flex-shrink-0 pl-2 pr-2",
-                    borderRadiusOverride,
-                    marginClass
-                  )}
-                  style={{
-                    backgroundColor: color,
-                    width: `calc(${group.widthPercent}% - ${totalGapWidth * (group.widthPercent / 100)}px)`,
-                    minWidth: 'fit-content',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    textAlign: 'right',
-                    transition: 'width 300ms ease-in-out, background-color 300ms ease-in-out',
-                  }}
-                >
-                  {group.label}
-                </Badge>
-              );
-            }
-          }
-        })}
-
-        {/* Unpainted group - proportional if grouped, minimal if not */}
+        {/* Unpainted button */}
         {proportionalData.unpaintedGroup && (
           <Button
             variant="outline"
@@ -277,25 +206,10 @@ export const ParticipantCountBar: React.FC<ParticipantCountBarProps> = ({
               isUnpaintedGrouped
                 ? "bg-unpainted text-white border-unpainted hover:bg-unpainted-800 hover:text-white"
                 : "bg-white text-unpainted-600 border-unpainted-300 hover:bg-unpainted-200 hover:border-unpainted-400",
-              // Make unpainted group flexible when it's large and grouped
-              proportionalData.unpaintedGroup.widthPercent > 80 && !proportionalData.unpaintedGroup.useMinimalWidth
-                ? "flex-shrink-1"
-                : "flex-shrink-0"
             )}
             onClick={handleUnpaintedClick}
             style={{
-              ...(proportionalData.unpaintedGroup.useMinimalWidth
-                ? { width: 'fit-content' }
-                : isUnpaintedGrouped
-                  ? {
-                      flex: '1 1 0', // Take remaining space when grouped, regardless of calculated percentage
-                      minWidth: 'fit-content',
-                    }
-                  : {
-                      width: `calc(${proportionalData.unpaintedGroup.widthPercent}% - ${(proportionalData.totalBadges - 1) * proportionalData.gapWidth * (proportionalData.unpaintedGroup.widthPercent / 100)}px)`,
-                    }
-              ),
-              minWidth: 'fit-content',
+              ...buttonFlexStyle,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',

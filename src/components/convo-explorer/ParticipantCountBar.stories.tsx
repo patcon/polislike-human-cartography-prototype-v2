@@ -233,6 +233,64 @@ export const RandomMediumConvo: Story = {
   },
 };
 
+// Exact participant counts from the screenshot in issue #12.
+// Painted groups: [5, 104, 146, 393, 212, 187, 288, 143, 37, 18]; unpainted: 209.
+const issueReproductionPointGroups: number[] = [
+  ...Array(5).fill(0),    // 5 Blue (A)
+  ...Array(104).fill(1),  // 104 Orange (B)
+  ...Array(146).fill(2),  // 146 Green (C)
+  ...Array(393).fill(3),  // 393 Red (D)
+  ...Array(212).fill(4),  // 212 Purple (E)
+  ...Array(187).fill(5),  // 187 Brown (F)
+  ...Array(288).fill(6),  // 288 Pink (G)
+  ...Array(143).fill(7),  // 143 Gray (H)
+  ...Array(37).fill(8),   // 37 Lime (I)
+  ...Array(18).fill(9),   // 18 Teal (J)
+  ...Array(209).fill(UNPAINTED_VALUE), // 209 unpainted
+];
+
+export const CrowdedUnpaintedButton: Story = {
+  args: {
+    pointGroups: issueReproductionPointGroups,
+  },
+  render: (args) => {
+    const [isUnpaintedGrouped, setIsUnpaintedGrouped] = useState(false);
+
+    return (
+      <div className="space-y-6 p-4">
+        <p className="text-sm text-gray-500">
+          Exact counts from issue #12 screenshot: painted [5, 104, 146, 393, 212, 187, 288, 143, 37, 18], unpainted 209.
+          The unpainted button should remain visible at all widths.
+        </p>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Full width</p>
+          <ParticipantCountBar
+            {...args}
+            isUnpaintedGrouped={isUnpaintedGrouped}
+            onUnpaintedGroupedChange={setIsUnpaintedGrouped}
+          />
+        </div>
+        <div className="w-[500px]">
+          <p className="text-xs text-gray-400 mb-1">500px</p>
+          <ParticipantCountBar
+            {...args}
+            isUnpaintedGrouped={isUnpaintedGrouped}
+            onUnpaintedGroupedChange={setIsUnpaintedGrouped}
+          />
+        </div>
+        <div className="w-[300px]">
+          <p className="text-xs text-gray-400 mb-1">300px</p>
+          <ParticipantCountBar
+            {...args}
+            isUnpaintedGrouped={isUnpaintedGrouped}
+            onUnpaintedGroupedChange={setIsUnpaintedGrouped}
+          />
+        </div>
+      </div>
+    );
+  },
+};
+
 export const RandomLargeConvo: Story = {
   args: {
     pointGroups: generateRandomPointGroups(3000, 40),
