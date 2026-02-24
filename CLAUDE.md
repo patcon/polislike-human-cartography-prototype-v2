@@ -73,6 +73,15 @@ Stories live next to their components (`*.stories.tsx`). Chromatic is used for v
 
 Tests use Vitest with jsdom. `src/test-setup.ts` mocks `matchMedia`, `ResizeObserver`, `IntersectionObserver`, and SVG methods (`getBBox`, `getComputedTextLength`).
 
+### Changelog
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com) conventions with `Added`, `Changed`, and `Fixed` subsections under each release.
+
+- **Every feature branch must include a `CHANGELOG.md` update** in the same commit (or PR) as the code change.
+- Entries go under `## [Unreleased]` until a version is tagged.
+- Link each entry to its GitHub issue (`[#27](.../issues/27)`) if one exists, otherwise fall back to the PR (`[#42](.../pull/42)`).
+- On release: rename `[Unreleased]` to the new version + date, update its compare URL to `compare/vPREV...vNEW`, and add a fresh empty `[Unreleased]` block at the top pointing to `compare/vNEW...main`.
+
 ### Python Scripts
 
 `scripts/python/` contains HDBSCAN clustering scripts for generating water-level threshold data used by the MagicPaintExperiment. Uses `uv` for package management (`cd scripts/python && uv sync`).
