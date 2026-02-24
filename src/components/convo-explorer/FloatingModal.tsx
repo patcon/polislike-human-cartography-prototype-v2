@@ -118,7 +118,7 @@ export const FloatingModal = React.forwardRef<HTMLDivElement, FloatingModalProps
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 pl-10">
             {/* Annotation label */}
             {title && (
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-none">
@@ -128,15 +128,22 @@ export const FloatingModal = React.forwardRef<HTMLDivElement, FloatingModalProps
             {/* Category swatches */}
             {legendItems && legendItems.length > 0 && (
               <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                {legendItems.map(({ label, color }) => (
-                  <div key={label} className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block w-3 h-3 rounded-sm flex-shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="text-xs text-gray-800 dark:text-gray-200">{label}</span>
-                  </div>
-                ))}
+                {legendItems.map(({ label, color }) => {
+                  const isBlank = label.trim() === "";
+                  const displayLabel = isBlank ? "N/A" : label;
+                  const displayColor = isBlank ? "#d3d3d3" : color;
+                  return (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block w-3 h-3 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: displayColor }}
+                      />
+                      <span className={`text-xs ${isBlank ? "text-gray-400" : "text-gray-800 dark:text-gray-200"}`}>
+                        {displayLabel}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
