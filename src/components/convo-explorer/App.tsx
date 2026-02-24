@@ -23,6 +23,7 @@ import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 import type { MetricConfig } from "./MetricsLayerConfig";
 import type { ObsColumnType } from "@/lib/color-schemes";
+import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import type { ObsColumnInfo } from "@/lib/h5ad-loader";
 
 // Helper function for ID matching - can be optimized later for performance
@@ -291,6 +292,40 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [currentDisplayState, currentPipelineId]);
 
+  // Derive obs column keys from preloaded data for the "Other" metrics option
+  // Exclude the display mask column so it doesn't appear in the dropdown
+  const obsColumnKeys = React.useMemo(() => {
+    if (!preloadedData?.obsColumns) return undefined;
+    const keys = Object.keys(preloadedData.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
+    return keys.length > 0 ? keys : undefined;
+  }, [preloadedData?.obsColumns]);
+
+  const cycleObsColumn = React.useCallback((direction: 'prev' | 'next') => {
+    if (!obsColumnKeys || obsColumnKeys.length === 0) return;
+    if (metricConfig.type !== 'obs-column') return;
+    const currentIndex = obsColumnKeys.indexOf(metricConfig.column);
+    if (currentIndex === -1) return;
+    const newIndex = direction === 'prev'
+      ? (currentIndex === 0 ? obsColumnKeys.length - 1 : currentIndex - 1)
+      : (currentIndex === obsColumnKeys.length - 1 ? 0 : currentIndex + 1);
+    setMetricConfig({ type: 'obs-column', column: obsColumnKeys[newIndex] });
+  }, [obsColumnKeys, metricConfig]);
+
+  // Derive legend items for the metrics FloatingModal (categorical columns only)
+  const metricsLegendItems = React.useMemo(() => {
+    if (metricConfig.type !== 'obs-column') return undefined;
+    if (!preloadedData?.obsColumns) return undefined;
+    const columnInfo = preloadedData.obsColumns[metricConfig.column];
+    if (!columnInfo || columnInfo.type !== 'categorical') return undefined;
+    const categories = columnInfo.categories ?? [];
+    // Hide legend when there are too many categories to be useful
+    if (categories.length > 65) return undefined;
+    return categories.map((cat, i) => ({
+      label: String(cat),
+      color: getAnnotationCategoricalColor(i),
+    }));
+  }, [metricConfig, preloadedData?.obsColumns]);
+
   const cycleStatement = React.useCallback((direction: 'prev' | 'next') => {
     if (statements.length === 0) return;
     const currentIndex = statements.findIndex(s => String(s.statement_id) === statementId);
@@ -320,6 +355,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         }
       }
 
+      // Handle left/right arrow keys for obs column cycling when metrics layer is active
+      if (layerMode === "metrics" && metricConfig.type === "obs-column" && obsColumnKeys && obsColumnKeys.length > 1) {
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          cycleObsColumn(event.key === 'ArrowLeft' ? 'prev' : 'next');
+          event.preventDefault();
+          return;
+        }
+      }
+
       // Handle number keys 1-9 and 0 for color selection
       if (event.key >= '1' && event.key <= '9') {
         const index = parseInt(event.key, 10);
@@ -342,7 +386,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [layerMode, statements, statementId, cycleStatement]);
+  }, [layerMode, statements, statementId, cycleStatement, metricConfig, obsColumnKeys, cycleObsColumn]);
 
   // Initialize point arrays when dataset is loaded
   React.useEffect(() => {
@@ -622,14 +666,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
-
-  // Derive obs column keys from preloaded data for the "Other" metrics option
-  // Exclude the display mask column so it doesn't appear in the dropdown
-  const obsColumnKeys = React.useMemo(() => {
-    if (!preloadedData?.obsColumns) return undefined;
-    const keys = Object.keys(preloadedData.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
-    return keys.length > 0 ? keys : undefined;
-  }, [preloadedData?.obsColumns]);
 
   // Derive display mask array (parallel to dataset) from obs column
   const displayMask = React.useMemo(() => {
@@ -925,6 +961,18 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           onClose={() => setLayerMode("groups")}
           onPrev={() => cycleStatement('prev')}
           onNext={() => cycleStatement('next')}
+        />
+      )}
+
+      {/* FloatingModal - shows annotation legend in metrics mode (obs-column) */}
+      {layerMode === "metrics" && metricConfig.type === "obs-column" && (
+        <FloatingModal
+          title={metricConfig.column}
+          legendItems={metricsLegendItems}
+          isVisible={true}
+          onClose={() => setLayerMode("groups")}
+          onPrev={obsColumnKeys && obsColumnKeys.length > 1 ? () => cycleObsColumn('prev') : undefined}
+          onNext={obsColumnKeys && obsColumnKeys.length > 1 ? () => cycleObsColumn('next') : undefined}
         />
       )}
 

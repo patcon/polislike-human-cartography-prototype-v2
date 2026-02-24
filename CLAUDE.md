@@ -78,6 +78,7 @@ Tests use Vitest with jsdom. `src/test-setup.ts` mocks `matchMedia`, `ResizeObse
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com) conventions with `Added`, `Changed`, and `Fixed` subsections under each release.
 
 - **Every feature branch must include a `CHANGELOG.md` update** in the same commit (or PR) as the code change.
+- **Claude must always update `CHANGELOG.md`** when implementing any feature, fix, or notable change — without waiting to be asked.
 - Entries go under `## [Unreleased]` until a version is tagged.
 - Link each entry to its GitHub issue (`[#27](.../issues/27)`) if one exists, otherwise fall back to the PR (`[#42](.../pull/42)`).
 - On release: rename `[Unreleased]` to the new version + date, update its compare URL to `compare/vPREV...vNEW`, and add a fresh empty `[Unreleased]` block at the top pointing to `compare/vNEW...main`.
