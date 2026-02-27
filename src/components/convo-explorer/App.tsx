@@ -753,15 +753,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     if (!obsColumns || dataset.length === 0) return;
 
     const columnNames = Object.keys(obsColumns);
-    const header = ['participant_id', ...columnNames];
-    const rows = dataset.map(([participantId]) => {
+    const header = ['participant_id', 'manual_painted', ...columnNames];
+    const rows = dataset.map(([participantId], idx) => {
+      const painted = pointGroups[idx];
+      const paintedValue = painted === UNPAINTED_VALUE ? '' : String(painted);
       const values = columnNames.map(col => {
-        const colInfo = obsColumns[col];
-        const idx = dataset.findIndex(([id]) => id === participantId);
-        const val = colInfo.values[idx];
+        const val = obsColumns[col].values[idx];
         return val === null || val === undefined ? '' : String(val);
       });
-      return [participantId, ...values];
+      return [participantId, paintedValue, ...values];
     });
 
     const csvContent = [header, ...rows]
@@ -778,7 +778,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     link.download = 'participants.csv';
     link.click();
     URL.revokeObjectURL(url);
-  }, [dataset, preloadedData?.obsColumns]);
+  }, [dataset, pointGroups, preloadedData?.obsColumns]);
 
   const handleClearAllColors = React.useCallback(() => {
     setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
