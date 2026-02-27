@@ -39,8 +39,8 @@ export const DownloadObsCsvDialog = React.forwardRef<
             Download Participant Data as CSV?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This will download participant metadata from the loaded .h5ad file as a CSV file.
-            It contains {participantCount} participants across {columnCount} metadata columns (obs/*).
+            This will download participant metadata from the loaded file as a CSV.
+            It contains {participantCount} participants across {columnCount} metadata columns.
             The file can be opened in any spreadsheet application.
           </AlertDialogDescription>
         </AlertDialogHeader>

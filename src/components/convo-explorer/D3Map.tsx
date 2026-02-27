@@ -53,7 +53,7 @@ type D3MapProps = {
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
   /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
-  /** Callback to trigger downloading obs/* data as CSV */
+  /** Callback to trigger downloading participant data as CSV */
   onDownloadObsCsv?: () => void;
   /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
   displayMask?: boolean[];
