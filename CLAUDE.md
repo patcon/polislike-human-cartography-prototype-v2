@@ -16,7 +16,7 @@ npm run lint         # ESLint (flat config, TS/TSX files)
 npm run test         # Vitest in watch mode (jsdom environment)
 npm run test:run     # Vitest single run (CI-friendly)
 npm run storybook    # Storybook dev server on port 6006
-npm run deploy       # Build and deploy to GitHub Pages via gh-pages
+npm run deploy       # Build and deploy to GitHub Pages via gh-pages — DO NOT run locally; deployment is triggered automatically by CI on push to main
 ```
 
 ## Architecture
