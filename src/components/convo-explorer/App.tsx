@@ -5,6 +5,7 @@ import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
+import { DownloadObsCsvDialog } from "./DownloadObsCsvDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
 import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
@@ -136,6 +137,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Clear colors dialog state
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
+
+  // Download obs CSV dialog state
+  const [downloadObsCsvDialogOpen, setDownloadObsCsvDialogOpen] = React.useState(false);
 
   // Update current pipeline ID when initialPipelineId prop changes
   React.useEffect(() => {
@@ -744,6 +748,38 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   }, []);
 
   // Clear all painted colors - reset all points to unpainted
+  const handleDownloadObsCsv = React.useCallback(() => {
+    const obsColumns = preloadedData?.obsColumns;
+    if (!obsColumns || dataset.length === 0) return;
+
+    const columnNames = Object.keys(obsColumns);
+    const header = ['participant_id', ...columnNames];
+    const rows = dataset.map(([participantId]) => {
+      const values = columnNames.map(col => {
+        const colInfo = obsColumns[col];
+        const idx = dataset.findIndex(([id]) => id === participantId);
+        const val = colInfo.values[idx];
+        return val === null || val === undefined ? '' : String(val);
+      });
+      return [participantId, ...values];
+    });
+
+    const csvContent = [header, ...rows]
+      .map(row => row.map(cell => {
+        const s = String(cell);
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'participants.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [dataset, preloadedData?.obsColumns]);
+
   const handleClearAllColors = React.useCallback(() => {
     setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
 
@@ -870,6 +906,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             onPipelineChange={handlePipelineChange}
             preloadedPipelineData={preloadedData?.pipelineData}
             onLoadFile={onLoadFile}
+            onDownloadObsCsv={preloadedData?.obsColumns ? () => setDownloadObsCsvDialogOpen(true) : undefined}
             displayMask={showFilteredParticipants ? undefined : displayMask}
             unpaintedColor={isUnpaintedGrouped ? undefined : "#cccccc"}
           />
@@ -981,6 +1018,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         open={clearDialogOpen}
         onOpenChange={setClearDialogOpen}
         onConfirm={handleClearAllColors}
+      />
+
+      {/* Download Obs CSV Dialog */}
+      <DownloadObsCsvDialog
+        open={downloadObsCsvDialogOpen}
+        onOpenChange={setDownloadObsCsvDialogOpen}
+        onConfirm={handleDownloadObsCsv}
+        participantCount={dataset.length}
+        columnCount={Object.keys(preloadedData?.obsColumns ?? {}).length}
       />
     </div>
   );
