@@ -7,7 +7,7 @@ import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { DownloadObsCsvDialog } from "./DownloadObsCsvDialog";
 import { FloatingModal } from "./FloatingModal";
-import { INITIAL_ACTION, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
+import { INITIAL_ACTION, PALETTE_COLOR_DEFINITIONS, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
 import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { isWebAssemblySupported } from "../../lib/wasm-detect";
@@ -756,7 +756,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     const header = ['participant_id', 'manual_painted', ...columnNames];
     const rows = dataset.map(([participantId], idx) => {
       const painted = pointGroups[idx];
-      const paintedValue = painted === UNPAINTED_VALUE ? '' : String(painted);
+      const paintedValue = painted === UNPAINTED_VALUE ? '' : (PALETTE_COLOR_DEFINITIONS[painted]?.name ?? String(painted));
       const values = columnNames.map(col => {
         const val = obsColumns[col].values[idx];
         return val === null || val === undefined ? '' : String(val);
