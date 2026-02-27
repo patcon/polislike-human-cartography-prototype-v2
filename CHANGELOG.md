@@ -5,7 +5,7 @@
 ### Added
 
 - Download participant metadata from a loaded `.h5ad` file as a CSV ([#33](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/33)).
-  - A download icon button appears next to the "Import .h5ad" button in the top-left corner of the map, but only when `obs/*` columns are present in the loaded file.
+  - A download icon button appears above the projection-selector controls (alongside the "Import .h5ad" button) when `obs/*` columns are present in the loaded file. Moving file-action buttons above the projection row keeps the projection row from becoming too wide on mobile.
   - Clicking the button opens a confirmation dialog that shows the participant and column count before the download begins.
   - The downloaded file (`participants.csv`) contains one row per participant with all `obs/*` metadata columns.
 - `FloatingModal` legend when viewing an obs-column annotation in the metrics layer ([#29](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/29)).

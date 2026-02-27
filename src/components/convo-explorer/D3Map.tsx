@@ -838,6 +838,7 @@ export const D3Map: React.FC<D3MapProps> = ({
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
           onLoadFile={onLoadFile}
+          onDownloadObsCsv={onDownloadObsCsv}
           top="1rem"
           left="1rem"
         />

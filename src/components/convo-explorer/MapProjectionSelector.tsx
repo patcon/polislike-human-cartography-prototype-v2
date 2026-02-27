@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
-import { Repeat1, Repeat, Import } from "lucide-react";
+import { FileDown, Import, Repeat1, Repeat } from "lucide-react";
 
 interface ProjectionOption {
   id: string;
@@ -45,6 +45,8 @@ interface MapProjectionSelectorProps {
   bottom?: number | string;
   /** Callback to trigger loading a new file */
   onLoadFile?: () => void;
+  /** Callback to trigger downloading obs/* data as CSV */
+  onDownloadObsCsv?: () => void;
 }
 
 export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
@@ -63,6 +65,7 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
   right,
   bottom,
   onLoadFile,
+  onDownloadObsCsv,
 }) => {
   // Measure the longest pipeline label to set a stable select width
   const longestLabel = React.useMemo(() => {
@@ -85,6 +88,34 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
 
   return (
     <div className="absolute bg-white p-4 rounded-lg shadow-lg border" style={positionStyle}>
+      {(onLoadFile || onDownloadObsCsv) && (
+        <div className="flex items-center gap-1 mb-3">
+          {onLoadFile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLoadFile}
+              disabled={isAnimating}
+              title="Import .h5ad file"
+              className="flex-1"
+            >
+              <Import className="h-4 w-4 mr-1" />
+              Import .h5ad
+            </Button>
+          )}
+          {onDownloadObsCsv && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Download participant data as CSV"
+              onClick={onDownloadObsCsv}
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )}
       <div className="mb-2">
         <h3 className="text-sm font-medium mb-2">
           Pipeline {isAnimating && "(Animating...)"}
@@ -131,17 +162,6 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
           >
             <Repeat className="h-4 w-4" />
           </Button>
-          {onLoadFile && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onLoadFile}
-              disabled={isAnimating}
-              title="Import a new file"
-            >
-              <Import className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
     </div>
