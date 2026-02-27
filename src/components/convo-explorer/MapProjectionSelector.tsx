@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
-import { Repeat1, Repeat, Import } from "lucide-react";
+import { FileDown, Import, Repeat1, Repeat } from "lucide-react";
 
 interface ProjectionOption {
   id: string;
@@ -45,6 +45,8 @@ interface MapProjectionSelectorProps {
   bottom?: number | string;
   /** Callback to trigger loading a new file */
   onLoadFile?: () => void;
+  /** Callback to trigger downloading participant data as CSV */
+  onDownloadObsCsv?: () => void;
 }
 
 export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
@@ -63,6 +65,7 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
   right,
   bottom,
   onLoadFile,
+  onDownloadObsCsv,
 }) => {
   // Measure the longest pipeline label to set a stable select width
   const longestLabel = React.useMemo(() => {
@@ -131,19 +134,37 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
           >
             <Repeat className="h-4 w-4" />
           </Button>
+        </div>
+      </div>
+      {(onLoadFile || onDownloadObsCsv) && (
+        <div className="flex items-center gap-1 mt-3">
           {onLoadFile && (
             <Button
               variant="outline"
               size="sm"
               onClick={onLoadFile}
               disabled={isAnimating}
-              title="Import a new file"
+              title="Import .h5ad file"
+              className="flex-1"
             >
-              <Import className="h-4 w-4" />
+              <Import className="h-4 w-4 mr-1" />
+              Import .h5ad
+            </Button>
+          )}
+          {onDownloadObsCsv && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDownloadObsCsv}
+              title="Download participant data as CSV"
+              className="flex-1"
+            >
+              <FileDown className="h-4 w-4 mr-1" />
+              Download Data
             </Button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };

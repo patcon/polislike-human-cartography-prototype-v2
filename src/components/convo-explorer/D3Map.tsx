@@ -8,7 +8,7 @@ import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getAnnotationCategor
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
-import { Import, Info } from "lucide-react";
+import { FileDown, Import, Info } from "lucide-react";
 
 type ProjectionData = [string, [number, number]][];
 
@@ -53,6 +53,8 @@ type D3MapProps = {
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
   /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
+  /** Callback to trigger downloading participant data as CSV */
+  onDownloadObsCsv?: () => void;
   /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
   displayMask?: boolean[];
   /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
@@ -82,6 +84,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   onPipelineChange,
   preloadedPipelineData,
   onLoadFile,
+  onDownloadObsCsv,
   displayMask,
   unpaintedColor = UNPAINTED_COLOR,
 }) => {
@@ -835,6 +838,7 @@ export const D3Map: React.FC<D3MapProps> = ({
             currentPipelineOptions.map(p => [p.id, !pipelineData[p.id]])
           )}
           onLoadFile={onLoadFile}
+          onDownloadObsCsv={onDownloadObsCsv}
           top="1rem"
           left="1rem"
         />
@@ -850,6 +854,17 @@ export const D3Map: React.FC<D3MapProps> = ({
             <Import className="h-4 w-4 mr-1" />
             Import .h5ad
           </Button>
+          {onDownloadObsCsv && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 bg-white/90 backdrop-blur-sm shadow-sm"
+              title="Download participant data as CSV"
+              onClick={onDownloadObsCsv}
+            >
+              <FileDown className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="outline"
             size="icon"
