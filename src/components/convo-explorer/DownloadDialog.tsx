@@ -3,9 +3,9 @@
 import * as React from "react";
 import { FileDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -30,16 +30,6 @@ export const DownloadDialog = React.forwardRef<
   DownloadDialogProps
 >(({ open, onOpenChange, onConfirm, onConfirmVotes, participantCount, columnCount, statementCount, conversationId }, ref) => {
   const [prefixDate, setPrefixDate] = React.useState(false);
-
-  const handleConfirm = () => {
-    onConfirm(prefixDate);
-    onOpenChange(false);
-  };
-
-  const handleConfirmVotes = () => {
-    onConfirmVotes?.(prefixDate);
-    onOpenChange(false);
-  };
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -68,31 +58,31 @@ export const DownloadDialog = React.forwardRef<
             </label>
           </div>
           <div className="flex flex-col gap-2">
-            <AlertDialogAction
-              onClick={handleConfirm}
-              className="flex items-center gap-2 justify-center"
+            <Button
+              onClick={() => onConfirm(prefixDate)}
+              className="flex items-center gap-2 justify-center w-full"
             >
               <FileDown size={16} />
               Download Participants CSV
               <span className="text-xs opacity-70">({participantCount} × {columnCount})</span>
-            </AlertDialogAction>
+            </Button>
             {onConfirmVotes && (
-              <AlertDialogAction
-                onClick={handleConfirmVotes}
-                className="flex items-center gap-2 justify-center"
+              <Button
+                onClick={() => onConfirmVotes(prefixDate)}
+                className="flex items-center gap-2 justify-center w-full"
               >
                 <FileDown size={16} />
                 Download Votes CSV
                 {statementCount !== undefined && (
                   <span className="text-xs opacity-70">({participantCount} × {statementCount})</span>
                 )}
-              </AlertDialogAction>
+              </Button>
             )}
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>Close</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
