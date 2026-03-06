@@ -19,6 +19,8 @@ export type H5adData = {
   fullDimensionEmbeddings: Record<string, [string, number[]][]>;
   /** Per-participant metadata columns from obs/ with type metadata */
   obsColumns: Record<string, ObsColumnInfo>;
+  /** Optional conversation identifier from uns['conversation_id'] */
+  conversationId?: string;
 };
 
 /**
@@ -351,7 +353,12 @@ export async function loadH5adFile(
     // --- Read votes from uns/votes ---
     const votesRows = readVotes(file);
 
-    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns };
+    // --- Read conversation_id from uns ---
+    const unsGroup = file.get('uns') as Group | null;
+    const convIdDs = unsGroup?.get('conversation_id') as Dataset | null;
+    const conversationId = convIdDs ? String(convIdDs.value) : undefined;
+
+    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, conversationId };
   } finally {
     if (file) {
       file.close();

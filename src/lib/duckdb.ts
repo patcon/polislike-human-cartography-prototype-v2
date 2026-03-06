@@ -220,6 +220,38 @@ export async function getVotesForParticipants(
 
 
 /**
+ * Get all votes from the votes table.
+ * @param kedroBaseUrl - Optional Kedro base URL for API access
+ * @param pipelineId - Optional pipeline ID for Kedro API
+ * @returns Array of all vote rows
+ */
+export async function getAllVotes(
+  kedroBaseUrl?: string,
+  pipelineId?: string
+): Promise<{ participant_id: string; comment_id: string; vote: number }[]> {
+  if (!conn) await initializeDuckDB();
+  await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
+
+  const result = await conn!.query(`
+    SELECT participant_id, comment_id, vote
+    FROM votes
+    ORDER BY participant_id, comment_id
+  `);
+
+  const votes = [];
+  for (let i = 0; i < result.numRows; i++) {
+    const participant_id = result.getChild('participant_id')?.get(i)?.toString();
+    const comment_id = result.getChild('comment_id')?.get(i)?.toString();
+    const rawVote = result.getChild('vote')?.get(i);
+    const vote = typeof rawVote === 'bigint' ? Number(rawVote) : rawVote as number;
+    if (participant_id !== undefined && comment_id !== undefined && vote !== undefined) {
+      votes.push({ participant_id, comment_id, vote });
+    }
+  }
+  return votes;
+}
+
+/**
  * Convert vote number to vote type string
  */
 function getVoteType(vote: number): keyof typeof VOTE_COLORS {
