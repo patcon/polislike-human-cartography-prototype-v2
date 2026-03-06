@@ -1,4 +1,4 @@
-name: Build and deploy Vite site
+name: Deploy
 
 on:
   push:
