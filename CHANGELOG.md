@@ -4,6 +4,7 @@
 
 ### Added
 
+- "Download Votes CSV" button in the download modal to export a vote matrix as `vote-matrix.csv` ([#35](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/35)). Rows are participants, columns are statement IDs, and values are `1` (agree), `-1` (disagree), `0` (pass), or empty (no vote). The modal now also shows a toggle to prefix filenames with today's date (`YYYY-MM-DD-`), and uses the `conversation_id` from the h5ad file (if present) as a filename prefix.
 - "Download Data" button in the projection selector panel to export participant metadata as `participants.csv` ([#33](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/33)). A confirmation dialog shows participant and column counts before downloading. Includes a `manual_painted` column with the color name of any painted group (e.g. `Orange`, blank if unpainted).
 - `FloatingModal` legend when viewing an obs-column annotation in the metrics layer ([#29](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/29)).
   - Shows the column name as the label and colored category swatches for categorical columns; continuous columns show an empty modal (legend to follow).

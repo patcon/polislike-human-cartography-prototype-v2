@@ -5,10 +5,10 @@ import { D3Map } from "./D3Map";
 import { MapOverlay } from "./MapOverlay";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { ClearColorsDialog } from "./ClearColorsDialog";
-import { DownloadObsCsvDialog } from "./DownloadObsCsvDialog";
+import { DownloadDialog } from "./DownloadDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLOR_DEFINITIONS, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
-import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory } from "../../lib/duckdb";
+import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory, getAllVotes } from "../../lib/duckdb";
 import { resolveAssetPath } from "../../lib/paths";
 import { isWebAssemblySupported } from "../../lib/wasm-detect";
 import { Spinner } from "../ui/spinner";
@@ -44,6 +44,8 @@ export type PreloadedData = {
   fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
   /** Per-participant metadata columns from obs/ with type metadata */
   obsColumns?: Record<string, ObsColumnInfo>;
+  /** Optional conversation identifier from uns['conversation_id'] */
+  conversationId?: string;
 };
 
 type AppProps = {
@@ -747,8 +749,34 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     setClearDialogOpen(true);
   }, []);
 
+  // Build a download filename with optional date prefix and conversationId
+  const buildFilename = React.useCallback((base: string, ext: string, prefixDate?: boolean): string => {
+    const parts = [];
+    if (prefixDate) parts.push(new Date().toISOString().slice(0, 10));
+    if (preloadedData?.conversationId) parts.push(preloadedData.conversationId);
+    parts.push(base);
+    return parts.join('-') + '.' + ext;
+  }, [preloadedData?.conversationId]);
+
+  // Escape a CSV cell value
+  const escapeCsvCell = (cell: string): string => {
+    const s = String(cell);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  // Trigger a CSV file download
+  const downloadCsv = (csvContent: string, filename: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Clear all painted colors - reset all points to unpainted
-  const handleDownloadObsCsv = React.useCallback(() => {
+  const handleDownloadObsCsv = React.useCallback((prefixDate: boolean) => {
     const obsColumns = preloadedData?.obsColumns;
     if (!obsColumns || dataset.length === 0) return;
 
@@ -765,20 +793,44 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     });
 
     const csvContent = [header, ...rows]
-      .map(row => row.map(cell => {
-        const s = String(cell);
-        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(','))
+      .map(row => row.map(escapeCsvCell).join(','))
       .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'participants.csv';
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [dataset, pointGroups, preloadedData?.obsColumns]);
+    downloadCsv(csvContent, buildFilename('participants', 'csv', prefixDate));
+  }, [dataset, pointGroups, preloadedData?.obsColumns, buildFilename]);
+
+  // Download vote matrix CSV: rows=participants, columns=statement IDs, values=vote or empty
+  const handleDownloadVoteCsv = React.useCallback(async (prefixDate: boolean) => {
+    if (!preloadedData?.statements || dataset.length === 0) return;
+
+    const statementIds = preloadedData.statements.map(s => s.statement_id);
+    const allVoteRows = await getAllVotes(kedroBaseUrl, currentPipelineId === 'default' ? undefined : currentPipelineId);
+
+    // Build lookup: participant_id → Map<comment_id, vote>
+    const voteLookup = new Map<string, Map<string, number>>();
+    for (const row of allVoteRows) {
+      if (!voteLookup.has(row.participant_id)) {
+        voteLookup.set(row.participant_id, new Map());
+      }
+      voteLookup.get(row.participant_id)!.set(row.comment_id, row.vote);
+    }
+
+    const header = ['participant_id', ...statementIds];
+    const rows = dataset.map(([participantId]) => {
+      const participantVotes = voteLookup.get(participantId);
+      const values = statementIds.map(sid => {
+        if (!participantVotes || !participantVotes.has(sid)) return '';
+        return String(participantVotes.get(sid));
+      });
+      return [participantId, ...values];
+    });
+
+    const csvContent = [header, ...rows]
+      .map(row => row.map(escapeCsvCell).join(','))
+      .join('\n');
+
+    downloadCsv(csvContent, buildFilename('vote-matrix', 'csv', prefixDate));
+  }, [dataset, preloadedData?.statements, kedroBaseUrl, currentPipelineId, buildFilename]);
 
   const handleClearAllColors = React.useCallback(() => {
     setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
@@ -1020,13 +1072,16 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         onConfirm={handleClearAllColors}
       />
 
-      {/* Download Obs CSV Dialog */}
-      <DownloadObsCsvDialog
+      {/* Download Dialog */}
+      <DownloadDialog
         open={downloadObsCsvDialogOpen}
         onOpenChange={setDownloadObsCsvDialogOpen}
         onConfirm={handleDownloadObsCsv}
+        onConfirmVotes={preloadedData?.statements ? handleDownloadVoteCsv : undefined}
         participantCount={dataset.length}
         columnCount={Object.keys(preloadedData?.obsColumns ?? {}).length}
+        statementCount={preloadedData?.statements?.length}
+        conversationId={preloadedData?.conversationId}
       />
     </div>
   );
