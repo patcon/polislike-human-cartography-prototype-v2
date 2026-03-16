@@ -1182,14 +1182,14 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
   return (
     <div className="relative w-screen h-screen">
-      <div style={navigationMode ? { perspective: '1200px', perspectiveOrigin: '50% 50%' } : undefined}>
+      <div style={navigationMode ? { perspective: '1200px', perspectiveOrigin: '50% 50%', overflow: 'visible' } : undefined}>
         <svg
           ref={svgRef}
           className="w-screen h-screen block bg-gray-50"
           style={{
             touchAction: 'none',
             ...(navigationMode && {
-              transform: `rotateX(${navTilt}deg) rotateZ(${navHeading}deg)`,
+              transform: `scale(3) rotateX(${navTilt}deg) rotateZ(${navHeading}deg)`,
               transformOrigin: 'center center',
               willChange: 'transform',
             }),
