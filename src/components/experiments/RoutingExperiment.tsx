@@ -547,6 +547,7 @@ type DisplaySettings = {
   pathStyle?: 'sharp' | 'smooth';
   kedroBaseUrl?: string;
   pipelineId?: string;
+  navigationMode?: boolean;
 };
 
 export const RoutingExperiment: React.FC<DisplaySettings> = ({
@@ -554,7 +555,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   showNodes: initialShowNodes = 'all',
   pathStyle: initialPathStyle = 'sharp',
   kedroBaseUrl,
-  pipelineId = 'mean_localmap_bestkmeans'
+  pipelineId = 'mean_localmap_bestkmeans',
+  navigationMode = false,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -576,6 +578,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [densityRadius, setDensityRadius] = React.useState(0.05);
   const [densityAlpha, setDensityAlpha] = React.useState(1.00);
   const [densityMap, setDensityMap] = React.useState<Map<string, number>>(new Map());
+
+  // Navigation mode state (3D tilt/heading)
+  const [navTilt, setNavTilt] = React.useState(0);      // 0–80 degrees
+  const [navHeading, setNavHeading] = React.useState(0); // 0–360 degrees
 
   // Local state for display settings (used when not controlled by Storybook)
   const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>('none');
@@ -921,7 +927,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             if (pathPoints.some(p => p.id === d.id)) return 5; // intermediate points
             return 3;
           })();
-          return baseRadius / currentTransform.k;
+          return navigationMode ? baseRadius : baseRadius / currentTransform.k;
         })
         .attr("fill", d => {
           if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
@@ -948,7 +954,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           if (pathPoints.some(p => p.id === d.id)) return "#d97706";
           return "none";
         })
-        .attr("stroke-width", 2 / currentTransform.k)
+        .attr("stroke-width", navigationMode ? 2 : 2 / currentTransform.k)
         .style("cursor", d => {
           // Show different cursor for draggable points
           if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) {
@@ -987,7 +993,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       })
       .call(dragBehavior);
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode]);
 
   // Calculate path points separately to avoid infinite loops
   React.useEffect(() => {
@@ -1013,6 +1019,41 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   }, [sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph]);
 
 
+  // Shift-drag for 3D navigation (tilt + heading), matching Google Maps convention
+  React.useEffect(() => {
+    if (!navigationMode || !svgRef.current) return;
+    const svgEl = svgRef.current;
+
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0 || !e.shiftKey) return;
+      e.preventDefault();
+      dragging = true;
+      lastX = e.clientX; lastY = e.clientY;
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      setNavHeading(h => (h + dx * 0.3 + 360) % 360);
+      setNavTilt(t => Math.max(0, Math.min(80, t + dy * 0.3)));
+    };
+    const onMouseUp = (e: MouseEvent) => { if (e.button === 0) dragging = false; };
+
+    svgEl.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      svgEl.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [navigationMode, isLoading]);
+
   // Add zoom behavior
   React.useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -1029,8 +1070,9 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         if (event.type === "touchstart" || event.type === "touchmove" || event.type === "touchend") {
           return true;
         }
-        // Allow mouse events for panning (but not clicking on points)
+        // Allow mouse events for panning (but not clicking on points, and not shift-drag in navigation mode)
         if (event.type === "mousedown") {
+          if (navigationMode && event.shiftKey) return false;
           const target = event.target as Element;
           return !target.closest("circle");
         }
@@ -1040,26 +1082,28 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         const transform = event.transform;
         container.attr("transform", transform);
 
-        // Update circle sizes to maintain visual consistency during zoom
-        container.selectAll("circle")
-          .attr("r", (d: any) => {
-            const baseRadius = (() => {
-              if (sourcePoint && d.id === sourcePoint.id) return 8;
-              if (destinationPoint && d.id === destinationPoint.id) return 8;
-              if (pathPoints.some(p => p.id === d.id)) return 5;
-              return 3;
-            })();
-            return baseRadius / transform.k;
-          })
-          .attr("stroke-width", 2 / transform.k);
+        if (!navigationMode) {
+          // Update circle sizes to maintain visual consistency during zoom
+          container.selectAll("circle")
+            .attr("r", (d: any) => {
+              const baseRadius = (() => {
+                if (sourcePoint && d.id === sourcePoint.id) return 8;
+                if (destinationPoint && d.id === destinationPoint.id) return 8;
+                if (pathPoints.some(p => p.id === d.id)) return 5;
+                return 3;
+              })();
+              return baseRadius / transform.k;
+            })
+            .attr("stroke-width", 2 / transform.k);
 
-        // Update path stroke width to maintain visibility
-        container.selectAll(".routing-path")
-          .attr("stroke-width", 3 / transform.k);
+          // Update path stroke width to maintain visibility
+          container.selectAll(".routing-path")
+            .attr("stroke-width", 3 / transform.k);
 
-        // Update network edge stroke width
-        container.selectAll(".network-edge")
-          .attr("stroke-width", 1 / transform.k);
+          // Update network edge stroke width
+          container.selectAll(".network-edge")
+            .attr("stroke-width", 1 / transform.k);
+        }
       });
 
     svg.call(zoom);
@@ -1072,6 +1116,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           zoom.transform,
           d3.zoomIdentity
         );
+        if (navigationMode) {
+          setNavTilt(0);
+          setNavHeading(0);
+        }
       }
     });
 
@@ -1079,7 +1127,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       svg.on(".zoom", null);
       svg.on("dblclick.zoom", null);
     };
-  }, [sourcePoint, destinationPoint, pathPoints]);
+  }, [sourcePoint, destinationPoint, pathPoints, navigationMode]);
 
   // Add arrow marker definition
   React.useEffect(() => {
@@ -1134,11 +1182,25 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
   return (
     <div className="relative w-screen h-screen">
-      <svg
-        ref={svgRef}
-        className="w-screen h-screen block bg-gray-50"
-        style={{ touchAction: 'none' }}
-      />
+      <div style={navigationMode ? { perspective: '1200px', perspectiveOrigin: '50% 50%' } : undefined}>
+        <svg
+          ref={svgRef}
+          className="w-screen h-screen block bg-gray-50"
+          style={{
+            touchAction: 'none',
+            ...(navigationMode && {
+              transform: `rotateX(${navTilt}deg) rotateZ(${navHeading}deg)`,
+              transformOrigin: 'center center',
+              willChange: 'transform',
+            }),
+          }}
+        />
+      </div>
+      {navigationMode && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
+          Tilt: {Math.round(navTilt)}° · Heading: {Math.round(navHeading)}° · Shift-drag to orbit
+        </div>
+      )}
 
       {/* Collapsible Controls Sheet */}
       <Sheet>
