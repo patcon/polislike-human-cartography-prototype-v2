@@ -1226,32 +1226,29 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       })
       .on("zoom", (event) => {
         const transform = event.transform;
+
+        if (navigationMode) {
+          // In nav mode, zoom is baked into the JS projection — don't touch the <g> transform
+          setNavZoomTransform(transform);
+          return;
+        }
+
         container.attr("transform", transform);
 
-        if (navigationMode) setNavZoomTransform(transform);
-
-        if (!navigationMode) {
-          // Update circle sizes to maintain visual consistency during zoom
-          container.selectAll("circle")
-            .attr("r", (d: any) => {
-              const baseRadius = (() => {
-                if (sourcePoint && d.id === sourcePoint.id) return 8;
-                if (destinationPoint && d.id === destinationPoint.id) return 8;
-                if (pathPoints.some(p => p.id === d.id)) return 5;
-                return 3;
-              })();
-              return baseRadius / transform.k;
-            })
-            .attr("stroke-width", 2 / transform.k);
-
-          // Update path stroke width to maintain visibility
-          container.selectAll(".routing-path")
-            .attr("stroke-width", 3 / transform.k);
-
-          // Update network edge stroke width
-          container.selectAll(".network-edge")
-            .attr("stroke-width", 1 / transform.k);
-        }
+        // Update circle/path/edge sizes to maintain visual consistency during zoom
+        container.selectAll("circle")
+          .attr("r", (d: any) => {
+            const baseRadius = (() => {
+              if (sourcePoint && d.id === sourcePoint.id) return 8;
+              if (destinationPoint && d.id === destinationPoint.id) return 8;
+              if (pathPoints.some(p => p.id === d.id)) return 5;
+              return 3;
+            })();
+            return baseRadius / transform.k;
+          })
+          .attr("stroke-width", 2 / transform.k);
+        container.selectAll(".routing-path").attr("stroke-width", 3 / transform.k);
+        container.selectAll(".network-edge").attr("stroke-width", 1 / transform.k);
       });
 
     svg.call(zoom);
