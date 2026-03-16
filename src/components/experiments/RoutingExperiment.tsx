@@ -633,38 +633,39 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   // Derive highlighted path points by sampling intermediates according to waypointDensity + waypointDistribution
   const visiblePathPoints = React.useMemo(() => {
     if (pathPoints.length <= 2 || waypointDensity >= 1.0) return pathPoints;
-    const intermediates = pathPoints.slice(1, -1);
-    const count = Math.round(intermediates.length * waypointDensity);
-    if (count === 0) return [pathPoints[0], pathPoints[pathPoints.length - 1]];
+    // totalCount treats start and end as waypoints, so innerCount is the intermediates to select
+    const totalCount = Math.max(2, Math.round(pathPoints.length * waypointDensity));
+    const innerCount = totalCount - 2;
+    if (innerCount === 0) return [pathPoints[0], pathPoints[pathPoints.length - 1]];
 
     let selected: Point[];
 
     if (waypointDistribution === 'distance') {
-      // Compute cumulative Euclidean distances along the intermediates
+      // Cumulative distances along the full path (including start/end)
       const cumDist: number[] = [0];
-      for (let i = 1; i < intermediates.length; i++) {
-        const prev = intermediates[i - 1], cur = intermediates[i];
+      for (let i = 1; i < pathPoints.length; i++) {
+        const prev = pathPoints[i - 1], cur = pathPoints[i];
         cumDist.push(cumDist[i - 1] + Math.sqrt((cur.x - prev.x) ** 2 + (cur.y - prev.y) ** 2));
       }
       const totalDist = cumDist[cumDist.length - 1];
+      // Place innerCount targets evenly between start and end (start=0, end=totalDist are fixed)
       selected = [];
-      for (let i = 0; i < count; i++) {
-        const target = count === 1 ? totalDist / 2 : (i / (count - 1)) * totalDist;
-        // Find intermediate whose cumulative distance is closest to target
-        let best = 0;
-        let bestDiff = Math.abs(cumDist[0] - target);
-        for (let j = 1; j < cumDist.length; j++) {
+      for (let i = 1; i <= innerCount; i++) {
+        const target = (i / (innerCount + 1)) * totalDist;
+        let best = 1;
+        let bestDiff = Math.abs(cumDist[1] - target);
+        for (let j = 2; j < cumDist.length - 1; j++) {
           const diff = Math.abs(cumDist[j] - target);
           if (diff < bestDiff) { bestDiff = diff; best = j; }
         }
-        selected.push(intermediates[best]);
+        selected.push(pathPoints[best]);
       }
     } else {
-      // Hops: evenly spaced by index
+      // Hops: evenly spaced by index across full path (start=0, end=last are fixed)
       selected = [];
-      for (let i = 0; i < count; i++) {
-        const idx = count === 1 ? 0 : Math.round(i * (intermediates.length - 1) / (count - 1));
-        selected.push(intermediates[idx]);
+      for (let i = 1; i <= innerCount; i++) {
+        const idx = Math.round(i * (pathPoints.length - 1) / (innerCount + 1));
+        selected.push(pathPoints[idx]);
       }
     }
 
