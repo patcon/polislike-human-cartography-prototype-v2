@@ -28,6 +28,27 @@ const meta: Meta<typeof RoutingExperiment> = {
       description: 'Path rendering style',
       defaultValue: 'sharp',
     },
+    navigationMode: {
+      control: 'boolean',
+      description: 'Enable Google Maps-style 3D navigation (tilt + orbit)',
+      defaultValue: false,
+    },
+    waypointDensity: {
+      control: { type: 'range', min: 0, max: 1, step: 0.1 },
+      description: 'Fraction of intermediate waypoints to highlight along the path (1.0 = all)',
+      defaultValue: 1.0,
+    },
+    waypointDistribution: {
+      control: { type: 'radio' },
+      options: ['hops', 'distance'],
+      description: 'How to distribute highlighted waypoints: evenly by hop count, or evenly by path length',
+      defaultValue: 'hops',
+    },
+    includeAvatars: {
+      control: 'boolean',
+      description: 'Show DiceBear adventurer-neutral avatars in pin heads (navigation mode only)',
+      defaultValue: false,
+    },
     // Kedro API Settings
     kedroBaseUrl: {
       control: 'text',
@@ -144,6 +165,31 @@ To use this story:
 1. Start your local Kedro server on port 4141
 2. The component will automatically fetch available pipelines
 3. Select different pipelines to see routing experiments on different datasets
+        `,
+      },
+    },
+  },
+};
+
+export const NavigationMode: Story = {
+  args: {
+    showEdges: 'all',
+    showNodes: 'all',
+    pathStyle: 'smooth',
+    navigationMode: true,
+    includeAvatars: true,
+    waypointDensity: 0.3,
+    waypointDistribution: 'distance',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Google Maps-style 3D navigation mode.
+- **Scroll** to zoom
+- **Left-drag** to pan
+- **Shift-drag** to orbit (horizontal = rotate heading, vertical = tilt)
+- **Double-click** empty space to reset view
         `,
       },
     },

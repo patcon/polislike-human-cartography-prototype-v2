@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { fetchAndProcessKedroData } from "@/lib/kedro-api";
 import { ChevronRightIcon, SettingsIcon } from "lucide-react";
 
@@ -481,6 +482,29 @@ const findBFSPath = (source: Point, destination: Point, networkGraph: Map<string
 
 
 // Routing algorithm implementations
+const pointsToSvgPath = (
+  points: Point[],
+  xScale: d3.ScaleLinear<number, number>,
+  yScale: d3.ScaleLinear<number, number>,
+  pathStyle: 'sharp' | 'smooth' = 'sharp'
+): string | null => {
+  if (points.length < 2) return null;
+  const scaled = points.map(p => ({ x: xScale(p.x), y: yScale(p.y) }));
+  if (pathStyle === 'smooth' && scaled.length >= 3) {
+    let s = `M ${scaled[0].x} ${scaled[0].y}`;
+    for (let i = 1; i < scaled.length - 1; i++) {
+      const cur = scaled[i], nxt = scaled[i + 1];
+      s += ` Q ${cur.x} ${cur.y} ${cur.x + (nxt.x - cur.x) * 0.5} ${cur.y + (nxt.y - cur.y) * 0.5}`;
+    }
+    const last = scaled[scaled.length - 1];
+    s += ` T ${last.x} ${last.y}`;
+    return s;
+  }
+  let s = `M ${scaled[0].x} ${scaled[0].y}`;
+  for (let i = 1; i < scaled.length; i++) s += ` L ${scaled[i].x} ${scaled[i].y}`;
+  return s;
+};
+
 const generatePath = (
   source: Point,
   destination: Point,
@@ -547,6 +571,10 @@ type DisplaySettings = {
   pathStyle?: 'sharp' | 'smooth';
   kedroBaseUrl?: string;
   pipelineId?: string;
+  navigationMode?: boolean;
+  waypointDensity?: number;
+  waypointDistribution?: 'hops' | 'distance';
+  includeAvatars?: boolean;
 };
 
 export const RoutingExperiment: React.FC<DisplaySettings> = ({
@@ -554,10 +582,15 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   showNodes: initialShowNodes = 'all',
   pathStyle: initialPathStyle = 'sharp',
   kedroBaseUrl,
-  pipelineId = 'mean_localmap_bestkmeans'
+  pipelineId = 'mean_localmap_bestkmeans',
+  navigationMode = false,
+  waypointDensity: initialWaypointDensity = 1.0,
+  waypointDistribution: initialWaypointDistribution = 'hops' as 'hops' | 'distance',
+  includeAvatars: initialIncludeAvatars = false,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+  const [navZoomTransform, setNavZoomTransform] = React.useState<d3.ZoomTransform>(d3.zoomIdentity);
 
   const [data, setData] = React.useState<Point[]>([]);
   const [sourcePoint, setSourcePoint] = React.useState<Point | null>(null);
@@ -577,15 +610,67 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [densityAlpha, setDensityAlpha] = React.useState(1.00);
   const [densityMap, setDensityMap] = React.useState<Map<string, number>>(new Map());
 
+  // Navigation mode state (3D tilt/heading)
+  const [navTilt, setNavTilt] = React.useState(0);      // 0–80 degrees
+  const [navHeading, setNavHeading] = React.useState(0); // 0–360 degrees
+
   // Local state for display settings (used when not controlled by Storybook)
   const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>('none');
   const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>('all');
   const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>('smooth');
+  const [localWaypointDensity, setLocalWaypointDensity] = React.useState(1.0);
+  const [localWaypointDistribution, setLocalWaypointDistribution] = React.useState<'hops' | 'distance'>('hops');
+  const [localIncludeAvatars, setLocalIncludeAvatars] = React.useState(false);
 
   // Use props if provided (from Storybook), otherwise use local state
   const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
   const showNodes = initialShowNodes !== 'all' ? initialShowNodes : localShowNodes;
   const pathStyle = initialPathStyle !== 'sharp' ? initialPathStyle : localPathStyle;
+  const waypointDensity = initialWaypointDensity !== 1.0 ? initialWaypointDensity : localWaypointDensity;
+  const waypointDistribution = initialWaypointDistribution !== 'hops' ? initialWaypointDistribution : localWaypointDistribution;
+  const includeAvatars = initialIncludeAvatars || localIncludeAvatars;
+
+  // Derive highlighted path points by sampling intermediates according to waypointDensity + waypointDistribution
+  const visiblePathPoints = React.useMemo(() => {
+    if (pathPoints.length <= 2 || waypointDensity >= 1.0) return pathPoints;
+    // totalCount treats start and end as waypoints, so innerCount is the intermediates to select
+    const totalCount = Math.max(2, Math.round(pathPoints.length * waypointDensity));
+    const innerCount = totalCount - 2;
+    if (innerCount === 0) return [pathPoints[0], pathPoints[pathPoints.length - 1]];
+
+    let selected: Point[];
+
+    if (waypointDistribution === 'distance') {
+      // Cumulative distances along the full path (including start/end)
+      const cumDist: number[] = [0];
+      for (let i = 1; i < pathPoints.length; i++) {
+        const prev = pathPoints[i - 1], cur = pathPoints[i];
+        cumDist.push(cumDist[i - 1] + Math.sqrt((cur.x - prev.x) ** 2 + (cur.y - prev.y) ** 2));
+      }
+      const totalDist = cumDist[cumDist.length - 1];
+      // Place innerCount targets evenly between start and end (start=0, end=totalDist are fixed)
+      selected = [];
+      for (let i = 1; i <= innerCount; i++) {
+        const target = (i / (innerCount + 1)) * totalDist;
+        let best = 1;
+        let bestDiff = Math.abs(cumDist[1] - target);
+        for (let j = 2; j < cumDist.length - 1; j++) {
+          const diff = Math.abs(cumDist[j] - target);
+          if (diff < bestDiff) { bestDiff = diff; best = j; }
+        }
+        selected.push(pathPoints[best]);
+      }
+    } else {
+      // Hops: evenly spaced by index across full path (start=0, end=last are fixed)
+      selected = [];
+      for (let i = 1; i <= innerCount; i++) {
+        const idx = Math.round(i * (pathPoints.length - 1) / (innerCount + 1));
+        selected.push(pathPoints[idx]);
+      }
+    }
+
+    return [pathPoints[0], ...selected, pathPoints[pathPoints.length - 1]];
+  }, [pathPoints, waypointDensity, waypointDistribution]);
 
   // Load and process the projection data
   React.useEffect(() => {
@@ -739,10 +824,60 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     const container = containerRef.current;
 
     // Get current zoom transform
-    const currentTransform = d3.zoomTransform(container.node()!);
+    const currentTransform = navigationMode ? navZoomTransform : d3.zoomTransform(container.node()!);
+
+
+    // In nav mode: bake zoom + 3D perspective into coordinates directly (no CSS transform on SVG).
+    // In normal mode: D3 zoom applies its transform to the <g> container; we just use xScale/yScale.
+    if (navigationMode) container.attr("transform", null);
+
+    const W = svgRef.current?.clientWidth ?? window.innerWidth;
+    const H = svgRef.current?.clientHeight ?? window.innerHeight;
+    const headingRad = navHeading * Math.PI / 180;
+    const tiltRad = navTilt * Math.PI / 180;
+    const cosH = Math.cos(headingRad), sinH = Math.sin(headingRad);
+    const cosT = Math.cos(tiltRad), sinT = Math.sin(tiltRad);
+    const focal = 1200;
+
+    const project = (dataX: number, dataY: number) => {
+      if (!navigationMode) return { x: xScale(dataX), y: yScale(dataY), tz: 0 };
+      const sx = xScale(dataX) * navZoomTransform.k + navZoomTransform.x;
+      const sy = yScale(dataY) * navZoomTransform.k + navZoomTransform.y;
+      const cx = sx - W / 2, cy = sy - H / 2;
+      const rx = cx * cosH - cy * sinH;
+      const ry = cx * sinH + cy * cosH;
+      const tz = -ry * sinT;
+      const s = focal / (focal + tz);
+      return { x: rx * s + W / 2, y: ry * cosT * s + H / 2, tz };
+    };
 
     // Clear all existing elements
     container.selectAll("*").remove();
+
+    // 0. Draw perspective grid in navigation mode (below everything)
+    if (navigationMode) {
+      const [xMin, xMax] = xScale.domain();
+      const [yMin, yMax] = yScale.domain();
+      const gridCount = 10;
+
+      for (let i = 0; i <= gridCount; i++) {
+        const tx = xMin + (xMax - xMin) * i / gridCount;
+        const p1 = project(tx, yMin), p2 = project(tx, yMax);
+        container.append("line")
+          .attr("x1", p1.x).attr("y1", p1.y)
+          .attr("x2", p2.x).attr("y2", p2.y)
+          .attr("stroke", "#d1d5db").attr("stroke-width", 1)
+          .style("pointer-events", "none");
+
+        const ty = yMin + (yMax - yMin) * i / gridCount;
+        const p3 = project(xMin, ty), p4 = project(xMax, ty);
+        container.append("line")
+          .attr("x1", p3.x).attr("y1", p3.y)
+          .attr("x2", p4.x).attr("y2", p4.y)
+          .attr("stroke", "#d1d5db").attr("stroke-width", 1)
+          .style("pointer-events", "none");
+      }
+    }
 
     // 1. Draw network edges first (bottom layer)
     if (networkEdges.length > 0) {
@@ -782,30 +917,45 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .enter()
         .append("line")
         .attr("class", "network-edge")
-        .attr("x1", (d: Edge) => xScale(d.source.x))
-        .attr("y1", (d: Edge) => yScale(d.source.y))
-        .attr("x2", (d: Edge) => xScale(d.target.x))
-        .attr("y2", (d: Edge) => yScale(d.target.y))
+        .attr("x1", (d: Edge) => project(d.source.x, d.source.y).x)
+        .attr("y1", (d: Edge) => project(d.source.x, d.source.y).y)
+        .attr("x2", (d: Edge) => project(d.target.x, d.target.y).x)
+        .attr("y2", (d: Edge) => project(d.target.x, d.target.y).y)
         .attr("stroke", edgeColor)
         .attr("stroke-width", 1 / currentTransform.k)
         .attr("stroke-opacity", edgeOpacity)
         .style("pointer-events", "none"); // Prevent edges from capturing mouse events
     }
 
-    // 2. Draw path (middle layer)
+    // 2. Draw path (middle layer) — always traverses all waypoints
     if (sourcePoint && destinationPoint && pathPoints.length > 0) {
-      const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
+      let pathD: string | null = null;
+      if (navigationMode) {
+        const pts = pathPoints.map(p => project(p.x, p.y));
+        if (pathStyle === 'smooth' && pts.length >= 3) {
+          pathD = `M ${pts[0].x} ${pts[0].y}`;
+          for (let i = 1; i < pts.length - 1; i++) {
+            const cur = pts[i], nxt = pts[i + 1];
+            pathD += ` Q ${cur.x} ${cur.y} ${cur.x + (nxt.x - cur.x) * 0.5} ${cur.y + (nxt.y - cur.y) * 0.5}`;
+          }
+          pathD += ` T ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
+        } else {
+          pathD = `M ${pts[0].x} ${pts[0].y}` + pts.slice(1).map(p => ` L ${p.x} ${p.y}`).join('');
+        }
+      } else {
+        pathD = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
+      }
 
-      if (path) {
+      if (pathD) {
         container.append("path")
           .attr("class", "routing-path")
-          .attr("d", path)
+          .attr("d", pathD)
           .attr("fill", "none")
           .attr("stroke", "#3b82f6")
-          .attr("stroke-width", 3 / currentTransform.k)
+          .attr("stroke-width", navigationMode ? 3 : 3 / currentTransform.k)
           .attr("stroke-opacity", 0.8)
           .attr("marker-end", "url(#arrowhead)")
-          .style("pointer-events", "none"); // Prevent path from capturing mouse events
+          .style("pointer-events", "none");
       }
     }
 
@@ -834,6 +984,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       (!sourcePoint || d.id !== sourcePoint.id) &&
       (!destinationPoint || d.id !== destinationPoint.id)
     );
+
+    const activeWaypointIds = new Set(visiblePathPoints.map(p => p.id));
 
     const startEndPoints = pointsToShow.filter(d =>
       (sourcePoint && d.id === sourcePoint.id) ||
@@ -912,21 +1064,22 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .enter()
         .append("circle")
         .attr("class", className)
-        .attr("cx", d => xScale(d.x))
-        .attr("cy", d => yScale(d.y))
+        .attr("cx", d => project(d.x, d.y).x)
+        .attr("cy", d => project(d.x, d.y).y)
         .attr("r", d => {
           const baseRadius = (() => {
             if (sourcePoint && d.id === sourcePoint.id) return 8;
             if (destinationPoint && d.id === destinationPoint.id) return 8;
-            if (pathPoints.some(p => p.id === d.id)) return 5; // intermediate points
+            if (pathPoints.some(p => p.id === d.id)) return 5;
             return 3;
           })();
-          return baseRadius / currentTransform.k;
+          return navigationMode ? baseRadius : baseRadius / currentTransform.k;
         })
         .attr("fill", d => {
           if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
           if (destinationPoint && d.id === destinationPoint.id) return "#ef4444"; // red
-          if (pathPoints.some(p => p.id === d.id)) return "#f59e0b"; // orange for path points
+          if (activeWaypointIds.has(d.id)) return "#f59e0b"; // orange — active waypoint
+          if (pathPoints.some(p => p.id === d.id)) return "#ffffff"; // white — inactive waypoint
 
           // Color by density if density alpha is not zero
           if (densityAlpha !== 0 && densityMap.size > 0) {
@@ -945,10 +1098,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .attr("stroke", d => {
           if (sourcePoint && d.id === sourcePoint.id) return "#16a34a";
           if (destinationPoint && d.id === destinationPoint.id) return "#dc2626";
-          if (pathPoints.some(p => p.id === d.id)) return "#d97706";
+          if (activeWaypointIds.has(d.id)) return "#d97706";
+          if (pathPoints.some(p => p.id === d.id)) return "#94a3b8"; // slate border for inactive
           return "none";
         })
-        .attr("stroke-width", 2 / currentTransform.k)
+        .attr("stroke-width", navigationMode ? 2 : 2 / currentTransform.k)
         .style("cursor", d => {
           // Show different cursor for draggable points
           if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) {
@@ -974,20 +1128,81 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       return circles;
     };
 
-    // Draw nodes in proper z-order: inactive -> intermediate -> start/end
+    const inactiveWaypoints = intermediatePoints.filter(d => !activeWaypointIds.has(d.id));
+    const activeWaypoints = intermediatePoints.filter(d => activeWaypointIds.has(d.id));
     drawCircles(inactivePoints, "inactive-node");
-    drawCircles(intermediatePoints, "intermediate-node");
-    const startEndCircles = drawCircles(startEndPoints, "start-end-node");
 
-    // Apply drag behavior only to source and destination points
-    startEndCircles
-      .filter(d => {
-        if (!sourcePoint || !destinationPoint) return false;
-        return d.id === sourcePoint.id || d.id === destinationPoint.id;
-      })
-      .call(dragBehavior);
+    if (navigationMode) {
+      // Upright pin: tip anchored to projected position, body extends straight up in screen space.
+      const drawPin = (point: Point, fill: string, stroke: string, r = 10, stemH = 20) => {
+        const { x: px, y: py } = project(point.x, point.y);
+        const pathD = `M ${px} ${py} L ${px - r} ${py - stemH} A ${r} ${r} 0 1 1 ${px + r} ${py - stemH} Z`;
+        container.append("path")
+          .attr("d", pathD)
+          .attr("fill", fill)
+          .attr("stroke", stroke)
+          .attr("stroke-width", 1.5)
+          .attr("stroke-linejoin", "round")
+          .style("cursor", "pointer")
+          .on("click", () => {
+            setSourcePoint(point);
+            setDestinationPoint(null);
+            setPathPoints([]);
+          });
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle]);
+        if (includeAvatars) {
+          const avatarR = r * 0.9;
+          const avatarUrl = `https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(String(point.id))}&radius=50`;
+          container.append("image")
+            .attr("href", avatarUrl)
+            .attr("x", px - avatarR).attr("y", py - stemH - avatarR)
+            .attr("width", avatarR * 2).attr("height", avatarR * 2)
+            .style("pointer-events", "none");
+        } else {
+          container.append("circle")
+            .attr("cx", px).attr("cy", py - stemH).attr("r", r * 0.38)
+            .attr("fill", "white")
+            .style("pointer-events", "none");
+        }
+      };
+
+      // Unified z-sorted pass: all path elements (dots + pins) sorted far-first (descending tz)
+      type ZItem =
+        | { kind: 'dot'; point: Point; fill: string; stroke: string }
+        | { kind: 'pin'; point: Point; fill: string; stroke: string; r: number; stemH: number };
+      const zItems: ZItem[] = [
+        ...inactiveWaypoints.map(p => ({ kind: 'dot' as const, point: p, fill: '#ffffff', stroke: '#94a3b8' })),
+        ...activeWaypoints.map(p => ({ kind: 'pin' as const, point: p, fill: '#f59e0b', stroke: '#d97706', r: 8, stemH: 16 })),
+        ...(sourcePoint ? [{ kind: 'pin' as const, point: sourcePoint, fill: '#22c55e', stroke: '#16a34a', r: 10, stemH: 20 }] : []),
+        ...(destinationPoint ? [{ kind: 'pin' as const, point: destinationPoint, fill: '#ef4444', stroke: '#dc2626', r: 10, stemH: 20 }] : []),
+      ];
+      zItems
+        .sort((a, b) => project(b.point.x, b.point.y).tz - project(a.point.x, a.point.y).tz)
+        .forEach(item => {
+          if (item.kind === 'dot') {
+            const { x, y } = project(item.point.x, item.point.y);
+            container.append('circle')
+              .attr('cx', x).attr('cy', y).attr('r', 4)
+              .attr('fill', item.fill).attr('stroke', item.stroke)
+              .attr('stroke-width', 1.5)
+              .style('pointer-events', 'none');
+          } else {
+            drawPin(item.point, item.fill, item.stroke, item.r, item.stemH);
+          }
+        });
+    } else {
+      drawCircles(inactiveWaypoints, "inactive-waypoint");
+      drawCircles(activeWaypoints, "active-waypoint");
+      const startEndCircles = drawCircles(startEndPoints, "start-end-node");
+      startEndCircles
+        .filter(d => {
+          if (!sourcePoint || !destinationPoint) return false;
+          return d.id === sourcePoint.id || d.id === destinationPoint.id;
+        })
+        .call(dragBehavior);
+    }
+
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, visiblePathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode, navZoomTransform, navTilt, navHeading, includeAvatars]);
 
   // Calculate path points separately to avoid infinite loops
   React.useEffect(() => {
@@ -1013,6 +1228,41 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   }, [sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph]);
 
 
+  // Shift-drag for 3D navigation (tilt + heading), matching Google Maps convention
+  React.useEffect(() => {
+    if (!navigationMode || !svgRef.current) return;
+    const svgEl = svgRef.current;
+
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0 || !e.shiftKey) return;
+      e.preventDefault();
+      dragging = true;
+      lastX = e.clientX; lastY = e.clientY;
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      setNavHeading(h => (h - dx * 0.3 + 360) % 360);
+      setNavTilt(t => Math.max(0, Math.min(80, t - dy * 0.3)));
+    };
+    const onMouseUp = (e: MouseEvent) => { if (e.button === 0) dragging = false; };
+
+    svgEl.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      svgEl.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [navigationMode, isLoading]);
+
   // Add zoom behavior
   React.useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -1029,8 +1279,9 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         if (event.type === "touchstart" || event.type === "touchmove" || event.type === "touchend") {
           return true;
         }
-        // Allow mouse events for panning (but not clicking on points)
+        // Allow mouse events for panning (but not clicking on points, and not shift-drag in navigation mode)
         if (event.type === "mousedown") {
+          if (navigationMode && event.shiftKey) return false;
           const target = event.target as Element;
           return !target.closest("circle");
         }
@@ -1038,9 +1289,16 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       })
       .on("zoom", (event) => {
         const transform = event.transform;
+
+        if (navigationMode) {
+          // In nav mode, zoom is baked into the JS projection — don't touch the <g> transform
+          setNavZoomTransform(transform);
+          return;
+        }
+
         container.attr("transform", transform);
 
-        // Update circle sizes to maintain visual consistency during zoom
+        // Update circle/path/edge sizes to maintain visual consistency during zoom
         container.selectAll("circle")
           .attr("r", (d: any) => {
             const baseRadius = (() => {
@@ -1052,14 +1310,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             return baseRadius / transform.k;
           })
           .attr("stroke-width", 2 / transform.k);
-
-        // Update path stroke width to maintain visibility
-        container.selectAll(".routing-path")
-          .attr("stroke-width", 3 / transform.k);
-
-        // Update network edge stroke width
-        container.selectAll(".network-edge")
-          .attr("stroke-width", 1 / transform.k);
+        container.selectAll(".routing-path").attr("stroke-width", 3 / transform.k);
+        container.selectAll(".network-edge").attr("stroke-width", 1 / transform.k);
       });
 
     svg.call(zoom);
@@ -1072,6 +1324,10 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           zoom.transform,
           d3.zoomIdentity
         );
+        if (navigationMode) {
+          setNavTilt(0);
+          setNavHeading(0);
+        }
       }
     });
 
@@ -1079,7 +1335,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       svg.on(".zoom", null);
       svg.on("dblclick.zoom", null);
     };
-  }, [sourcePoint, destinationPoint, pathPoints]);
+  }, [sourcePoint, destinationPoint, pathPoints, navigationMode]);
 
   // Add arrow marker definition
   React.useEffect(() => {
@@ -1139,6 +1395,11 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         className="w-screen h-screen block bg-gray-50"
         style={{ touchAction: 'none' }}
       />
+      {navigationMode && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
+          Tilt: {Math.round(navTilt)}° · Heading: {Math.round(navHeading)}° · Shift-drag to orbit
+        </div>
+      )}
 
       {/* Collapsible Controls Sheet */}
       <Sheet>
@@ -1330,6 +1591,53 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                       </div>
                     </RadioGroup>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-2">
+                      Waypoints: {waypointDensity >= 1.0 ? 'All' : `${Math.round(waypointDensity * 100)}%`}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={localWaypointDensity}
+                      onChange={(e) => setLocalWaypointDensity(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fraction of intermediate waypoints to highlight
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">Waypoint Distribution</Label>
+                    <RadioGroup
+                      value={waypointDistribution}
+                      onValueChange={(value: 'hops' | 'distance') => setLocalWaypointDistribution(value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="hops" id="wp-hops" className="w-3 h-3" />
+                        <Label htmlFor="wp-hops" className="text-xs">Hops</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="distance" id="wp-distance" className="w-3 h-3" />
+                        <Label htmlFor="wp-distance" className="text-xs">Distance</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {navigationMode && (
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="include-avatars" className="text-xs font-medium">Avatar Pins</Label>
+                      <Switch
+                        id="include-avatars"
+                        checked={includeAvatars}
+                        onCheckedChange={setLocalIncludeAvatars}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
