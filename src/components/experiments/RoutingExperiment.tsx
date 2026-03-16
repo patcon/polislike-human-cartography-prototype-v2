@@ -873,7 +873,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     }
 
     // 2. Draw path (middle layer) — always traverses all waypoints
-    if (sourcePoint && destinationPoint && pathPoints.length > 0) {
+    // In navigation mode the path is rendered in the overlay instead (same projected coords as circles)
+    if (!navigationMode && sourcePoint && destinationPoint && pathPoints.length > 0) {
       const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
 
       if (path) {
@@ -1237,6 +1238,30 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     };
 
     d3.select(overlaySvg).selectAll("*").remove();
+
+    // Draw path in overlay using projected coordinates so it correctly connects the circles
+    if (sourcePoint && destinationPoint && pathPoints.length > 1) {
+      const pts = pathPoints.map(p => project(p.x, p.y));
+      let pathD: string;
+      if (pathStyle === 'smooth' && pts.length >= 3) {
+        pathD = `M ${pts[0].x} ${pts[0].y}`;
+        for (let i = 1; i < pts.length - 1; i++) {
+          const cur = pts[i], nxt = pts[i + 1];
+          pathD += ` Q ${cur.x} ${cur.y} ${cur.x + (nxt.x - cur.x) * 0.5} ${cur.y + (nxt.y - cur.y) * 0.5}`;
+        }
+        pathD += ` T ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
+      } else {
+        pathD = `M ${pts[0].x} ${pts[0].y}` + pts.slice(1).map(p => ` L ${p.x} ${p.y}`).join('');
+      }
+      d3.select(overlaySvg)
+        .append("path")
+        .attr("d", pathD)
+        .attr("fill", "none")
+        .attr("stroke", "#3b82f6")
+        .attr("stroke-width", 3)
+        .attr("stroke-opacity", 0.8)
+        .style("pointer-events", "none");
+    }
 
     const activeWaypointIds = new Set(visiblePathPoints.map(p => p.id));
 
