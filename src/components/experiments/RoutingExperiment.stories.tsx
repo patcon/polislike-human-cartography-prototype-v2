@@ -33,6 +33,11 @@ const meta: Meta<typeof RoutingExperiment> = {
       description: 'Enable Google Maps-style 3D navigation (tilt + orbit)',
       defaultValue: false,
     },
+    waypointDensity: {
+      control: { type: 'range', min: 0, max: 1, step: 0.1 },
+      description: 'Fraction of intermediate waypoints to show along the path (1.0 = all)',
+      defaultValue: 1.0,
+    },
     // Kedro API Settings
     kedroBaseUrl: {
       control: 'text',

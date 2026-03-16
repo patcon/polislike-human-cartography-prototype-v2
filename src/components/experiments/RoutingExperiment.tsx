@@ -481,6 +481,29 @@ const findBFSPath = (source: Point, destination: Point, networkGraph: Map<string
 
 
 // Routing algorithm implementations
+const pointsToSvgPath = (
+  points: Point[],
+  xScale: d3.ScaleLinear<number, number>,
+  yScale: d3.ScaleLinear<number, number>,
+  pathStyle: 'sharp' | 'smooth' = 'sharp'
+): string | null => {
+  if (points.length < 2) return null;
+  const scaled = points.map(p => ({ x: xScale(p.x), y: yScale(p.y) }));
+  if (pathStyle === 'smooth' && scaled.length >= 3) {
+    let s = `M ${scaled[0].x} ${scaled[0].y}`;
+    for (let i = 1; i < scaled.length - 1; i++) {
+      const cur = scaled[i], nxt = scaled[i + 1];
+      s += ` Q ${cur.x} ${cur.y} ${cur.x + (nxt.x - cur.x) * 0.5} ${cur.y + (nxt.y - cur.y) * 0.5}`;
+    }
+    const last = scaled[scaled.length - 1];
+    s += ` T ${last.x} ${last.y}`;
+    return s;
+  }
+  let s = `M ${scaled[0].x} ${scaled[0].y}`;
+  for (let i = 1; i < scaled.length; i++) s += ` L ${scaled[i].x} ${scaled[i].y}`;
+  return s;
+};
+
 const generatePath = (
   source: Point,
   destination: Point,
@@ -548,6 +571,7 @@ type DisplaySettings = {
   kedroBaseUrl?: string;
   pipelineId?: string;
   navigationMode?: boolean;
+  waypointDensity?: number;
 };
 
 export const RoutingExperiment: React.FC<DisplaySettings> = ({
@@ -557,6 +581,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   kedroBaseUrl,
   pipelineId = 'mean_localmap_bestkmeans',
   navigationMode = false,
+  waypointDensity: initialWaypointDensity = 1.0,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -587,11 +612,27 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [localShowEdges, setLocalShowEdges] = React.useState<'none' | 'all' | 'only path'>('none');
   const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>('all');
   const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>('smooth');
+  const [localWaypointDensity, setLocalWaypointDensity] = React.useState(1.0);
 
   // Use props if provided (from Storybook), otherwise use local state
   const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
   const showNodes = initialShowNodes !== 'all' ? initialShowNodes : localShowNodes;
   const pathStyle = initialPathStyle !== 'sharp' ? initialPathStyle : localPathStyle;
+  const waypointDensity = initialWaypointDensity !== 1.0 ? initialWaypointDensity : localWaypointDensity;
+
+  // Derive visible path points by sampling intermediates according to waypointDensity
+  const visiblePathPoints = React.useMemo(() => {
+    if (pathPoints.length <= 2 || waypointDensity >= 1.0) return pathPoints;
+    const intermediates = pathPoints.slice(1, -1);
+    const count = Math.round(intermediates.length * waypointDensity);
+    if (count === 0) return [pathPoints[0], pathPoints[pathPoints.length - 1]];
+    const selected: Point[] = [];
+    for (let i = 0; i < count; i++) {
+      const idx = count === 1 ? 0 : Math.round(i * (intermediates.length - 1) / (count - 1));
+      selected.push(intermediates[idx]);
+    }
+    return [pathPoints[0], ...selected, pathPoints[pathPoints.length - 1]];
+  }, [pathPoints, waypointDensity]);
 
   // Load and process the projection data
   React.useEffect(() => {
@@ -798,7 +839,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .style("pointer-events", "none"); // Prevent edges from capturing mouse events
     }
 
-    // 2. Draw path (middle layer)
+    // 2. Draw path (middle layer) — always traverses all waypoints
     if (sourcePoint && destinationPoint && pathPoints.length > 0) {
       const path = generatePath(sourcePoint, destinationPoint, selectedAlgorithm, networkGraph, weightedGraph, xScale, yScale, pathStyle);
 
@@ -840,6 +881,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       (!sourcePoint || d.id !== sourcePoint.id) &&
       (!destinationPoint || d.id !== destinationPoint.id)
     );
+
+    const activeWaypointIds = new Set(visiblePathPoints.map(p => p.id));
 
     const startEndPoints = pointsToShow.filter(d =>
       (sourcePoint && d.id === sourcePoint.id) ||
@@ -932,7 +975,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .attr("fill", d => {
           if (sourcePoint && d.id === sourcePoint.id) return "#22c55e"; // green
           if (destinationPoint && d.id === destinationPoint.id) return "#ef4444"; // red
-          if (pathPoints.some(p => p.id === d.id)) return "#f59e0b"; // orange for path points
+          if (activeWaypointIds.has(d.id)) return "#f59e0b"; // orange — active waypoint
+          if (pathPoints.some(p => p.id === d.id)) return "#ffffff"; // white — inactive waypoint
 
           // Color by density if density alpha is not zero
           if (densityAlpha !== 0 && densityMap.size > 0) {
@@ -951,7 +995,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .attr("stroke", d => {
           if (sourcePoint && d.id === sourcePoint.id) return "#16a34a";
           if (destinationPoint && d.id === destinationPoint.id) return "#dc2626";
-          if (pathPoints.some(p => p.id === d.id)) return "#d97706";
+          if (activeWaypointIds.has(d.id)) return "#d97706";
+          if (pathPoints.some(p => p.id === d.id)) return "#94a3b8"; // slate border for inactive
           return "none";
         })
         .attr("stroke-width", navigationMode ? 2 : 2 / currentTransform.k)
@@ -993,7 +1038,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       })
       .call(dragBehavior);
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, visiblePathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode]);
 
   // Calculate path points separately to avoid infinite loops
   React.useEffect(() => {
@@ -1391,6 +1436,24 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                         <Label htmlFor="path-smooth" className="text-xs">Smooth</Label>
                       </div>
                     </RadioGroup>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-2">
+                      Waypoints: {waypointDensity >= 1.0 ? 'All' : `${Math.round(waypointDensity * 100)}%`}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={localWaypointDensity}
+                      onChange={(e) => setLocalWaypointDensity(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fraction of intermediate waypoints to include
+                    </p>
                   </div>
                 </div>
               </div>
