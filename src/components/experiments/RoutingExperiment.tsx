@@ -839,7 +839,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     const focal = 1200;
 
     const project = (dataX: number, dataY: number) => {
-      if (!navigationMode) return { x: xScale(dataX), y: yScale(dataY) };
+      if (!navigationMode) return { x: xScale(dataX), y: yScale(dataY), tz: 0 };
       const sx = xScale(dataX) * navZoomTransform.k + navZoomTransform.x;
       const sy = yScale(dataY) * navZoomTransform.k + navZoomTransform.y;
       const cx = sx - W / 2, cy = sy - H / 2;
@@ -847,7 +847,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       const ry = cx * sinH + cy * cosH;
       const tz = -ry * sinT;
       const s = focal / (focal + tz);
-      return { x: rx * s + W / 2, y: ry * cosT * s + H / 2 };
+      return { x: rx * s + W / 2, y: ry * cosT * s + H / 2, tz };
     };
 
     // Clear all existing elements
@@ -1127,12 +1127,9 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       return circles;
     };
 
-    // Draw nodes in proper z-order: inactive -> inactive waypoints -> active waypoints -> start/end
     const inactiveWaypoints = intermediatePoints.filter(d => !activeWaypointIds.has(d.id));
     const activeWaypoints = intermediatePoints.filter(d => activeWaypointIds.has(d.id));
     drawCircles(inactivePoints, "inactive-node");
-    drawCircles(inactiveWaypoints, "inactive-waypoint");
-    drawCircles(activeWaypoints, "active-waypoint");
 
     if (navigationMode) {
       // Upright pin: tip anchored to projected position, body extends straight up in screen space.
@@ -1168,12 +1165,33 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         }
       };
 
-      // Active waypoints as smaller upright pins
-      drawCircles(inactiveWaypoints, "inactive-waypoint");
-      activeWaypoints.forEach(p => drawPin(p, "#f59e0b", "#d97706", 8, 16));
-      if (sourcePoint) drawPin(sourcePoint, "#22c55e", "#16a34a");
-      if (destinationPoint) drawPin(destinationPoint, "#ef4444", "#dc2626");
+      // Unified z-sorted pass: all path elements (dots + pins) sorted far-first (descending tz)
+      type ZItem =
+        | { kind: 'dot'; point: Point; fill: string; stroke: string }
+        | { kind: 'pin'; point: Point; fill: string; stroke: string; r: number; stemH: number };
+      const zItems: ZItem[] = [
+        ...inactiveWaypoints.map(p => ({ kind: 'dot' as const, point: p, fill: '#ffffff', stroke: '#94a3b8' })),
+        ...activeWaypoints.map(p => ({ kind: 'pin' as const, point: p, fill: '#f59e0b', stroke: '#d97706', r: 8, stemH: 16 })),
+        ...(sourcePoint ? [{ kind: 'pin' as const, point: sourcePoint, fill: '#22c55e', stroke: '#16a34a', r: 10, stemH: 20 }] : []),
+        ...(destinationPoint ? [{ kind: 'pin' as const, point: destinationPoint, fill: '#ef4444', stroke: '#dc2626', r: 10, stemH: 20 }] : []),
+      ];
+      zItems
+        .sort((a, b) => project(b.point.x, b.point.y).tz - project(a.point.x, a.point.y).tz)
+        .forEach(item => {
+          if (item.kind === 'dot') {
+            const { x, y } = project(item.point.x, item.point.y);
+            container.append('circle')
+              .attr('cx', x).attr('cy', y).attr('r', 4)
+              .attr('fill', item.fill).attr('stroke', item.stroke)
+              .attr('stroke-width', 1.5)
+              .style('pointer-events', 'none');
+          } else {
+            drawPin(item.point, item.fill, item.stroke, item.r, item.stemH);
+          }
+        });
     } else {
+      drawCircles(inactiveWaypoints, "inactive-waypoint");
+      drawCircles(activeWaypoints, "active-waypoint");
       const startEndCircles = drawCircles(startEndPoints, "start-end-node");
       startEndCircles
         .filter(d => {
