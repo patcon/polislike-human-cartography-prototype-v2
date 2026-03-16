@@ -572,6 +572,7 @@ type DisplaySettings = {
   pipelineId?: string;
   navigationMode?: boolean;
   waypointDensity?: number;
+  waypointDistribution?: 'hops' | 'distance';
 };
 
 export const RoutingExperiment: React.FC<DisplaySettings> = ({
@@ -582,6 +583,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   pipelineId = 'mean_localmap_bestkmeans',
   navigationMode = false,
   waypointDensity: initialWaypointDensity = 1.0,
+  waypointDistribution: initialWaypointDistribution = 'hops' as 'hops' | 'distance',
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -613,26 +615,55 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [localShowNodes, setLocalShowNodes] = React.useState<'none' | 'all' | 'only path'>('all');
   const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>('smooth');
   const [localWaypointDensity, setLocalWaypointDensity] = React.useState(1.0);
+  const [localWaypointDistribution, setLocalWaypointDistribution] = React.useState<'hops' | 'distance'>('hops');
 
   // Use props if provided (from Storybook), otherwise use local state
   const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
   const showNodes = initialShowNodes !== 'all' ? initialShowNodes : localShowNodes;
   const pathStyle = initialPathStyle !== 'sharp' ? initialPathStyle : localPathStyle;
   const waypointDensity = initialWaypointDensity !== 1.0 ? initialWaypointDensity : localWaypointDensity;
+  const waypointDistribution = initialWaypointDistribution !== 'hops' ? initialWaypointDistribution : localWaypointDistribution;
 
-  // Derive visible path points by sampling intermediates according to waypointDensity
+  // Derive highlighted path points by sampling intermediates according to waypointDensity + waypointDistribution
   const visiblePathPoints = React.useMemo(() => {
     if (pathPoints.length <= 2 || waypointDensity >= 1.0) return pathPoints;
     const intermediates = pathPoints.slice(1, -1);
     const count = Math.round(intermediates.length * waypointDensity);
     if (count === 0) return [pathPoints[0], pathPoints[pathPoints.length - 1]];
-    const selected: Point[] = [];
-    for (let i = 0; i < count; i++) {
-      const idx = count === 1 ? 0 : Math.round(i * (intermediates.length - 1) / (count - 1));
-      selected.push(intermediates[idx]);
+
+    let selected: Point[];
+
+    if (waypointDistribution === 'distance') {
+      // Compute cumulative Euclidean distances along the intermediates
+      const cumDist: number[] = [0];
+      for (let i = 1; i < intermediates.length; i++) {
+        const prev = intermediates[i - 1], cur = intermediates[i];
+        cumDist.push(cumDist[i - 1] + Math.sqrt((cur.x - prev.x) ** 2 + (cur.y - prev.y) ** 2));
+      }
+      const totalDist = cumDist[cumDist.length - 1];
+      selected = [];
+      for (let i = 0; i < count; i++) {
+        const target = count === 1 ? totalDist / 2 : (i / (count - 1)) * totalDist;
+        // Find intermediate whose cumulative distance is closest to target
+        let best = 0;
+        let bestDiff = Math.abs(cumDist[0] - target);
+        for (let j = 1; j < cumDist.length; j++) {
+          const diff = Math.abs(cumDist[j] - target);
+          if (diff < bestDiff) { bestDiff = diff; best = j; }
+        }
+        selected.push(intermediates[best]);
+      }
+    } else {
+      // Hops: evenly spaced by index
+      selected = [];
+      for (let i = 0; i < count; i++) {
+        const idx = count === 1 ? 0 : Math.round(i * (intermediates.length - 1) / (count - 1));
+        selected.push(intermediates[idx]);
+      }
     }
+
     return [pathPoints[0], ...selected, pathPoints[pathPoints.length - 1]];
-  }, [pathPoints, waypointDensity]);
+  }, [pathPoints, waypointDensity, waypointDistribution]);
 
   // Load and process the projection data
   React.useEffect(() => {
@@ -1455,8 +1486,26 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                       className="w-full"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Fraction of intermediate waypoints to include
+                      Fraction of intermediate waypoints to highlight
                     </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium mb-1 block">Waypoint Distribution</Label>
+                    <RadioGroup
+                      value={waypointDistribution}
+                      onValueChange={(value: 'hops' | 'distance') => setLocalWaypointDistribution(value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="hops" id="wp-hops" className="w-3 h-3" />
+                        <Label htmlFor="wp-hops" className="text-xs">Hops</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="distance" id="wp-distance" className="w-3 h-3" />
+                        <Label htmlFor="wp-distance" className="text-xs">Distance</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 </div>
               </div>

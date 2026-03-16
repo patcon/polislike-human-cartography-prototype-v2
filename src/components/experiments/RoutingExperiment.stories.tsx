@@ -35,8 +35,14 @@ const meta: Meta<typeof RoutingExperiment> = {
     },
     waypointDensity: {
       control: { type: 'range', min: 0, max: 1, step: 0.1 },
-      description: 'Fraction of intermediate waypoints to show along the path (1.0 = all)',
+      description: 'Fraction of intermediate waypoints to highlight along the path (1.0 = all)',
       defaultValue: 1.0,
+    },
+    waypointDistribution: {
+      control: { type: 'radio' },
+      options: ['hops', 'distance'],
+      description: 'How to distribute highlighted waypoints: evenly by hop count, or evenly by path length',
+      defaultValue: 'hops',
     },
     // Kedro API Settings
     kedroBaseUrl: {
