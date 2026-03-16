@@ -586,7 +586,9 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   waypointDistribution: initialWaypointDistribution = 'hops' as 'hops' | 'distance',
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
+  const navCirclesRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+  const [navZoomTransform, setNavZoomTransform] = React.useState<d3.ZoomTransform>(d3.zoomIdentity);
 
   const [data, setData] = React.useState<Point[]>([]);
   const [sourcePoint, setSourcePoint] = React.useState<Point | null>(null);
@@ -1057,20 +1059,23 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     };
 
     // Draw nodes in proper z-order: inactive -> inactive waypoints -> active waypoints -> start/end
-    const inactiveWaypoints = intermediatePoints.filter(d => !activeWaypointIds.has(d.id));
-    const activeWaypoints = intermediatePoints.filter(d => activeWaypointIds.has(d.id));
-    drawCircles(inactivePoints, "inactive-node");
-    drawCircles(inactiveWaypoints, "inactive-waypoint");
-    drawCircles(activeWaypoints, "active-waypoint");
-    const startEndCircles = drawCircles(startEndPoints, "start-end-node");
+    // In navigation mode, circles are rendered in the navCircles overlay instead (undistorted)
+    if (!navigationMode) {
+      const inactiveWaypoints = intermediatePoints.filter(d => !activeWaypointIds.has(d.id));
+      const activeWaypoints = intermediatePoints.filter(d => activeWaypointIds.has(d.id));
+      drawCircles(inactivePoints, "inactive-node");
+      drawCircles(inactiveWaypoints, "inactive-waypoint");
+      drawCircles(activeWaypoints, "active-waypoint");
+      const startEndCircles = drawCircles(startEndPoints, "start-end-node");
 
-    // Apply drag behavior only to source and destination points
-    startEndCircles
-      .filter(d => {
-        if (!sourcePoint || !destinationPoint) return false;
-        return d.id === sourcePoint.id || d.id === destinationPoint.id;
-      })
-      .call(dragBehavior);
+      // Apply drag behavior only to source and destination points
+      startEndCircles
+        .filter(d => {
+          if (!sourcePoint || !destinationPoint) return false;
+          return d.id === sourcePoint.id || d.id === destinationPoint.id;
+        })
+        .call(dragBehavior);
+    }
 
   }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, visiblePathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode]);
 
@@ -1161,6 +1166,8 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         const transform = event.transform;
         container.attr("transform", transform);
 
+        if (navigationMode) setNavZoomTransform(transform);
+
         if (!navigationMode) {
           // Update circle sizes to maintain visual consistency during zoom
           container.selectAll("circle")
@@ -1207,6 +1214,114 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       svg.on("dblclick.zoom", null);
     };
   }, [sourcePoint, destinationPoint, pathPoints, navigationMode]);
+
+  // Render circles in the undistorted overlay SVG when in navigation mode.
+  // Positions are projected via getScreenCTM() so they land correctly on the
+  // perspective-tilted plane as seen by the viewer.
+  React.useEffect(() => {
+    if (!navigationMode || !navCirclesRef.current || !svgRef.current || !xScale || !yScale) return;
+
+    const overlaySvg = navCirclesRef.current;
+    const mainSvg = svgRef.current;
+    const mainCTM = mainSvg.getScreenCTM();
+    const overlayCTM = overlaySvg.getScreenCTM();
+    if (!mainCTM || !overlayCTM) return;
+    const overlayCTMInv = overlayCTM.inverse();
+
+    const project = (dataX: number, dataY: number) => {
+      const svgX = xScale(dataX) * navZoomTransform.k + navZoomTransform.x;
+      const svgY = yScale(dataY) * navZoomTransform.k + navZoomTransform.y;
+      const screen = new DOMPoint(svgX, svgY).matrixTransform(mainCTM);
+      const local = new DOMPoint(screen.x, screen.y).matrixTransform(overlayCTMInv);
+      return { x: local.x, y: local.y };
+    };
+
+    d3.select(overlaySvg).selectAll("*").remove();
+
+    const activeWaypointIds = new Set(visiblePathPoints.map(p => p.id));
+
+    let pointsToShow = data;
+    if (showNodes === 'none') {
+      pointsToShow = [];
+    } else if (showNodes === 'only path') {
+      pointsToShow = data.filter(d =>
+        (sourcePoint && d.id === sourcePoint.id) ||
+        (destinationPoint && d.id === destinationPoint.id) ||
+        pathPoints.some(p => p.id === d.id)
+      );
+    }
+
+    const isIntermediate = (d: Point) =>
+      pathPoints.some(p => p.id === d.id) &&
+      (!sourcePoint || d.id !== sourcePoint.id) &&
+      (!destinationPoint || d.id !== destinationPoint.id);
+
+    const layers = [
+      pointsToShow.filter(d => !isIntermediate(d) && (!sourcePoint || d.id !== sourcePoint.id) && (!destinationPoint || d.id !== destinationPoint.id)),
+      pointsToShow.filter(d => isIntermediate(d) && !activeWaypointIds.has(d.id)),
+      pointsToShow.filter(d => isIntermediate(d) && activeWaypointIds.has(d.id)),
+      pointsToShow.filter(d => (sourcePoint && d.id === sourcePoint.id) || (destinationPoint && d.id === destinationPoint.id)),
+    ];
+
+    layers.forEach((layerPoints, i) => {
+      d3.select(overlaySvg)
+        .selectAll(`.nav-circle-${i}`)
+        .data(layerPoints)
+        .enter()
+        .append("circle")
+        .attr("class", `nav-circle-${i}`)
+        .attr("cx", d => project(d.x, d.y).x)
+        .attr("cy", d => project(d.x, d.y).y)
+        .attr("r", d => {
+          if (sourcePoint && d.id === sourcePoint.id) return 8;
+          if (destinationPoint && d.id === destinationPoint.id) return 8;
+          if (pathPoints.some(p => p.id === d.id)) return 5;
+          return 3;
+        })
+        .attr("fill", d => {
+          if (sourcePoint && d.id === sourcePoint.id) return "#22c55e";
+          if (destinationPoint && d.id === destinationPoint.id) return "#ef4444";
+          if (activeWaypointIds.has(d.id)) return "#f59e0b";
+          if (pathPoints.some(p => p.id === d.id)) return "#ffffff";
+          if (densityAlpha !== 0 && densityMap.size > 0) {
+            const density = densityMap.get(d.id) || 0;
+            const maxDensity = Math.max(...Array.from(densityMap.values()));
+            if (maxDensity > 0) {
+              const normalizedDensity = density / maxDensity;
+              const intensity = Math.floor(normalizedDensity * 200 + 55);
+              return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
+            }
+          }
+          return "#64748b";
+        })
+        .attr("stroke", d => {
+          if (sourcePoint && d.id === sourcePoint.id) return "#16a34a";
+          if (destinationPoint && d.id === destinationPoint.id) return "#dc2626";
+          if (activeWaypointIds.has(d.id)) return "#d97706";
+          if (pathPoints.some(p => p.id === d.id)) return "#94a3b8";
+          return "none";
+        })
+        .attr("stroke-width", 2)
+        .style("pointer-events", "all")
+        .style("cursor", d => {
+          if (sourcePoint && destinationPoint && (d.id === sourcePoint.id || d.id === destinationPoint.id)) return "grab";
+          return "pointer";
+        })
+        .on("click", (_, d) => {
+          if (!sourcePoint) {
+            setSourcePoint(d);
+            setDestinationPoint(null);
+            setPathPoints([]);
+          } else if (!destinationPoint) {
+            setDestinationPoint(d);
+          } else {
+            setSourcePoint(d);
+            setDestinationPoint(null);
+            setPathPoints([]);
+          }
+        });
+    });
+  }, [navigationMode, navZoomTransform, navTilt, navHeading, pathPoints, visiblePathPoints, sourcePoint, destinationPoint, data, xScale, yScale, showNodes, densityAlpha, densityMap]);
 
   // Add arrow marker definition
   React.useEffect(() => {
@@ -1275,6 +1390,13 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
           }}
         />
       </div>
+      {navigationMode && (
+        <svg
+          ref={navCirclesRef}
+          className="absolute inset-0 w-screen h-screen"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
       {navigationMode && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none">
           Tilt: {Math.round(navTilt)}° · Heading: {Math.round(navHeading)}° · Shift-drag to orbit
