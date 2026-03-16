@@ -1127,10 +1127,37 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     drawCircles(inactivePoints, "inactive-node");
     drawCircles(inactiveWaypoints, "inactive-waypoint");
     drawCircles(activeWaypoints, "active-waypoint");
-    const startEndCircles = drawCircles(startEndPoints, "start-end-node");
 
-    // Drag only available outside nav mode
-    if (!navigationMode) {
+    if (navigationMode) {
+      // In nav mode, source/dest are upright pins — tip anchored to projected position,
+      // body extends straight up in screen space regardless of tilt/heading.
+      const drawPin = (point: Point, fill: string, stroke: string) => {
+        const { x: px, y: py } = project(point.x, point.y);
+        const r = 10, stemH = 20; // circle radius, distance from tip to circle center
+        // Teardrop: tip at (px,py), circle centered at (px, py-stemH)
+        const d = `M ${px} ${py} L ${px - r} ${py - stemH} A ${r} ${r} 0 1 1 ${px + r} ${py - stemH} Z`;
+        container.append("path")
+          .attr("d", d)
+          .attr("fill", fill)
+          .attr("stroke", stroke)
+          .attr("stroke-width", 1.5)
+          .attr("stroke-linejoin", "round")
+          .style("cursor", "pointer")
+          .on("click", () => {
+            setSourcePoint(point);
+            setDestinationPoint(null);
+            setPathPoints([]);
+          });
+        container.append("circle")
+          .attr("cx", px).attr("cy", py - stemH).attr("r", r * 0.38)
+          .attr("fill", "white")
+          .style("pointer-events", "none");
+      };
+
+      if (sourcePoint) drawPin(sourcePoint, "#22c55e", "#16a34a");
+      if (destinationPoint) drawPin(destinationPoint, "#ef4444", "#dc2626");
+    } else {
+      const startEndCircles = drawCircles(startEndPoints, "start-end-node");
       startEndCircles
         .filter(d => {
           if (!sourcePoint || !destinationPoint) return false;
