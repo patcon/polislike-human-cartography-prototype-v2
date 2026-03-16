@@ -44,6 +44,11 @@ const meta: Meta<typeof RoutingExperiment> = {
       description: 'How to distribute highlighted waypoints: evenly by hop count, or evenly by path length',
       defaultValue: 'hops',
     },
+    includeAvatars: {
+      control: 'boolean',
+      description: 'Show DiceBear adventurer-neutral avatars in pin heads (navigation mode only)',
+      defaultValue: false,
+    },
     // Kedro API Settings
     kedroBaseUrl: {
       control: 'text',

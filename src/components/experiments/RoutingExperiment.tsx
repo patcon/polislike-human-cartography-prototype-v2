@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { fetchAndProcessKedroData } from "@/lib/kedro-api";
 import { ChevronRightIcon, SettingsIcon } from "lucide-react";
 
@@ -573,6 +574,7 @@ type DisplaySettings = {
   navigationMode?: boolean;
   waypointDensity?: number;
   waypointDistribution?: 'hops' | 'distance';
+  includeAvatars?: boolean;
 };
 
 export const RoutingExperiment: React.FC<DisplaySettings> = ({
@@ -584,6 +586,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   navigationMode = false,
   waypointDensity: initialWaypointDensity = 1.0,
   waypointDistribution: initialWaypointDistribution = 'hops' as 'hops' | 'distance',
+  includeAvatars: initialIncludeAvatars = false,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -617,6 +620,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const [localPathStyle, setLocalPathStyle] = React.useState<'sharp' | 'smooth'>('smooth');
   const [localWaypointDensity, setLocalWaypointDensity] = React.useState(1.0);
   const [localWaypointDistribution, setLocalWaypointDistribution] = React.useState<'hops' | 'distance'>('hops');
+  const [localIncludeAvatars, setLocalIncludeAvatars] = React.useState(false);
 
   // Use props if provided (from Storybook), otherwise use local state
   const showEdges = initialShowEdges !== 'all' ? initialShowEdges : localShowEdges;
@@ -624,6 +628,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
   const pathStyle = initialPathStyle !== 'sharp' ? initialPathStyle : localPathStyle;
   const waypointDensity = initialWaypointDensity !== 1.0 ? initialWaypointDensity : localWaypointDensity;
   const waypointDistribution = initialWaypointDistribution !== 'hops' ? initialWaypointDistribution : localWaypointDistribution;
+  const includeAvatars = initialIncludeAvatars || localIncludeAvatars;
 
   // Derive highlighted path points by sampling intermediates according to waypointDensity + waypointDistribution
   const visiblePathPoints = React.useMemo(() => {
@@ -819,6 +824,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
     // Get current zoom transform
     const currentTransform = navigationMode ? navZoomTransform : d3.zoomTransform(container.node()!);
+
 
     // In nav mode: bake zoom + 3D perspective into coordinates directly (no CSS transform on SVG).
     // In normal mode: D3 zoom applies its transform to the <g> container; we just use xScale/yScale.
@@ -1129,15 +1135,12 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
     drawCircles(activeWaypoints, "active-waypoint");
 
     if (navigationMode) {
-      // In nav mode, source/dest are upright pins — tip anchored to projected position,
-      // body extends straight up in screen space regardless of tilt/heading.
-      const drawPin = (point: Point, fill: string, stroke: string) => {
+      // Upright pin: tip anchored to projected position, body extends straight up in screen space.
+      const drawPin = (point: Point, fill: string, stroke: string, r = 10, stemH = 20) => {
         const { x: px, y: py } = project(point.x, point.y);
-        const r = 10, stemH = 20; // circle radius, distance from tip to circle center
-        // Teardrop: tip at (px,py), circle centered at (px, py-stemH)
-        const d = `M ${px} ${py} L ${px - r} ${py - stemH} A ${r} ${r} 0 1 1 ${px + r} ${py - stemH} Z`;
+        const pathD = `M ${px} ${py} L ${px - r} ${py - stemH} A ${r} ${r} 0 1 1 ${px + r} ${py - stemH} Z`;
         container.append("path")
-          .attr("d", d)
+          .attr("d", pathD)
           .attr("fill", fill)
           .attr("stroke", stroke)
           .attr("stroke-width", 1.5)
@@ -1148,12 +1151,26 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
             setDestinationPoint(null);
             setPathPoints([]);
           });
-        container.append("circle")
-          .attr("cx", px).attr("cy", py - stemH).attr("r", r * 0.38)
-          .attr("fill", "white")
-          .style("pointer-events", "none");
+
+        if (includeAvatars) {
+          const avatarR = r * 0.9;
+          const avatarUrl = `https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(String(point.id))}&radius=50`;
+          container.append("image")
+            .attr("href", avatarUrl)
+            .attr("x", px - avatarR).attr("y", py - stemH - avatarR)
+            .attr("width", avatarR * 2).attr("height", avatarR * 2)
+            .style("pointer-events", "none");
+        } else {
+          container.append("circle")
+            .attr("cx", px).attr("cy", py - stemH).attr("r", r * 0.38)
+            .attr("fill", "white")
+            .style("pointer-events", "none");
+        }
       };
 
+      // Active waypoints as smaller upright pins
+      drawCircles(inactiveWaypoints, "inactive-waypoint");
+      activeWaypoints.forEach(p => drawPin(p, "#f59e0b", "#d97706", 8, 16));
       if (sourcePoint) drawPin(sourcePoint, "#22c55e", "#16a34a");
       if (destinationPoint) drawPin(destinationPoint, "#ef4444", "#dc2626");
     } else {
@@ -1166,7 +1183,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
         .call(dragBehavior);
     }
 
-  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, visiblePathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode, navZoomTransform, navTilt, navHeading]);
+  }, [data, xScale, yScale, sourcePoint, destinationPoint, pathPoints, visiblePathPoints, showNodes, densityAlpha, densityMap, networkEdges, selectedNetworkType, showEdges, selectedAlgorithm, networkGraph, weightedGraph, pathStyle, navigationMode, navZoomTransform, navTilt, navHeading, includeAvatars]);
 
   // Calculate path points separately to avoid infinite loops
   React.useEffect(() => {
@@ -1591,6 +1608,17 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
                       </div>
                     </RadioGroup>
                   </div>
+
+                  {navigationMode && (
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="include-avatars" className="text-xs font-medium">Avatar Pins</Label>
+                      <Switch
+                        id="include-avatars"
+                        checked={includeAvatars}
+                        onCheckedChange={setLocalIncludeAvatars}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
