@@ -177,6 +177,9 @@ export const NavigationMode: Story = {
     showNodes: 'all',
     pathStyle: 'smooth',
     navigationMode: true,
+    includeAvatars: true,
+    waypointDensity: 0.3,
+    waypointDistribution: 'distance',
   },
   parameters: {
     docs: {
