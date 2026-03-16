@@ -1025,9 +1025,12 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       return circles;
     };
 
-    // Draw nodes in proper z-order: inactive -> intermediate -> start/end
+    // Draw nodes in proper z-order: inactive -> inactive waypoints -> active waypoints -> start/end
+    const inactiveWaypoints = intermediatePoints.filter(d => !activeWaypointIds.has(d.id));
+    const activeWaypoints = intermediatePoints.filter(d => activeWaypointIds.has(d.id));
     drawCircles(inactivePoints, "inactive-node");
-    drawCircles(intermediatePoints, "intermediate-node");
+    drawCircles(inactiveWaypoints, "inactive-waypoint");
+    drawCircles(activeWaypoints, "active-waypoint");
     const startEndCircles = drawCircles(startEndPoints, "start-end-node");
 
     // Apply drag behavior only to source and destination points
