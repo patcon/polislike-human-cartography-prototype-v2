@@ -839,13 +839,38 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       const cx = sx - W / 2, cy = sy - H / 2;
       const rx = cx * cosH - cy * sinH;
       const ry = cx * sinH + cy * cosH;
-      const tz = ry * sinT;
+      const tz = -ry * sinT;
       const s = focal / (focal + tz);
       return { x: rx * s + W / 2, y: ry * cosT * s + H / 2 };
     };
 
     // Clear all existing elements
     container.selectAll("*").remove();
+
+    // 0. Draw perspective grid in navigation mode (below everything)
+    if (navigationMode) {
+      const [xMin, xMax] = xScale.domain();
+      const [yMin, yMax] = yScale.domain();
+      const gridCount = 10;
+
+      for (let i = 0; i <= gridCount; i++) {
+        const tx = xMin + (xMax - xMin) * i / gridCount;
+        const p1 = project(tx, yMin), p2 = project(tx, yMax);
+        container.append("line")
+          .attr("x1", p1.x).attr("y1", p1.y)
+          .attr("x2", p2.x).attr("y2", p2.y)
+          .attr("stroke", "#d1d5db").attr("stroke-width", 1)
+          .style("pointer-events", "none");
+
+        const ty = yMin + (yMax - yMin) * i / gridCount;
+        const p3 = project(xMin, ty), p4 = project(xMax, ty);
+        container.append("line")
+          .attr("x1", p3.x).attr("y1", p3.y)
+          .attr("x2", p4.x).attr("y2", p4.y)
+          .attr("stroke", "#d1d5db").attr("stroke-width", 1)
+          .style("pointer-events", "none");
+      }
+    }
 
     // 1. Draw network edges first (bottom layer)
     if (networkEdges.length > 0) {
