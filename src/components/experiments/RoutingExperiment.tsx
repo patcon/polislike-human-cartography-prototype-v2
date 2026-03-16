@@ -1039,7 +1039,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
       const dy = e.clientY - lastY;
       lastX = e.clientX; lastY = e.clientY;
       setNavHeading(h => (h + dx * 0.3 + 360) % 360);
-      setNavTilt(t => Math.max(0, Math.min(80, t + dy * 0.3)));
+      setNavTilt(t => Math.max(0, Math.min(80, t - dy * 0.3)));
     };
     const onMouseUp = (e: MouseEvent) => { if (e.button === 0) dragging = false; };
 
