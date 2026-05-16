@@ -66,7 +66,10 @@ export interface VoteConnection {
 
 const Config = {
   stats: {
-    significanceThreshold: 1.645, // 90% confidence z-score threshold
+    // One-tailed z-test at 90% confidence: upper-tail probability = 0.10 → z = 1.2816.
+    // Polis tests whether a group's support rate is *higher than baseline* (directional),
+    // so a one-tailed threshold is correct here.
+    significanceThreshold: 1.2816,
     minVotes: 7,
   }
 };
@@ -332,6 +335,12 @@ export function selectRepComments(
         bestAgreeComment.best_agree = true;
       }
 
+      // Fall back to the single best comment when no statement passed significance
+      if (sufficient.length === 0) {
+        finalResult[gid] = best ? [best] : [];
+        return;
+      }
+
       let selectedComments: FinalizedCommentStats[] = [];
       if (bestAgreeComment) {
         selectedComments.push(bestAgreeComment);
@@ -356,11 +365,10 @@ export function selectRepComments(
 }
 
 /**
- * Check if a p-value is significant at the given confidence level.
+ * Check if a z-score (or proportion-test value) is significant at 90% confidence, one-tailed.
  */
-export function isSignificant(pValue: number, confidence: number = 0.9): boolean {
-  const zThreshold = confidence === 0.9 ? 1.645 : 1.96;
-  return Math.abs(pValue) > zThreshold;
+export function isSignificant(pValue: number): boolean {
+  return zSig90(Math.abs(pValue));
 }
 
 /**
@@ -371,7 +379,6 @@ export function selectConsensusStatements(
   modOutStatementIds: number[] = [],
   pickMax: number | null = null,
   probThreshold: number = 0.5,
-  confidence: number = 0.9,
   options: {
     minVoteCount?: number;
     maxStatementsCount?: number;
@@ -451,14 +458,14 @@ export function selectConsensusStatements(
   });
 
   let agreeCandidates = statements
-    .filter((s) => s.pa > probThreshold && isSignificant(s.pat, confidence))
+    .filter((s) => s.pa > probThreshold && isSignificant(s.pat))
     .sort((a, b) => b.agreeMetric - a.agreeMetric);
 
   const maxAgree = pickMax !== null && pickMax !== undefined ? pickMax : Math.floor(maxStatementsCount / 2);
   agreeCandidates = agreeCandidates.slice(0, maxAgree);
 
   let disagreeCandidates = statements
-    .filter((s) => s.pd > probThreshold && isSignificant(s.pdt, confidence))
+    .filter((s) => s.pd > probThreshold && isSignificant(s.pdt))
     .sort((a, b) => b.disagreeMetric - a.disagreeMetric);
 
   const maxDisagree = pickMax !== null && pickMax !== undefined ? pickMax : Math.floor(maxStatementsCount / 2);
@@ -604,7 +611,6 @@ export async function analyzeLabeledGroups(
       modOutStatementIds,
       null,
       0.5,
-      0.9,
       {
         minVoteCount: options.minVoteCount,
         maxStatementsCount: options.maxStatementsCount
