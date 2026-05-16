@@ -23,4 +23,7 @@
 
 ### Changed
 
+- Extracted core statistical functions (`stats.ts`, `representative-statements.ts`) into a standalone `reddwarf-ts` workspace package under `packages/`. The app now imports these from the package via a pnpm workspace link. `src/lib/stats.ts` becomes a re-export shim; `src/lib/representative-statements.ts` becomes a thin DuckDB adapter. No changes to the app's public API.
+- Renamed `analyzePaintedClusters` → `analyzeLabeledGroups` in the package (neutral terminology; the app adapter preserves backward compat internally).
+
 ### Fixed

@@ -137,6 +137,20 @@ See [docs/data-format.md](docs/data-format.md) for the full `.h5ad` (AnnData) fi
 
 ---
 
+## 📦 Packages
+
+This repository uses pnpm workspaces. The app lives at the root; reusable packages live under `packages/`.
+
+### `packages/reddwarf-ts`
+
+A standalone TypeScript library for polis-style representative statement and consensus analysis. Contains the core statistical functions (z-tests, repness metrics, group vote matrix queries) extracted from the app. Algorithms originally derived from [raykyri/osccai-simulation](https://github.com/raykyri/osccai-simulation/tree/main/src/utils).
+
+Works with any labeled grouping of participants — k-means, HDBSCAN, manual, or any other clustering. Requires a DuckDB-compatible connection with a `votes` table loaded by the caller.
+
+See [`packages/reddwarf-ts/README.md`](packages/reddwarf-ts/README.md) for installation and usage.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! This project is developed with the assistance of [Claude Code](https://claude.ai/code), which means **a well-written GitHub issue is often enough to get a feature built or a bug fixed** — no code required from contributors.
