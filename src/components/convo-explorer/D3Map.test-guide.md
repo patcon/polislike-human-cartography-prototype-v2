@@ -17,7 +17,7 @@ This guide provides comprehensive testing strategies for the D3Map component to 
 Basic rendering and prop handling tests that ensure the component doesn't crash:
 
 ```bash
-npm run test:run -- src/components/convo-explorer/D3Map.smoke.test.tsx
+pnpm run test:run -- src/components/convo-explorer/D3Map.smoke.test.tsx
 ```
 
 **What it tests:**
@@ -185,7 +185,7 @@ When modifying D3Map component:
 
 Before deploying changes:
 
-1. Run smoke tests: `npm run test:run -- D3Map.smoke.test.tsx`
+1. Run smoke tests: `pnpm run test:run -- D3Map.smoke.test.tsx`
 2. Manual test the critical scenarios above
 3. Test on multiple devices/browsers
 4. Verify no console errors during normal usage

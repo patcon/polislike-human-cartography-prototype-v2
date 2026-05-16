@@ -9,14 +9,14 @@ A map-like interface for exploring perspective maps built from polis-like opinio
 ## Commands
 
 ```bash
-npm run dev          # Start Vite dev server
-npm run dev:tunnel   # Start Vite + localtunnel for mobile testing
-npm run build        # TypeScript check + Vite production build
-npm run lint         # ESLint (flat config, TS/TSX files)
-npm run test         # Vitest in watch mode (jsdom environment)
-npm run test:run     # Vitest single run (CI-friendly)
-npm run storybook    # Storybook dev server on port 6006
-npm run deploy       # Build and deploy to GitHub Pages via gh-pages — DO NOT run locally; deployment is triggered automatically by CI on push to main
+pnpm run dev          # Start Vite dev server
+pnpm run dev:tunnel   # Start Vite + localtunnel for mobile testing
+pnpm run build        # TypeScript check + Vite production build
+pnpm run lint         # ESLint (flat config, TS/TSX files)
+pnpm run test         # Vitest in watch mode (jsdom environment)
+pnpm run test:run     # Vitest single run (CI-friendly)
+pnpm run storybook    # Storybook dev server on port 6006
+pnpm run deploy       # Build and deploy to GitHub Pages via gh-pages — DO NOT run locally; deployment is triggered automatically by CI on push to main
 ```
 
 ## Architecture

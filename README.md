@@ -108,15 +108,15 @@ Prototype explorations hosted on [Storybook][storybook]:
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (see `.nvmrc` or `package.json` for version)
-- `npm`
+- `pnpm`
 
 ### Getting started
 
 ```bash
 git clone https://github.com/patcon/polislike-human-cartography-prototype-v2.git
 cd polislike-human-cartography-prototype-v2
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 The app will be available at `http://localhost:5173`.
@@ -124,11 +124,11 @@ The app will be available at `http://localhost:5173`.
 ### Other useful commands
 
 ```bash
-npm run build        # TypeScript check + production build
-npm run test         # Vitest in watch mode
-npm run test:run     # Vitest single run (CI)
-npm run lint         # ESLint
-npm run storybook    # Storybook on port 6006
+pnpm run build        # TypeScript check + production build
+pnpm run test         # Vitest in watch mode
+pnpm run test:run     # Vitest single run (CI)
+pnpm run lint         # ESLint
+pnpm run storybook    # Storybook on port 6006
 ```
 
 ### Data format

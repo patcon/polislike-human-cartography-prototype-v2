@@ -14,20 +14,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm  # optional caching
+          node-version-file: .node-version
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Vite site
         env:
           VITE_GITHUB_REPO_NAME: ${{ github.event.repository.name }}
           VITE_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-        run: npm run build
+        run: pnpm run build
 
       # Upload the dist folder produced by Vite
       - name: Upload static files as artifact
