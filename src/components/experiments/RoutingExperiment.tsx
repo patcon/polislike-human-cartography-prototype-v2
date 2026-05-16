@@ -481,30 +481,6 @@ const findBFSPath = (source: Point, destination: Point, networkGraph: Map<string
 };
 
 
-// Routing algorithm implementations
-const pointsToSvgPath = (
-  points: Point[],
-  xScale: d3.ScaleLinear<number, number>,
-  yScale: d3.ScaleLinear<number, number>,
-  pathStyle: 'sharp' | 'smooth' = 'sharp'
-): string | null => {
-  if (points.length < 2) return null;
-  const scaled = points.map(p => ({ x: xScale(p.x), y: yScale(p.y) }));
-  if (pathStyle === 'smooth' && scaled.length >= 3) {
-    let s = `M ${scaled[0].x} ${scaled[0].y}`;
-    for (let i = 1; i < scaled.length - 1; i++) {
-      const cur = scaled[i], nxt = scaled[i + 1];
-      s += ` Q ${cur.x} ${cur.y} ${cur.x + (nxt.x - cur.x) * 0.5} ${cur.y + (nxt.y - cur.y) * 0.5}`;
-    }
-    const last = scaled[scaled.length - 1];
-    s += ` T ${last.x} ${last.y}`;
-    return s;
-  }
-  let s = `M ${scaled[0].x} ${scaled[0].y}`;
-  for (let i = 1; i < scaled.length; i++) s += ` L ${scaled[i].x} ${scaled[i].y}`;
-  return s;
-};
-
 const generatePath = (
   source: Point,
   destination: Point,
