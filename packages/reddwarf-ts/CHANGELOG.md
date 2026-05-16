@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-16
+
 ### Added
 
 - Initial extraction from [polislike-human-cartography-prototype-v2](https://github.com/patcon/polislike-human-cartography-prototype-v2). Algorithms originally derived from [raykyri/osccai-simulation](https://github.com/raykyri/osccai-simulation/tree/main/src/utils).
