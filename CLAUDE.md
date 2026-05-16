@@ -83,6 +83,27 @@ Tests use Vitest with jsdom. `src/test-setup.ts` mocks `matchMedia`, `ResizeObse
 - Link each entry to its GitHub issue (`[#27](.../issues/27)`) if one exists, otherwise fall back to the PR (`[#42](.../pull/42)`).
 - On release: rename `[Unreleased]` to the new version + date, update its compare URL to `compare/vPREV...vNEW`, and add a fresh empty `[Unreleased]` block at the top pointing to `compare/vNEW...main`.
 
+### Workspace Package Versioning
+
+This repo uses pnpm workspaces. The root app (`polis-param-chooser-component`) is `private: true` and is never versioned or tagged. Publishable packages live under `packages/` and are versioned independently.
+
+**Tagging convention:** use `package-name@semver` scoped tags — not `v0.1.0` at the root, which would be ambiguous across packages:
+
+```bash
+git tag reddwarf-ts@0.1.0
+git push origin reddwarf-ts@0.1.0
+```
+
+**On release of a workspace package:**
+1. Update its `packages/<name>/CHANGELOG.md`: rename `[Unreleased]` to the version + date, add a fresh empty `[Unreleased]` block above it.
+2. Bump `"version"` in `packages/<name>/package.json`.
+3. Commit, then create the scoped git tag.
+
+**Git install reference** (for consumers installing from git rather than npm):
+```
+github:patcon/polislike-human-cartography-prototype-v2#reddwarf-ts@0.1.0&path=packages/reddwarf-ts
+```
+
 ### Python Scripts
 
 `scripts/python/` contains HDBSCAN clustering scripts for generating water-level threshold data used by the MagicPaintExperiment. Uses `uv` for package management (`cd scripts/python && uv sync`).
