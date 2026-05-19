@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
-import { FileDown, Import, Repeat1, Repeat } from "lucide-react";
+import { FileDown, Import, Repeat1, Repeat, RefreshCw } from "lucide-react";
 
 interface ProjectionOption {
   id: string;
@@ -47,6 +47,8 @@ interface MapProjectionSelectorProps {
   onLoadFile?: () => void;
   /** Callback to trigger downloading participant data as CSV */
   onDownloadObsCsv?: () => void;
+  /** Callback to open the recompute-projection dialog */
+  onRecomputeProjection?: () => void;
 }
 
 export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
@@ -66,6 +68,7 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
   bottom,
   onLoadFile,
   onDownloadObsCsv,
+  onRecomputeProjection,
 }) => {
   // Measure the longest pipeline label to set a stable select width
   const longestLabel = React.useMemo(() => {
@@ -136,8 +139,21 @@ export const MapProjectionSelector: React.FC<MapProjectionSelectorProps> = ({
           </Button>
         </div>
       </div>
-      {(onLoadFile || onDownloadObsCsv) && (
+      {(onLoadFile || onDownloadObsCsv || onRecomputeProjection) && (
         <div className="flex items-center gap-1 mt-3">
+          {onRecomputeProjection && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRecomputeProjection}
+              disabled={isAnimating}
+              title="Recompute projection in-browser"
+              className="flex-1"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Recompute
+            </Button>
+          )}
           {onLoadFile && (
             <Button
               variant="outline"

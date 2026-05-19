@@ -4,6 +4,7 @@
 
 ### Added
 
+- In-browser dimensional reduction via DruidJS. After importing an `.h5ad` file, a "Recompute" button in the projection selector opens a dialog to pick a dense `layers/` matrix as the vote matrix, choose an algorithm (UMAP, PaCMAP, or LocalMAP) and its parameters, and run the reduction in a web worker. The result is added as a new selectable projection and auto-selected. Mean imputation / moderated-column zeroing is expected to already be done in the chosen layer.
 - `includeAvatars` prop/toggle for `RoutingExperiment` navigation mode to show DiceBear adventurer-neutral avatars (circular crop, radius 90% of pin head) in each pin head, keyed by point ID for stable identity. Toggle appears in the Controls sheet under Waypoint Distribution when navigation mode is active.
 - `waypointDensity` prop (0–1 slider, default 1.0 = all) for `RoutingExperiment` to sample intermediate waypoints evenly along the path; inactive waypoints remain visible as white dots while active ones stay orange.
 - `NavigationMode` story for `RoutingExperiment` with Google Maps-style 3D navigation: right-drag to tilt/orbit (heading + pitch), scroll to zoom, left-drag to pan, double-click to reset view. Adds `navigationMode` prop to the component.

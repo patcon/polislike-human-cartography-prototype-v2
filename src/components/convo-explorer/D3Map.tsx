@@ -51,6 +51,10 @@ type D3MapProps = {
   onPipelineChange?: (pipelineId: string) => void;
   /** Preloaded pipeline data (e.g. from h5ad file) — bypasses fetch-based loading */
   preloadedPipelineData?: Record<string, [string, [number, number]][] | null>;
+  /** Extra projections computed in-browser (e.g. via DruidJS) — merged into pipeline options */
+  extraPipelineData?: Record<string, [string, [number, number]][]>;
+  /** Callback to open the recompute-projection dialog (shown as button in MapProjectionSelector) */
+  onRecomputeProjection?: () => void;
   /** Callback to trigger loading a new file (shown as button in MapProjectionSelector) */
   onLoadFile?: () => void;
   /** Callback to trigger downloading participant data as CSV */
@@ -83,6 +87,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   availablePipelines = [],
   onPipelineChange,
   preloadedPipelineData,
+  extraPipelineData,
+  onRecomputeProjection,
   onLoadFile,
   onDownloadObsCsv,
   displayMask,
@@ -126,11 +132,16 @@ export const D3Map: React.FC<D3MapProps> = ({
   );
   const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
 
-  // Preloaded pipeline options derived from preloadedPipelineData keys
+  // Preloaded pipeline options derived from preloadedPipelineData keys,
+  // plus any projections recomputed in-browser
   const preloadedPipelineOptions = React.useMemo(() => {
     if (!preloadedPipelineData) return [];
-    return Object.keys(preloadedPipelineData).map(id => ({ id, name: id }));
-  }, [preloadedPipelineData]);
+    const keys = [
+      ...Object.keys(preloadedPipelineData),
+      ...Object.keys(extraPipelineData ?? {}),
+    ];
+    return keys.map(id => ({ id, name: id }));
+  }, [preloadedPipelineData, extraPipelineData]);
 
   // Current pipeline options based on mode
   const currentPipelineOptions = preloadedPipelineData ? preloadedPipelineOptions : isKedroMode ? kedroOptions : staticPipelines;
@@ -184,8 +195,9 @@ export const D3Map: React.FC<D3MapProps> = ({
     if (!testAnimation) return;
 
     // If preloaded pipeline data is provided, use it directly
+    // (merged with any projections recomputed in-browser)
     if (preloadedPipelineData) {
-      setPipelineData(preloadedPipelineData);
+      setPipelineData({ ...preloadedPipelineData, ...extraPipelineData });
       return;
     }
 
@@ -237,7 +249,22 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
 
     loadProjections();
-  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData]);
+  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData, extraPipelineData]);
+
+  // Auto-select a freshly recomputed projection when it first appears
+  const prevExtraKeysRef = React.useRef<string[]>([]);
+  React.useEffect(() => {
+    const keys = Object.keys(extraPipelineData ?? {});
+    const added = keys.find(k => !prevExtraKeysRef.current.includes(k));
+    prevExtraKeysRef.current = keys;
+    if (added) {
+      setSelectedPipeline(prev => {
+        setPreviousPipeline(prev);
+        return added;
+      });
+      onPipelineChange?.(added);
+    }
+  }, [extraPipelineData, onPipelineChange]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {
@@ -839,6 +866,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           )}
           onLoadFile={onLoadFile}
           onDownloadObsCsv={onDownloadObsCsv}
+          onRecomputeProjection={onRecomputeProjection}
           top="1rem"
           left="1rem"
         />

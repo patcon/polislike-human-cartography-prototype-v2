@@ -69,6 +69,7 @@ const App: React.FC = () => {
         pipelineData: parsed.allEmbeddings,
         fullDimensionEmbeddings: parsed.fullDimensionEmbeddings,
         obsColumns: parsed.obsColumns,
+        layers: parsed.layers,
         conversationId: parsed.conversationId,
       });
     } catch (err) {

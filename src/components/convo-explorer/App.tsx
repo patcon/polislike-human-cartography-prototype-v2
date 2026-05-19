@@ -25,7 +25,10 @@ import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
 import type { MetricConfig } from "./MetricsLayerConfig";
 import type { ObsColumnType } from "@/lib/color-schemes";
 import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
-import type { ObsColumnInfo } from "@/lib/h5ad-loader";
+import type { ObsColumnInfo, LayerMatrix } from "@/lib/h5ad-loader";
+import { useDruidWorker } from "@/hooks/useDruidWorker";
+import type { ReducerAlgorithm } from "@/lib/druid-reducer";
+import { RecomputeProjectionDialog } from "./RecomputeProjectionDialog";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -44,6 +47,8 @@ export type PreloadedData = {
   fullDimensionEmbeddings?: Record<string, [string, number[]][]>;
   /** Per-participant metadata columns from obs/ with type metadata */
   obsColumns?: Record<string, ObsColumnInfo>;
+  /** Dense layer matrices from layers/ usable as input for in-browser reduction */
+  layers?: Record<string, LayerMatrix>;
   /** Optional conversation identifier from uns['conversation_id'] */
   conversationId?: string;
 };
@@ -142,6 +147,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Download obs CSV dialog state
   const [downloadObsCsvDialogOpen, setDownloadObsCsvDialogOpen] = React.useState(false);
+
+  // Recompute-projection dialog + in-browser dimensional reduction state
+  const [recomputeDialogOpen, setRecomputeDialogOpen] = React.useState(false);
+  const [recomputedProjections, setRecomputedProjections] = React.useState<Record<string, [string, [number, number]][]>>({});
+  const { status: druidStatus, result: druidResult, error: druidError, runReduction, reset: resetDruid } = useDruidWorker();
+  const pendingAlgorithmRef = React.useRef<ReducerAlgorithm>("umap");
 
   // Update current pipeline ID when initialPipelineId prop changes
   React.useEffect(() => {
@@ -899,6 +910,59 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     return false; // Default: allow other behaviors
   }
 
+  // Reshape a selected layer matrix and kick off in-browser dimensional reduction
+  const handleRecomputeRun = React.useCallback(
+    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>) => {
+      const layer = preloadedData?.layers?.[layerKey];
+      if (!layer) return;
+      const [nObs, nVars] = layer.shape;
+      if (nObs !== dataset.length) {
+        console.error(
+          `Layer "${layerKey}" has ${nObs} rows but the dataset has ${dataset.length} participants.`
+        );
+        return;
+      }
+      const matrix: number[][] = [];
+      for (let i = 0; i < nObs; i++) {
+        const row = new Array<number>(nVars);
+        for (let j = 0; j < nVars; j++) {
+          row[j] = layer.data[i * nVars + j];
+        }
+        matrix.push(row);
+      }
+      pendingAlgorithmRef.current = algorithm;
+      runReduction(matrix, algorithm, params);
+    },
+    [preloadedData?.layers, dataset, runReduction]
+  );
+
+  // When a reduction finishes, add the result as a new selectable projection
+  React.useEffect(() => {
+    if (druidStatus !== "done" || !druidResult) return;
+
+    const obsNames = dataset.map(([id]) => id);
+    const projection = druidResult.map(
+      (xy, i) => [obsNames[i], xy] as [string, [number, number]]
+    );
+
+    setRecomputedProjections((prev) => {
+      const taken = new Set([
+        ...Object.keys(prev),
+        ...Object.keys(preloadedData?.pipelineData ?? {}),
+      ]);
+      const base = `${pendingAlgorithmRef.current}-recomputed`;
+      let key = base;
+      let n = 2;
+      while (taken.has(key)) {
+        key = `${base}-${n++}`;
+      }
+      return { ...prev, [key]: projection };
+    });
+
+    setRecomputeDialogOpen(false);
+    resetDruid();
+  }, [druidStatus, druidResult, dataset, preloadedData?.pipelineData, resetDruid]);
+
   const wasmSupported = isWebAssemblySupported();
 
   if (loading) {
@@ -957,6 +1021,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             availablePipelines={kedroBaseUrl ? [] : undefined} // Will be populated by D3Map's usePipelineOptions
             onPipelineChange={handlePipelineChange}
             preloadedPipelineData={preloadedData?.pipelineData}
+            extraPipelineData={recomputedProjections}
+            onRecomputeProjection={
+              preloadedData?.layers && Object.keys(preloadedData.layers).length > 0
+                ? () => setRecomputeDialogOpen(true)
+                : undefined
+            }
             onLoadFile={onLoadFile}
             onDownloadObsCsv={preloadedData?.obsColumns ? () => setDownloadObsCsvDialogOpen(true) : undefined}
             displayMask={showFilteredParticipants ? undefined : displayMask}
@@ -1071,6 +1141,18 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         onOpenChange={setClearDialogOpen}
         onConfirm={handleClearAllColors}
       />
+
+      {/* Recompute Projection Dialog */}
+      {preloadedData?.layers && (
+        <RecomputeProjectionDialog
+          open={recomputeDialogOpen}
+          onOpenChange={setRecomputeDialogOpen}
+          layers={preloadedData.layers}
+          status={druidStatus}
+          error={druidError}
+          onRun={handleRecomputeRun}
+        />
+      )}
 
       {/* Download Dialog */}
       <DownloadDialog
