@@ -67,7 +67,7 @@ export const KNN_BACKEND_ALGORITHMS: ReducerAlgorithm[] = ["pacmap", "localmap"]
 export type KnnBackend = "annoy" | "hnsw";
 export const KNN_BACKENDS: { value: KnnBackend; label: string }[] = [
   { value: "annoy", label: "Annoy" },
-  { value: "hnsw",  label: "HNSW"  },
+  { value: "hnsw",  label: "HNSW (broken?)"  },
 ];
 
 /** Build a fresh params object for an algorithm using the defined defaults. */
