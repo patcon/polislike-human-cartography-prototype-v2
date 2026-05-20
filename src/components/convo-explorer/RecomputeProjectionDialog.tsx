@@ -118,20 +118,22 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
           <div className="flex flex-col gap-4">
             {/* Layer (vote matrix) */}
             <div className="flex flex-col gap-1.5">
-              <Label>Vote matrix layer</Label>
+              <div className="flex items-baseline justify-between">
+                <Label>Vote matrix layer</Label>
+                {layerKey && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {layers[layerKey].shape[0]}&times;{layers[layerKey].shape[1]}
+                  </span>
+                )}
+              </div>
               <Select value={layerKey} onValueChange={setLayerKey} disabled={isRunning}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a layer..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {layerKeys.map((key) => {
-                    const [rows, cols] = layers[key].shape;
-                    return (
-                      <SelectItem key={key} value={key}>
-                        {key} ({rows}&times;{cols})
-                      </SelectItem>
-                    );
-                  })}
+                  {layerKeys.map((key) => (
+                    <SelectItem key={key} value={key}>{key}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
