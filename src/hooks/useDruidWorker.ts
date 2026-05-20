@@ -15,7 +15,8 @@ export type DruidWorkerState = {
     matrix: number[][],
     algorithm: ReducerAlgorithm,
     params: Record<string, number>,
-    knnBackend?: KnnBackend
+    knnBackend?: KnnBackend,
+    knnParams?: Record<string, number>
   ) => void;
   reset: () => void;
 };
@@ -66,12 +67,12 @@ export function useDruidWorker(): DruidWorkerState {
   }, []);
 
   const runReduction = useCallback(
-    (matrix: number[][], algorithm: ReducerAlgorithm, params: Record<string, number>, knnBackend?: KnnBackend) => {
+    (matrix: number[][], algorithm: ReducerAlgorithm, params: Record<string, number>, knnBackend?: KnnBackend, knnParams?: Record<string, number>) => {
       setStatus("running");
       setResult(null);
       setError(null);
       // progress stays null until first tick — signals KNN graph is building
-      const request: ReducerRequest = { type: "reduce", matrix, algorithm, params, knnBackend };
+      const request: ReducerRequest = { type: "reduce", matrix, algorithm, params, knnBackend, knnParams };
       getWorker().postMessage(request);
     },
     [getWorker]

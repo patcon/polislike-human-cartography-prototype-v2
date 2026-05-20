@@ -84,6 +84,19 @@ export function defaultAdvancedParamsFor(algorithm: ReducerAlgorithm): Record<st
   );
 }
 
+/** HNSW-specific tunable params exposed in the dialog when hnsw backend is selected. */
+export const HNSW_PARAM_DEFS: Record<string, ParamDef> = {
+  ef:               { label: "ef (search)",        min: 10,  max: 1000, step: 10,  default: 50  },
+  ef_construction:  { label: "ef_construction",    min: 10,  max: 2000, step: 10,  default: 200 },
+};
+
+/** Build a fresh HNSW params object using the defined defaults. */
+export function defaultHnswParams(): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(HNSW_PARAM_DEFS).map(([key, def]) => [key, def.default])
+  );
+}
+
 /** Message sent from the main thread to the reducer worker. */
 export type ReducerRequest = {
   type: "reduce";
@@ -91,6 +104,7 @@ export type ReducerRequest = {
   algorithm: ReducerAlgorithm;
   params: Record<string, number>;
   knnBackend?: KnnBackend;
+  knnParams?: Record<string, number>;
 };
 
 /** Message sent from the reducer worker back to the main thread. */

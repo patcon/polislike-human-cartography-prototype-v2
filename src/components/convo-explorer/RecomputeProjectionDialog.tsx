@@ -22,12 +22,14 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import type { LayerMatrix } from "@/lib/h5ad-loader";
 import {
+  HNSW_PARAM_DEFS,
   KNN_BACKENDS,
   KNN_BACKEND_ALGORITHMS,
   REDUCER_ADVANCED_PARAM_DEFS,
   REDUCER_LABELS,
   REDUCER_PARAM_DEFS,
   defaultAdvancedParamsFor,
+  defaultHnswParams,
   defaultParamsFor,
   type KnnBackend,
   type ReducerAlgorithm,
@@ -53,7 +55,8 @@ type RecomputeProjectionDialogProps = {
     algorithm: ReducerAlgorithm,
     params: Record<string, number>,
     knnBackend: KnnBackend | undefined,
-    maskColumn: string | null
+    maskColumn: string | null,
+    knnParams: Record<string, number> | undefined
   ) => void;
 };
 
@@ -73,6 +76,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   const [algorithm, setAlgorithm] = React.useState<ReducerAlgorithm>("umap");
   const [maskColumn, setMaskColumn] = React.useState<string>("none");
   const [knnBackend, setKnnBackend] = React.useState<KnnBackend>("annoy");
+  const [hnswParams, setHnswParams] = React.useState<Record<string, number>>(() => defaultHnswParams());
   const [paramsByAlgorithm, setParamsByAlgorithm] = React.useState<
     Record<ReducerAlgorithm, Record<string, number>>
   >(() => ({
@@ -114,6 +118,10 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
     }));
   };
 
+  const setHnswParam = (key: string, value: number) => {
+    setHnswParams((prev) => ({ ...prev, [key]: value }));
+  };
+
   const handleRun = () => {
     if (!layerKey || isRunning) return;
     const allParams = { ...params, ...advancedParams };
@@ -122,7 +130,8 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
       algorithm,
       allParams,
       hasKnnBackend ? knnBackend : undefined,
-      maskColumn === "none" ? null : maskColumn
+      maskColumn === "none" ? null : maskColumn,
+      hasKnnBackend && knnBackend === "hnsw" ? hnswParams : undefined
     );
   };
 
@@ -258,23 +267,47 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
                 </div>
 
                 {hasKnnBackend && (
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-sm">KNN backend</Label>
-                    <Select
-                      value={knnBackend}
-                      onValueChange={(v) => setKnnBackend(v as KnnBackend)}
-                      disabled={isRunning}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {KNN_BACKENDS.map((b) => (
-                          <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm">KNN backend</Label>
+                      <Select
+                        value={knnBackend}
+                        onValueChange={(v) => setKnnBackend(v as KnnBackend)}
+                        disabled={isRunning}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {KNN_BACKENDS.map((b) => (
+                            <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {knnBackend === "hnsw" && (
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                        {Object.entries(HNSW_PARAM_DEFS).map(([key, def]) => (
+                          <div key={key} className="flex items-center justify-between gap-2">
+                            <Label htmlFor={`hnsw-${key}`} className="text-sm whitespace-nowrap">
+                              {def.label}
+                            </Label>
+                            <input
+                              id={`hnsw-${key}`}
+                              type="number"
+                              min={def.min}
+                              max={def.max}
+                              step={def.step}
+                              value={hnswParams[key]}
+                              disabled={isRunning}
+                              onChange={(e) => setHnswParam(key, Number(e.target.value))}
+                              className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm tabular-nums text-right disabled:opacity-50"
+                            />
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </details>

@@ -9,7 +9,7 @@ import { REDUCER_DEFAULT_ITERATIONS } from "./druid-reducer";
 const PROGRESS_INTERVAL = 10;
 
 function reduce(req: ReducerRequest): void {
-  const { matrix, algorithm, params, knnBackend } = req;
+  const { matrix, algorithm, params, knnBackend, knnParams } = req;
   const n = matrix.length;
   if (n < 3) {
     throw new Error(`Need at least 3 rows to run dimensional reduction (got ${n}).`);
@@ -43,6 +43,7 @@ function reduce(req: ReducerRequest): void {
       seed: params.seed,
       lr: params.lr,
       knn_backend: knnBackend ?? "annoy",
+      knn_params: knnParams ?? {},
     });
     gen = dr.generator();
   } else {
@@ -54,6 +55,7 @@ function reduce(req: ReducerRequest): void {
       seed: params.seed,
       lr: params.lr,
       knn_backend: knnBackend ?? "annoy",
+      knn_params: knnParams ?? {},
     });
     gen = dr.generator();
   }
