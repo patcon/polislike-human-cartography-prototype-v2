@@ -113,7 +113,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
             <div className="flex flex-col gap-1.5">
               <Label>Vote matrix layer</Label>
               <Select value={layerKey} onValueChange={setLayerKey} disabled={isRunning}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a layer..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,7 +137,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
                 onValueChange={(value) => setAlgorithm(value as ReducerAlgorithm)}
                 disabled={isRunning}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -151,27 +151,22 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
             </div>
 
             {/* Parameters */}
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
               {Object.entries(REDUCER_PARAM_DEFS[algorithm]).map(([key, def]) => (
-                <div key={key} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`param-${key}`} className="text-sm">
-                      {def.label}
-                    </Label>
-                    <span className="text-sm tabular-nums text-muted-foreground">
-                      {params[key]}
-                    </span>
-                  </div>
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <Label htmlFor={`param-${key}`} className="text-sm whitespace-nowrap">
+                    {def.label}
+                  </Label>
                   <input
                     id={`param-${key}`}
-                    type="range"
+                    type="number"
                     min={def.min}
                     max={def.max}
                     step={def.step}
                     value={params[key]}
                     disabled={isRunning}
                     onChange={(e) => setParam(key, Number(e.target.value))}
-                    className="w-full accent-blue-600"
+                    className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm tabular-nums text-right disabled:opacity-50"
                   />
                 </div>
               ))}
