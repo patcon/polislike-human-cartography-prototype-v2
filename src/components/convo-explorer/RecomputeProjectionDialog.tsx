@@ -199,35 +199,34 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
               ))}
             </div>
 
-            {isRunning && (
-              <div className="flex flex-col gap-1">
-                {progress === null ? (
-                  <p className="text-xs text-muted-foreground animate-pulse">
-                    Building KNN graph…
-                  </p>
-                ) : (
-                  <>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-blue-600 transition-all duration-300"
-                        style={{ width: `${Math.round(progress * 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground text-right">
-                      {Math.round(progress * 100)}%
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
             {error && status === "error" && (
               <p className="text-sm text-red-600">{error}</p>
             )}
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="items-center">
+          <div className="flex-1 min-w-0">
+            {isRunning && (
+              progress === null ? (
+                <p className="text-xs text-muted-foreground animate-pulse">
+                  Building KNN graph…
+                </p>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-blue-600 transition-all duration-300"
+                      style={{ width: `${Math.round(progress * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums w-8 text-right shrink-0">
+                    {Math.round(progress * 100)}%
+                  </span>
+                </div>
+              )
+            )}
+          </div>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRunning}>
             Cancel
           </Button>
