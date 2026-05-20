@@ -930,6 +930,19 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         }
         matrix.push(row);
       }
+
+      // Mean imputation: replace NaN cells with the column mean of observed values.
+      for (let j = 0; j < nVars; j++) {
+        let sum = 0, count = 0;
+        for (let i = 0; i < nObs; i++) {
+          if (!isNaN(matrix[i][j])) { sum += matrix[i][j]; count++; }
+        }
+        const colMean = count > 0 ? sum / count : 0;
+        for (let i = 0; i < nObs; i++) {
+          if (isNaN(matrix[i][j])) matrix[i][j] = colMean;
+        }
+      }
+
       pendingAlgorithmRef.current = algorithm;
       runReduction(matrix, algorithm, params);
     },
