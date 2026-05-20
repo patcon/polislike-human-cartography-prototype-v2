@@ -27,7 +27,7 @@ import {
   defaultParamsFor,
   type ReducerAlgorithm,
 } from "@/lib/druid-reducer";
-import type { DruidWorkerStatus } from "@/hooks/useDruidWorker";
+import type { DruidWorkerState } from "@/hooks/useDruidWorker";
 
 const ALGORITHMS: ReducerAlgorithm[] = ["umap", "pacmap", "localmap"];
 
@@ -36,8 +36,9 @@ type RecomputeProjectionDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** Dense layer matrices available as the input vote matrix. */
   layers: Record<string, LayerMatrix>;
-  status: DruidWorkerStatus;
+  status: DruidWorkerState["status"];
   error: string | null;
+  progress: DruidWorkerState["progress"];
   onRun: (
     layerKey: string,
     algorithm: ReducerAlgorithm,
@@ -51,6 +52,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   layers,
   status,
   error,
+  progress,
   onRun,
 }) => {
   const layerKeys = React.useMemo(() => Object.keys(layers), [layers]);
@@ -174,6 +176,20 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
                 </div>
               ))}
             </div>
+
+            {isRunning && (
+              <div className="flex flex-col gap-1">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-blue-600 transition-all duration-300"
+                    style={{ width: `${Math.round((progress ?? 0) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-right">
+                  {Math.round((progress ?? 0) * 100)}%
+                </p>
+              </div>
+            )}
 
             {error && status === "error" && (
               <p className="text-sm text-red-600">{error}</p>

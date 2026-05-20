@@ -9,6 +9,8 @@ export type DruidWorkerState = {
   /** 2D coordinates from the last successful run, in input-row order. */
   result: [number, number][] | null;
   error: string | null;
+  /** 0–1 progress fraction while running, null otherwise. */
+  progress: number | null;
   runReduction: (
     matrix: number[][],
     algorithm: ReducerAlgorithm,
@@ -25,6 +27,7 @@ export function useDruidWorker(): DruidWorkerState {
   const [status, setStatus] = useState<DruidWorkerStatus>("idle");
   const [result, setResult] = useState<[number, number][] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
@@ -41,9 +44,13 @@ export function useDruidWorker(): DruidWorkerState {
         const msg = e.data;
         if (msg.type === "done") {
           setResult(msg.coords);
+          setProgress(null);
           setStatus("done");
+        } else if (msg.type === "progress") {
+          setProgress(msg.iteration / msg.total);
         } else {
           setError(msg.message);
+          setProgress(null);
           setStatus("error");
         }
       };
@@ -62,6 +69,7 @@ export function useDruidWorker(): DruidWorkerState {
       setStatus("running");
       setResult(null);
       setError(null);
+      setProgress(0);
       const request: ReducerRequest = { type: "reduce", matrix, algorithm, params };
       getWorker().postMessage(request);
     },
@@ -72,7 +80,8 @@ export function useDruidWorker(): DruidWorkerState {
     setStatus("idle");
     setResult(null);
     setError(null);
+    setProgress(null);
   }, []);
 
-  return { status, result, error, runReduction, reset };
+  return { status, result, error, progress, runReduction, reset };
 }

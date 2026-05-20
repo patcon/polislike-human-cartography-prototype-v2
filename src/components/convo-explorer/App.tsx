@@ -151,7 +151,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Recompute-projection dialog + in-browser dimensional reduction state
   const [recomputeDialogOpen, setRecomputeDialogOpen] = React.useState(false);
   const [recomputedProjections, setRecomputedProjections] = React.useState<Record<string, [string, [number, number]][]>>({});
-  const { status: druidStatus, result: druidResult, error: druidError, runReduction, reset: resetDruid } = useDruidWorker();
+  const { status: druidStatus, result: druidResult, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
   const pendingAlgorithmRef = React.useRef<ReducerAlgorithm>("umap");
 
   // Update current pipeline ID when initialPipelineId prop changes
@@ -1150,6 +1150,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           layers={preloadedData.layers}
           status={druidStatus}
           error={druidError}
+          progress={druidProgress}
           onRun={handleRecomputeRun}
         />
       )}

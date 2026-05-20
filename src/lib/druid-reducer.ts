@@ -60,4 +60,12 @@ export type ReducerRequest = {
 /** Message sent from the reducer worker back to the main thread. */
 export type ReducerResponse =
   | { type: "done"; coords: [number, number][] }
+  | { type: "progress"; iteration: number; total: number }
   | { type: "error"; message: string };
+
+/** Default total iterations per algorithm (used for progress reporting). */
+export const REDUCER_DEFAULT_ITERATIONS: Record<ReducerAlgorithm, number> = {
+  umap: 350,
+  pacmap: 450,
+  localmap: 450,
+};

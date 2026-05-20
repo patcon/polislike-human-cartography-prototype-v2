@@ -4,53 +4,69 @@
  */
 import { UMAP, PaCMAP, LocalMAP } from "@saehrimnir/druidjs";
 import type { ReducerRequest, ReducerResponse } from "./druid-reducer";
+import { REDUCER_DEFAULT_ITERATIONS } from "./druid-reducer";
 
-function reduce(req: ReducerRequest): [number, number][] {
+const PROGRESS_INTERVAL = 10;
+
+function reduce(req: ReducerRequest): void {
   const { matrix, algorithm, params } = req;
   const n = matrix.length;
   if (n < 3) {
     throw new Error(`Need at least 3 rows to run dimensional reduction (got ${n}).`);
   }
-  // DruidJS requires n_neighbors < n; clamp to a sane range.
   const nNeighbors = Math.max(2, Math.min(Math.round(params.n_neighbors), n - 1));
+  const total = REDUCER_DEFAULT_ITERATIONS[algorithm];
 
-  let projection: number[][];
+  let gen: Generator<unknown, unknown, unknown>;
   if (algorithm === "umap") {
-    const umap = new UMAP(matrix, {
+    const dr = new UMAP(matrix, {
       d: 2,
       n_neighbors: nNeighbors,
       min_dist: params.min_dist,
       _spread: params.spread,
     });
-    projection = umap.transform() as number[][];
+    gen = dr.generator(total);
   } else if (algorithm === "localmap") {
-    const localmap = new LocalMAP(matrix, {
+    const dr = new LocalMAP(matrix, {
       d: 2,
       n_neighbors: nNeighbors,
       MN_ratio: params.MN_ratio,
       FP_ratio: params.FP_ratio,
       low_dist_thres: params.low_dist_thres,
     });
-    projection = localmap.transform() as number[][];
+    gen = dr.generator();
   } else {
-    const pacmap = new PaCMAP(matrix, {
+    const dr = new PaCMAP(matrix, {
       d: 2,
       n_neighbors: nNeighbors,
       MN_ratio: params.MN_ratio,
       FP_ratio: params.FP_ratio,
+      seed: 42,
     });
-    projection = pacmap.transform() as number[][];
+    gen = dr.generator();
   }
 
-  return projection.map((row) => [row[0], row[1]] as [number, number]);
+  let iteration = 0;
+  let lastProjection: number[][] = [];
+  for (const projection of gen) {
+    iteration++;
+    lastProjection = projection as number[][];
+    if (iteration % PROGRESS_INTERVAL === 0) {
+      const progress: ReducerResponse = { type: "progress", iteration, total };
+      self.postMessage(progress);
+    }
+  }
+
+  const coords = lastProjection.map((row) => [row[0], row[1]] as [number, number]);
+  const done: ReducerResponse = { type: "done", coords };
+  self.postMessage(done);
 }
 
 self.onmessage = (e: MessageEvent<ReducerRequest>) => {
   const req = e.data;
   if (req?.type !== "reduce") return;
   try {
-    const response: ReducerResponse = { type: "done", coords: reduce(req) };
-    self.postMessage(response);
+    reduce(req);
   } catch (err) {
     const response: ReducerResponse = {
       type: "error",
