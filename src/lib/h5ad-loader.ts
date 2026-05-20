@@ -11,6 +11,8 @@ export type ObsColumnInfo = {
 export type H5adData = {
   dataset: [string, [number, number]][];
   statements: { statement_id: string; txt: string; moderated: number }[];
+  /** Statement IDs in original h5ad var order — matches layer column indices. */
+  varNames: string[];
   votesRows: { participant_id: string; comment_id: string; vote: number }[];
   availableEmbeddings: string[];
   /** All 2D embeddings keyed by pipeline-style ID (X_ prefix stripped) */
@@ -404,7 +406,7 @@ export async function loadH5adFile(
     const convIdDs = unsGroup?.get('conversation_id') as Dataset | null;
     const conversationId = convIdDs ? String(convIdDs.value) : undefined;
 
-    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, layers, conversationId };
+    return { dataset, statements, varNames, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, layers, conversationId };
   } finally {
     if (file) {
       file.close();

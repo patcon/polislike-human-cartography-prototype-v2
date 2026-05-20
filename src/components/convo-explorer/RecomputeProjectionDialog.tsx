@@ -31,18 +31,23 @@ import type { DruidWorkerState } from "@/hooks/useDruidWorker";
 
 const ALGORITHMS: ReducerAlgorithm[] = ["umap", "pacmap", "localmap"];
 
+export type MaskOption = { value: string; label: string };
+
 type RecomputeProjectionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Dense layer matrices available as the input vote matrix. */
   layers: Record<string, LayerMatrix>;
+  /** Available column mask options (e.g. moderation columns from var metadata). */
+  maskOptions: MaskOption[];
   status: DruidWorkerState["status"];
   error: string | null;
   progress: DruidWorkerState["progress"];
   onRun: (
     layerKey: string,
     algorithm: ReducerAlgorithm,
-    params: Record<string, number>
+    params: Record<string, number>,
+    maskColumn: string | null
   ) => void;
 };
 
@@ -50,6 +55,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   open,
   onOpenChange,
   layers,
+  maskOptions,
   status,
   error,
   progress,
@@ -59,6 +65,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
 
   const [layerKey, setLayerKey] = React.useState<string>("");
   const [algorithm, setAlgorithm] = React.useState<ReducerAlgorithm>("umap");
+  const [maskColumn, setMaskColumn] = React.useState<string>("none");
   const [paramsByAlgorithm, setParamsByAlgorithm] = React.useState<
     Record<ReducerAlgorithm, Record<string, number>>
   >(() => ({
@@ -86,7 +93,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
 
   const handleRun = () => {
     if (!layerKey || isRunning) return;
-    onRun(layerKey, algorithm, params);
+    onRun(layerKey, algorithm, params, maskColumn === "none" ? null : maskColumn);
   };
 
   return (
@@ -129,25 +136,43 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
               </Select>
             </div>
 
-            {/* Algorithm */}
-            <div className="flex flex-col gap-1.5">
-              <Label>Algorithm</Label>
-              <Select
-                value={algorithm}
-                onValueChange={(value) => setAlgorithm(value as ReducerAlgorithm)}
-                disabled={isRunning}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALGORITHMS.map((algo) => (
-                    <SelectItem key={algo} value={algo}>
-                      {REDUCER_LABELS[algo]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Column mask + Algorithm (same row) */}
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label>Column mask</Label>
+                <Select value={maskColumn} onValueChange={setMaskColumn} disabled={isRunning}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {maskOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label>Algorithm</Label>
+                <Select
+                  value={algorithm}
+                  onValueChange={(value) => setAlgorithm(value as ReducerAlgorithm)}
+                  disabled={isRunning}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALGORITHMS.map((algo) => (
+                      <SelectItem key={algo} value={algo}>
+                        {REDUCER_LABELS[algo]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Parameters */}

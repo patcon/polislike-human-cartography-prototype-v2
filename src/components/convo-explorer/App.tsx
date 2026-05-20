@@ -49,6 +49,8 @@ export type PreloadedData = {
   obsColumns?: Record<string, ObsColumnInfo>;
   /** Dense layer matrices from layers/ usable as input for in-browser reduction */
   layers?: Record<string, LayerMatrix>;
+  /** Statement IDs in original h5ad var order — matches layer column indices. */
+  varNames?: string[];
   /** Optional conversation identifier from uns['conversation_id'] */
   conversationId?: string;
 };
@@ -912,7 +914,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Reshape a selected layer matrix and kick off in-browser dimensional reduction
   const handleRecomputeRun = React.useCallback(
-    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>) => {
+    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>, maskColumn: string | null) => {
       const layer = preloadedData?.layers?.[layerKey];
       if (!layer) return;
       const [nObs, nVars] = layer.shape;
@@ -943,10 +945,23 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         }
       }
 
+      // Column mask: zero out columns whose var metadata value is truthy.
+      if (maskColumn && preloadedData?.varNames) {
+        const stmtByVarId = new Map(
+          preloadedData.statements.map((s) => [s.statement_id, s])
+        );
+        for (let j = 0; j < nVars; j++) {
+          const stmt = stmtByVarId.get(preloadedData.varNames[j]);
+          if (stmt && (stmt as Record<string, unknown>)[maskColumn]) {
+            for (let i = 0; i < nObs; i++) matrix[i][j] = 0;
+          }
+        }
+      }
+
       pendingAlgorithmRef.current = algorithm;
       runReduction(matrix, algorithm, params);
     },
-    [preloadedData?.layers, dataset, runReduction]
+    [preloadedData?.layers, preloadedData?.varNames, preloadedData?.statements, dataset, runReduction]
   );
 
   // When a reduction finishes, add the result as a new selectable projection
@@ -1161,6 +1176,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           open={recomputeDialogOpen}
           onOpenChange={setRecomputeDialogOpen}
           layers={preloadedData.layers}
+          maskOptions={[{ value: "moderated", label: "moderated" }]}
           status={druidStatus}
           error={druidError}
           progress={druidProgress}
