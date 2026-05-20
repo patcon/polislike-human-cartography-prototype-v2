@@ -42,10 +42,45 @@ export const REDUCER_PARAM_DEFS: Record<ReducerAlgorithm, Record<string, ParamDe
   },
 };
 
+export const REDUCER_ADVANCED_PARAM_DEFS: Record<ReducerAlgorithm, Record<string, ParamDef>> = {
+  umap: {
+    _n_epochs:              { label: "Epochs",               min: 50,    max: 2000,  step: 10,    default: 350  },
+    seed:                   { label: "Seed",                 min: 0,     max: 99999, step: 1,     default: 1212 },
+    local_connectivity:     { label: "Local connectivity",   min: 1,     max: 20,    step: 1,     default: 1    },
+    _initial_alpha:         { label: "Initial LR",           min: 0.01,  max: 5,     step: 0.01,  default: 1    },
+    _repulsion_strength:    { label: "Repulsion strength",   min: 0,     max: 5,     step: 0.1,   default: 1    },
+    _negative_sample_rate:  { label: "Neg. sample rate",     min: 1,     max: 20,    step: 1,     default: 5    },
+    _set_op_mix_ratio:      { label: "Set-op mix ratio",     min: 0,     max: 1,     step: 0.01,  default: 1    },
+  },
+  pacmap: {
+    seed: { label: "Seed",          min: 0,     max: 99999, step: 1,     default: 1212 },
+    lr:   { label: "Learning rate", min: 0.001, max: 10,    step: 0.001, default: 1.0  },
+  },
+  localmap: {
+    seed: { label: "Seed",          min: 0,     max: 99999, step: 1,     default: 1212 },
+    lr:   { label: "Learning rate", min: 0.001, max: 10,    step: 0.001, default: 1.0  },
+  },
+};
+
+/** Algorithms that support a selectable KNN backend. */
+export const KNN_BACKEND_ALGORITHMS: ReducerAlgorithm[] = ["pacmap", "localmap"];
+export type KnnBackend = "annoy" | "hnsw";
+export const KNN_BACKENDS: { value: KnnBackend; label: string }[] = [
+  { value: "annoy", label: "Annoy" },
+  { value: "hnsw",  label: "HNSW"  },
+];
+
 /** Build a fresh params object for an algorithm using the defined defaults. */
 export function defaultParamsFor(algorithm: ReducerAlgorithm): Record<string, number> {
   return Object.fromEntries(
     Object.entries(REDUCER_PARAM_DEFS[algorithm]).map(([key, def]) => [key, def.default])
+  );
+}
+
+/** Build a fresh advanced params object for an algorithm using the defined defaults. */
+export function defaultAdvancedParamsFor(algorithm: ReducerAlgorithm): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(REDUCER_ADVANCED_PARAM_DEFS[algorithm]).map(([key, def]) => [key, def.default])
   );
 }
 
@@ -55,6 +90,7 @@ export type ReducerRequest = {
   matrix: number[][];
   algorithm: ReducerAlgorithm;
   params: Record<string, number>;
+  knnBackend?: KnnBackend;
 };
 
 /** Message sent from the reducer worker back to the main thread. */

@@ -914,7 +914,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Reshape a selected layer matrix and kick off in-browser dimensional reduction
   const handleRecomputeRun = React.useCallback(
-    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>, maskColumn: string | null) => {
+    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>, knnBackend: string | undefined, maskColumn: string | null) => {
       const layer = preloadedData?.layers?.[layerKey];
       if (!layer) return;
       const [nObs, nVars] = layer.shape;
@@ -959,7 +959,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       }
 
       pendingAlgorithmRef.current = algorithm;
-      runReduction(matrix, algorithm, params);
+      runReduction(matrix, algorithm, params, knnBackend as import("@/lib/druid-reducer").KnnBackend | undefined);
     },
     [preloadedData?.layers, preloadedData?.varNames, preloadedData?.statements, dataset, runReduction]
   );

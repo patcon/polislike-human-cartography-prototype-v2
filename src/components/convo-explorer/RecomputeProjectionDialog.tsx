@@ -22,9 +22,14 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import type { LayerMatrix } from "@/lib/h5ad-loader";
 import {
+  KNN_BACKENDS,
+  KNN_BACKEND_ALGORITHMS,
+  REDUCER_ADVANCED_PARAM_DEFS,
   REDUCER_LABELS,
   REDUCER_PARAM_DEFS,
+  defaultAdvancedParamsFor,
   defaultParamsFor,
+  type KnnBackend,
   type ReducerAlgorithm,
 } from "@/lib/druid-reducer";
 import type { DruidWorkerState } from "@/hooks/useDruidWorker";
@@ -47,6 +52,7 @@ type RecomputeProjectionDialogProps = {
     layerKey: string,
     algorithm: ReducerAlgorithm,
     params: Record<string, number>,
+    knnBackend: KnnBackend | undefined,
     maskColumn: string | null
   ) => void;
 };
@@ -66,12 +72,20 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   const [layerKey, setLayerKey] = React.useState<string>("");
   const [algorithm, setAlgorithm] = React.useState<ReducerAlgorithm>("umap");
   const [maskColumn, setMaskColumn] = React.useState<string>("none");
+  const [knnBackend, setKnnBackend] = React.useState<KnnBackend>("annoy");
   const [paramsByAlgorithm, setParamsByAlgorithm] = React.useState<
     Record<ReducerAlgorithm, Record<string, number>>
   >(() => ({
     umap: defaultParamsFor("umap"),
     pacmap: defaultParamsFor("pacmap"),
     localmap: defaultParamsFor("localmap"),
+  }));
+  const [advancedParamsByAlgorithm, setAdvancedParamsByAlgorithm] = React.useState<
+    Record<ReducerAlgorithm, Record<string, number>>
+  >(() => ({
+    umap: defaultAdvancedParamsFor("umap"),
+    pacmap: defaultAdvancedParamsFor("pacmap"),
+    localmap: defaultAdvancedParamsFor("localmap"),
   }));
 
   // Default the layer selection to the first available layer.
@@ -82,7 +96,9 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   }, [layerKey, layerKeys]);
 
   const params = paramsByAlgorithm[algorithm];
+  const advancedParams = advancedParamsByAlgorithm[algorithm];
   const isRunning = status === "running";
+  const hasKnnBackend = KNN_BACKEND_ALGORITHMS.includes(algorithm);
 
   const setParam = (key: string, value: number) => {
     setParamsByAlgorithm((prev) => ({
@@ -91,9 +107,23 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
     }));
   };
 
+  const setAdvancedParam = (key: string, value: number) => {
+    setAdvancedParamsByAlgorithm((prev) => ({
+      ...prev,
+      [algorithm]: { ...prev[algorithm], [key]: value },
+    }));
+  };
+
   const handleRun = () => {
     if (!layerKey || isRunning) return;
-    onRun(layerKey, algorithm, params, maskColumn === "none" ? null : maskColumn);
+    const allParams = { ...params, ...advancedParams };
+    onRun(
+      layerKey,
+      algorithm,
+      allParams,
+      hasKnnBackend ? knnBackend : undefined,
+      maskColumn === "none" ? null : maskColumn
+    );
   };
 
   return (
@@ -198,6 +228,56 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
                 </div>
               ))}
             </div>
+
+            {/* Advanced */}
+            <details className="group">
+              <summary className="cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground list-none flex items-center gap-1">
+                <span className="transition-transform group-open:rotate-90">›</span>
+                Advanced
+              </summary>
+              <div className="mt-2 flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                  {Object.entries(REDUCER_ADVANCED_PARAM_DEFS[algorithm]).map(([key, def]) => (
+                    <div key={key} className="flex items-center justify-between gap-2">
+                      <Label htmlFor={`adv-${key}`} className="text-sm whitespace-nowrap">
+                        {def.label}
+                      </Label>
+                      <input
+                        id={`adv-${key}`}
+                        type="number"
+                        min={def.min}
+                        max={def.max}
+                        step={def.step}
+                        value={advancedParams[key]}
+                        disabled={isRunning}
+                        onChange={(e) => setAdvancedParam(key, Number(e.target.value))}
+                        className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm tabular-nums text-right disabled:opacity-50"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {hasKnnBackend && (
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-sm">KNN backend</Label>
+                    <Select
+                      value={knnBackend}
+                      onValueChange={(v) => setKnnBackend(v as KnnBackend)}
+                      disabled={isRunning}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {KNN_BACKENDS.map((b) => (
+                          <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </details>
 
             {error && status === "error" && (
               <p className="text-sm text-red-600">{error}</p>

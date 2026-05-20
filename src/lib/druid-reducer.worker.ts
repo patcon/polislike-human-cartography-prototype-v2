@@ -9,13 +9,13 @@ import { REDUCER_DEFAULT_ITERATIONS } from "./druid-reducer";
 const PROGRESS_INTERVAL = 10;
 
 function reduce(req: ReducerRequest): void {
-  const { matrix, algorithm, params } = req;
+  const { matrix, algorithm, params, knnBackend } = req;
   const n = matrix.length;
   if (n < 3) {
     throw new Error(`Need at least 3 rows to run dimensional reduction (got ${n}).`);
   }
   const nNeighbors = Math.max(2, Math.min(Math.round(params.n_neighbors), n - 1));
-  const total = REDUCER_DEFAULT_ITERATIONS[algorithm];
+  const total = params._n_epochs ?? REDUCER_DEFAULT_ITERATIONS[algorithm];
 
   let gen: Generator<unknown, unknown, unknown>;
   if (algorithm === "umap") {
@@ -24,6 +24,13 @@ function reduce(req: ReducerRequest): void {
       n_neighbors: nNeighbors,
       min_dist: params.min_dist,
       _spread: params.spread,
+      seed: params.seed,
+      local_connectivity: params.local_connectivity,
+      _initial_alpha: params._initial_alpha,
+      _repulsion_strength: params._repulsion_strength,
+      _negative_sample_rate: params._negative_sample_rate,
+      _set_op_mix_ratio: params._set_op_mix_ratio,
+      _n_epochs: total,
     });
     gen = dr.generator(total);
   } else if (algorithm === "localmap") {
@@ -33,6 +40,9 @@ function reduce(req: ReducerRequest): void {
       MN_ratio: params.MN_ratio,
       FP_ratio: params.FP_ratio,
       low_dist_thres: params.low_dist_thres,
+      seed: params.seed,
+      lr: params.lr,
+      knn_backend: knnBackend ?? "annoy",
     });
     gen = dr.generator();
   } else {
@@ -41,7 +51,9 @@ function reduce(req: ReducerRequest): void {
       n_neighbors: nNeighbors,
       MN_ratio: params.MN_ratio,
       FP_ratio: params.FP_ratio,
-      seed: 42,
+      seed: params.seed,
+      lr: params.lr,
+      knn_backend: knnBackend ?? "annoy",
     });
     gen = dr.generator();
   }
