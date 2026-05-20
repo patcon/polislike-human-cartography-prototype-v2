@@ -179,15 +179,23 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
 
             {isRunning && (
               <div className="flex flex-col gap-1">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full bg-blue-600 transition-all duration-300"
-                    style={{ width: `${Math.round((progress ?? 0) * 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-right">
-                  {Math.round((progress ?? 0) * 100)}%
-                </p>
+                {progress === null ? (
+                  <p className="text-xs text-muted-foreground animate-pulse">
+                    Building KNN graph…
+                  </p>
+                ) : (
+                  <>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-blue-600 transition-all duration-300"
+                        style={{ width: `${Math.round(progress * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">
+                      {Math.round(progress * 100)}%
+                    </p>
+                  </>
+                )}
               </div>
             )}
 

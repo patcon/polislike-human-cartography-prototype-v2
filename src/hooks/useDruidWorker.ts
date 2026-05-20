@@ -69,7 +69,7 @@ export function useDruidWorker(): DruidWorkerState {
       setStatus("running");
       setResult(null);
       setError(null);
-      setProgress(0);
+      // progress stays null until first tick — signals KNN graph is building
       const request: ReducerRequest = { type: "reduce", matrix, algorithm, params };
       getWorker().postMessage(request);
     },
