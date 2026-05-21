@@ -4,6 +4,8 @@
 
 ### Added
 
+- `reddwarf-ts/react` entry point exposing `useDruidWorker` hook and its types (`DruidWorkerState`, `DruidWorkerStatus`). React ≥18 is a peerDependency (optional). Consumers must use Vite to bundle, as the worker is imported via the `?worker` query.
+- `druid-reducer.worker.ts` — the Web Worker script that backs `useDruidWorker`, extracted from the main app.
 - `imputeColumnMeans(matrix)` — in-place mean imputation for NaN cells per column, extracted from the main app.
 - `zeroMaskedColumns(matrix, mask)` — zeroes out columns in-place at indices where `mask[j]` is true.
 

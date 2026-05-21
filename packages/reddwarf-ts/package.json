@@ -5,6 +5,9 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./react": {
+      "import": "./src/react/index.ts"
     }
   },
   "scripts": {
@@ -13,7 +16,16 @@
   "dependencies": {
     "@saehrimnir/druidjs": "github:patcon/DruidJS#add-pacmap-support"
   },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@types/react": "^18",
     "typescript": "~5.8.3"
   }
 }
