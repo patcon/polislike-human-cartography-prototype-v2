@@ -27,6 +27,7 @@ import type { ObsColumnType } from "@/lib/color-schemes";
 import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import type { ObsColumnInfo, LayerMatrix } from "@/lib/h5ad-loader";
 import { useDruidWorker } from "@/hooks/useDruidWorker";
+import { useLerpedCoords } from "@/hooks/useLerpedCoords";
 import type { ReducerAlgorithm } from "@/lib/druid-reducer";
 import { imputeColumnMeans, zeroMaskedColumns } from "@/lib/druid-reducer";
 import { RecomputeProjectionDialog } from "./RecomputeProjectionDialog";
@@ -983,10 +984,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   const wasmSupported = isWebAssemblySupported();
 
+  const lerpedCoords = useLerpedCoords(druidStatus === "running" ? druidCoords : null);
   const druidLiveDataset = React.useMemo(() => {
-    if (druidStatus !== "running" || !druidCoords || druidCoords.length !== dataset.length) return undefined;
-    return druidCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
-  }, [druidStatus, druidCoords, dataset]);
+    if (!lerpedCoords || lerpedCoords.length !== dataset.length) return undefined;
+    return lerpedCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
+  }, [lerpedCoords, dataset]);
 
   if (loading) {
     return (
