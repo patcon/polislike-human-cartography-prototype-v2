@@ -10,7 +10,6 @@ import {
   getAnalysisStatusMessage,
   formatRepresentativeStatementsForDisplay,
   createStatementTextMap,
-  RepresentativeStatementsManager as _RepresentativeStatementsManager,
 } from 'reddwarf-ts';
 import { UNPAINTED_VALUE } from '@/constants';
 import type {
@@ -67,44 +66,3 @@ export async function calculateRepresentativeStatements(
   return _calculateRepresentativeStatements(conn, labelArray, participants, { ...packageOptions, commentTextMap });
 }
 
-/**
- * App-level manager: adds DuckDB connection injection on top of the package manager.
- */
-export class RepresentativeStatementsManager {
-  private _manager = new _RepresentativeStatementsManager();
-
-  get isCalculating(): boolean {
-    return this._manager.isCalculating;
-  }
-
-  get lastResult(): RepresentativeStatementsResult | null {
-    return this._manager.lastResult;
-  }
-
-  get error(): Error | null {
-    return this._manager.error;
-  }
-
-  async calculate(
-    labelArray: (string | null)[],
-    participants: string[],
-    commentTextMap: Record<string | number, unknown>,
-    options: AnalysisOptions = {}
-  ): Promise<RepresentativeStatementsResult> {
-    const { kedroBaseUrl, pipelineId, ...packageOptions } = options;
-
-    const { ensureVotesTableLoaded, getConnection } = await import('@/lib/duckdb');
-    await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
-
-    const conn = getConnection();
-    if (!conn) {
-      throw new Error('Database connection not available');
-    }
-
-    return this._manager.calculate(conn, labelArray, participants, { ...packageOptions, commentTextMap });
-  }
-
-  reset(): void {
-    this._manager.reset();
-  }
-}
