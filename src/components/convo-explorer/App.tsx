@@ -154,7 +154,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Recompute-projection dialog + in-browser dimensional reduction state
   const [recomputeDialogOpen, setRecomputeDialogOpen] = React.useState(false);
   const [recomputedProjections, setRecomputedProjections] = React.useState<Record<string, [string, [number, number]][]>>({});
-  const { status: druidStatus, result: druidResult, liveCoords: druidLiveCoords, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
+  const { status: druidStatus, coords: druidCoords, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
   const pendingAlgorithmRef = React.useRef<ReducerAlgorithm>("umap");
 
   // Update current pipeline ID when initialPipelineId prop changes
@@ -957,10 +957,10 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // When a reduction finishes, add the result as a new selectable projection
   React.useEffect(() => {
-    if (druidStatus !== "done" || !druidResult) return;
+    if (druidStatus !== "done" || !druidCoords) return;
 
     const obsNames = dataset.map(([id]) => id);
-    const projection = druidResult.map(
+    const projection = druidCoords.map(
       (xy, i) => [obsNames[i], xy] as [string, [number, number]]
     );
 
@@ -979,14 +979,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     });
 
     resetDruid();
-  }, [druidStatus, druidResult, dataset, preloadedData?.pipelineData, resetDruid]);
+  }, [druidStatus, druidCoords, dataset, preloadedData?.pipelineData, resetDruid]);
 
   const wasmSupported = isWebAssemblySupported();
 
   const druidLiveDataset = React.useMemo(() => {
-    if (!druidLiveCoords || druidLiveCoords.length !== dataset.length) return undefined;
-    return druidLiveCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
-  }, [druidLiveCoords, dataset]);
+    if (druidStatus !== "running" || !druidCoords || druidCoords.length !== dataset.length) return undefined;
+    return druidCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
+  }, [druidStatus, druidCoords, dataset]);
 
   if (loading) {
     return (
