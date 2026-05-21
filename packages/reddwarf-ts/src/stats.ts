@@ -1,6 +1,7 @@
 /**
- * Statistical functions for polis-style representative statement and consensus analysis.
+ * Pure statistical functions for polis-style representative statement and consensus analysis.
  * Algorithms originally derived from raykyri/osccai-simulation (src/utils).
+ * DB-layer types and query helpers live in db.ts.
  */
 
 // Type definitions
@@ -49,19 +50,6 @@ export interface ConsensusStatement {
   p_success: number;
   p_test: number;
   cons_for: string;
-}
-
-/**
- * Minimal structural interface for a DuckDB-WASM connection.
- * Any object satisfying this shape can be passed to the DB-dependent functions.
- */
-export interface VoteQueryResult {
-  numRows: number;
-  getChild(name: string): { get(i: number): unknown } | null | undefined;
-}
-
-export interface VoteConnection {
-  query(sql: string): Promise<VoteQueryResult>;
 }
 
 const Config = {
@@ -134,55 +122,6 @@ export function addComparativeStats(inStats: BasicCommentStats, restStats: Basic
     rat,
     rdt,
   };
-}
-
-/**
- * Query votes for each label group from a DuckDB-compatible connection.
- * The caller is responsible for ensuring the votes table is loaded before calling this.
- */
-export async function getGroupVoteMatrices(
-  conn: VoteConnection,
-  labelArray: (string | null)[],
-  participants?: string[],
-): Promise<Record<string, GroupVoteMatrix>> {
-  const groups: Record<string, string[]> = {};
-  labelArray.forEach((label, index) => {
-    if (label != null) {
-      const pid = participants?.[index];
-      if (pid !== undefined) {
-        if (!groups[label]) groups[label] = [];
-        groups[label].push(pid);
-      }
-    }
-  });
-
-  const groupVotes: Record<string, GroupVoteMatrix> = {};
-  for (const [label, indices] of Object.entries(groups)) {
-    const quotedIndices = indices.map((pid) => `'${pid}'`);
-    const result = await conn.query(`
-      SELECT participant_id, comment_id, vote
-      FROM votes
-      WHERE participant_id IN(${quotedIndices.join(",")})
-    `);
-
-    const voteMatrix: GroupVoteMatrix = {};
-    for (let i = 0; i < result.numRows; i++) {
-      const pid = result.getChild('participant_id')?.get(i)?.toString();
-      const cid = result.getChild('comment_id')?.get(i)?.toString();
-      const rawVote = result.getChild('vote')?.get(i);
-
-      const vote = typeof rawVote === 'bigint' ? Number(rawVote) : rawVote as number;
-
-      if (pid && cid && vote !== undefined) {
-        if (!voteMatrix[pid]) voteMatrix[pid] = {};
-        voteMatrix[pid][cid] = vote;
-      }
-    }
-
-    groupVotes[label] = voteMatrix;
-  }
-
-  return groupVotes;
 }
 
 /**
@@ -563,64 +502,3 @@ export function calculateRepresentativeComments(
   return selectRepComments(withComparatives, null, options);
 }
 
-/**
- * Analyze labeled groups: fetch vote matrices from the DB, then compute
- * representative and consensus statements.
- *
- * The caller must ensure the votes table is loaded in `conn` before calling.
- */
-export async function analyzeLabeledGroups(
-  conn: VoteConnection,
-  labelArray: (string | null)[],
-  commentTexts?: Array<{ id: number }>,
-  participants?: string[],
-  options: {
-    includeModerated?: boolean;
-    minVoteCount?: number;
-    maxStatementsCount?: number;
-    commentTextMap?: Record<string, unknown>;
-  } = {}
-): Promise<{
-  repComments: Record<string, FinalizedCommentStats[]>;
-  consensusStatements: { agree: ConsensusStatement[]; disagree: ConsensusStatement[] } | null;
-  groupVotes: Record<string, GroupVoteMatrix>;
-}> {
-  if (!conn) {
-    throw new Error('Database connection not available');
-  }
-
-  const groupVotes = await getGroupVoteMatrices(conn, labelArray, participants);
-  const repComments = calculateRepresentativeComments(groupVotes, commentTexts, options);
-
-  const uniqueGroups = Object.keys(groupVotes);
-  let consensusStatements = null;
-  if (uniqueGroups.length >= 2) {
-    const modOutStatementIds: number[] = [];
-    if (!options.includeModerated && options.commentTextMap) {
-      Object.entries(options.commentTextMap).forEach(([tid, comment]) => {
-        const c = comment as { mod?: string | number } | null;
-        const isModerated = c?.mod === "-1" || c?.mod === -1;
-        if (isModerated) {
-          modOutStatementIds.push(parseInt(tid));
-        }
-      });
-    }
-
-    consensusStatements = selectConsensusStatements(
-      groupVotes,
-      modOutStatementIds,
-      null,
-      0.5,
-      {
-        minVoteCount: options.minVoteCount,
-        maxStatementsCount: options.maxStatementsCount
-      }
-    );
-  }
-
-  return {
-    repComments,
-    consensusStatements,
-    groupVotes
-  };
-}

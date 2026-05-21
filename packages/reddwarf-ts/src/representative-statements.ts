@@ -3,13 +3,17 @@
  * Works with any labeled grouping of participants (k-means, HDBSCAN, manual, etc.).
  */
 
-import { analyzeLabeledGroups } from './stats.js';
+import {
+  calculateRepresentativeComments,
+  selectConsensusStatements,
+} from './stats.js';
 import type {
   FinalizedCommentStats,
   ConsensusStatement,
   GroupVoteMatrix,
-  VoteConnection,
 } from './stats.js';
+import { getGroupVoteMatrices } from './db.js';
+import type { VoteConnection } from './db.js';
 
 // Re-export types so consumers only need one import
 export type {
@@ -32,44 +36,52 @@ export interface AnalysisOptions {
   includeModerated?: boolean;
   minVoteCount?: number;
   maxStatementsCount?: number;
+  commentTextMap?: Record<string | number, unknown>;
 }
 
 /**
- * Calculate representative statements for labeled groups.
- *
- * @param conn - DuckDB-compatible connection with votes table already loaded
- * @param labelArray - Group label for each participant (null = excluded)
- * @param participants - Participant IDs, aligned with labelArray
- * @param commentTextMap - Map of comment IDs to comment metadata
- * @param options - Analysis options
+ * Fetch votes from the DB, then compute representative and consensus statements.
+ * The caller must ensure the votes table is loaded in `conn` before calling.
  */
 export async function calculateRepresentativeStatements(
   conn: VoteConnection,
   labelArray: (string | null)[],
   participants: string[],
-  commentTextMap: Record<string | number, unknown>,
   options: AnalysisOptions = {}
 ): Promise<RepresentativeStatementsResult> {
   const {
     includeModerated = false,
     minVoteCount = 1,
     maxStatementsCount = 10,
+    commentTextMap = {},
   } = options;
 
-  const result = await analyzeLabeledGroups(
-    conn,
-    labelArray,
-    undefined,
-    participants,
-    {
-      includeModerated,
+  const groupVotes = await getGroupVoteMatrices(conn, labelArray, participants);
+  const repComments = calculateRepresentativeComments(groupVotes, undefined, {
+    includeModerated,
+    minVoteCount,
+    maxStatementsCount,
+    commentTextMap,
+  });
+
+  let consensusStatements = null;
+  if (Object.keys(groupVotes).length >= 2) {
+    const modOutStatementIds: number[] = [];
+    if (!includeModerated) {
+      Object.entries(commentTextMap).forEach(([tid, comment]) => {
+        const c = comment as { mod?: string | number } | null;
+        if (c?.mod === "-1" || c?.mod === -1) {
+          modOutStatementIds.push(parseInt(tid));
+        }
+      });
+    }
+    consensusStatements = selectConsensusStatements(groupVotes, modOutStatementIds, null, 0.5, {
       minVoteCount,
       maxStatementsCount,
-      commentTextMap,
-    }
-  );
+    });
+  }
 
-  return result;
+  return { repComments, consensusStatements, groupVotes };
 }
 
 /**
@@ -194,7 +206,6 @@ export class RepresentativeStatementsManager {
     conn: VoteConnection,
     labelArray: (string | null)[],
     participants: string[],
-    commentTextMap: Record<string | number, unknown>,
     options: AnalysisOptions = {}
   ): Promise<RepresentativeStatementsResult> {
     if (this._isCalculating) {
@@ -205,14 +216,7 @@ export class RepresentativeStatementsManager {
     this._error = null;
 
     try {
-      const result = await calculateRepresentativeStatements(
-        conn,
-        labelArray,
-        participants,
-        commentTextMap,
-        options
-      );
-
+      const result = await calculateRepresentativeStatements(conn, labelArray, participants, options);
       this._lastResult = result;
       return result;
     } catch (error) {

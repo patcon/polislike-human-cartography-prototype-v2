@@ -64,7 +64,7 @@ export async function calculateRepresentativeStatements(
     throw new Error('Database connection not available');
   }
 
-  return _calculateRepresentativeStatements(conn, labelArray, participants, commentTextMap, packageOptions);
+  return _calculateRepresentativeStatements(conn, labelArray, participants, { ...packageOptions, commentTextMap });
 }
 
 /**
@@ -101,7 +101,7 @@ export class RepresentativeStatementsManager {
       throw new Error('Database connection not available');
     }
 
-    return this._manager.calculate(conn, labelArray, participants, commentTextMap, packageOptions);
+    return this._manager.calculate(conn, labelArray, participants, { ...packageOptions, commentTextMap });
   }
 
   reset(): void {
