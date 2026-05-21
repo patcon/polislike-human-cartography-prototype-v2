@@ -25,6 +25,7 @@
 
 ### Changed
 
+- Extracted dimensional reduction logic (types, config, and a pure `runReducer()` generator) into `reddwarf-ts`. `src/lib/druid-reducer.ts` becomes a named re-export shim; `src/lib/druid-reducer.worker.ts` becomes a thin message-protocol shell. `runReducer()` yields `ReducerResponse` events and is usable outside the browser (e.g. in Node.js scripts) without the web worker infrastructure. `@saehrimnir/druidjs` added as a runtime dependency of `reddwarf-ts`.
 - Extracted core statistical functions (`stats.ts`, `representative-statements.ts`) into a standalone `reddwarf-ts` workspace package under `packages/`. The app now imports these from the package via a pnpm workspace link. `src/lib/stats.ts` becomes a re-export shim; `src/lib/representative-statements.ts` becomes a thin DuckDB adapter. No changes to the app's public API.
 - Renamed `analyzePaintedClusters` → `analyzeLabeledGroups` in the package (neutral terminology; the app adapter preserves backward compat internally).
 
