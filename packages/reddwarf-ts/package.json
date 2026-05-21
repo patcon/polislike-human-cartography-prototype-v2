@@ -10,6 +10,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@saehrimnir/druidjs": "github:patcon/DruidJS#add-pacmap-support"
+  },
   "devDependencies": {
     "typescript": "~5.8.3"
   }

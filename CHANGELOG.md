@@ -4,6 +4,9 @@
 
 ### Added
 
+- Annoy KNN backend now exposes its parameters (`numTrees`, `maxPointsPerLeaf`, `seed`) in the recompute dialog, matching the HNSW pattern. Switching backends shows that backend's params immediately; values are forwarded as `knn_params` to PaCMAP and LocalMAP. HNSW params expanded to include `m` and `seed`.
+- HNSW `ef` and `ef_construction` inputs in the recompute dialog's Advanced section, shown only when the HNSW KNN backend is selected. Values are forwarded as `knn_params` to PaCMAP and LocalMAP, overriding the library defaults (`ef=50`, `ef_construction=200`).
+- In-browser dimensional reduction via DruidJS. After importing an `.h5ad` file, a "Recompute" button in the projection selector opens a dialog to pick a dense `layers/` matrix as the vote matrix, choose an algorithm (UMAP, PaCMAP, or LocalMAP) and its parameters, and run the reduction in a web worker. The result is added as a new selectable projection and auto-selected. Empty cells in the chosen layer are filled with the column mean before reduction (mean imputation). A progress bar shows iteration progress (0–100 %) while the reduction runs, preceded by a "Building KNN graph…" phase indicator.
 - `includeAvatars` prop/toggle for `RoutingExperiment` navigation mode to show DiceBear adventurer-neutral avatars (circular crop, radius 90% of pin head) in each pin head, keyed by point ID for stable identity. Toggle appears in the Controls sheet under Waypoint Distribution when navigation mode is active.
 - `waypointDensity` prop (0–1 slider, default 1.0 = all) for `RoutingExperiment` to sample intermediate waypoints evenly along the path; inactive waypoints remain visible as white dots while active ones stay orange.
 - `NavigationMode` story for `RoutingExperiment` with Google Maps-style 3D navigation: right-drag to tilt/orbit (heading + pitch), scroll to zoom, left-drag to pan, double-click to reset view. Adds `navigationMode` prop to the component.
@@ -23,6 +26,9 @@
 
 ### Changed
 
+- Removed `RepresentativeStatementsManager` class from `reddwarf-ts` and its app-layer wrapper; the class was never instantiated (App.tsx owns `isCalculatingRepStatements` state directly via `useState`).
+- Split `reddwarf-ts` stats module: pure statistical functions stay in `stats.ts`; DB-layer types (`VoteConnection`, `VoteQueryResult`) and `getGroupVoteMatrices` move to new `db.ts`. Unified `AnalysisOptions` (now includes `commentTextMap`) replaces two divergent options shapes. Collapsed `analyzeLabeledGroups` (was in `stats.ts`) and `calculateRepresentativeStatements` (was a thin wrapper in `representative-statements.ts`) into a single function in `representative-statements.ts`; app adapter updated to fold `commentTextMap` into options.
+- Extracted dimensional reduction logic (types, config, and a pure `runReducer()` generator) into `reddwarf-ts`. `src/lib/druid-reducer.ts` becomes a named re-export shim; `src/lib/druid-reducer.worker.ts` becomes a thin message-protocol shell. `runReducer()` yields `ReducerResponse` events and is usable outside the browser (e.g. in Node.js scripts) without the web worker infrastructure. `@saehrimnir/druidjs` added as a runtime dependency of `reddwarf-ts`.
 - Extracted core statistical functions (`stats.ts`, `representative-statements.ts`) into a standalone `reddwarf-ts` workspace package under `packages/`. The app now imports these from the package via a pnpm workspace link. `src/lib/stats.ts` becomes a re-export shim; `src/lib/representative-statements.ts` becomes a thin DuckDB adapter. No changes to the app's public API.
 - Renamed `analyzePaintedClusters` → `analyzeLabeledGroups` in the package (neutral terminology; the app adapter preserves backward compat internally).
 

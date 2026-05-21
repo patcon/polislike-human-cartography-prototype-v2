@@ -11,6 +11,8 @@ export type ObsColumnInfo = {
 export type H5adData = {
   dataset: [string, [number, number]][];
   statements: { statement_id: string; txt: string; moderated: number }[];
+  /** Statement IDs in original h5ad var order — matches layer column indices. */
+  varNames: string[];
   votesRows: { participant_id: string; comment_id: string; vote: number }[];
   availableEmbeddings: string[];
   /** All 2D embeddings keyed by pipeline-style ID (X_ prefix stripped) */
@@ -19,8 +21,16 @@ export type H5adData = {
   fullDimensionEmbeddings: Record<string, [string, number[]][]>;
   /** Per-participant metadata columns from obs/ with type metadata */
   obsColumns: Record<string, ObsColumnInfo>;
+  /** Dense matrices from layers/ keyed by layer name (rows = participants, cols = statements) */
+  layers: Record<string, LayerMatrix>;
   /** Optional conversation identifier from uns['conversation_id'] */
   conversationId?: string;
+};
+
+/** A dense 2D matrix from an AnnData layer, stored flat in row-major order. */
+export type LayerMatrix = {
+  shape: [number, number];
+  data: ArrayLike<number>;
 };
 
 /**
@@ -181,6 +191,41 @@ function listEmbeddingsFromFile(file: H5File): string[] {
     }
   }
   return embeddings;
+}
+
+/**
+ * Read dense matrices from the layers/ group.
+ * Each layer is expected to be a dense 2D dataset with shape [n_obs, n_vars].
+ * Sparse layers (stored as sub-groups with data/indices/indptr) are skipped.
+ */
+function readLayers(file: H5File, nObs: number): Record<string, LayerMatrix> {
+  const layersGroup = file.get('layers') as Group | null;
+  if (!layersGroup) return {};
+
+  const layers: Record<string, LayerMatrix> = {};
+  for (const key of layersGroup.keys()) {
+    const item = layersGroup.get(key);
+    if (!item || !('shape' in item)) {
+      console.warn(`Skipping non-dense layer "${key}" (sparse layers are not supported).`);
+      continue;
+    }
+    const ds = item as Dataset;
+    const shape = ds.shape;
+    if (!shape || shape.length !== 2 || shape[0] !== nObs) {
+      console.warn(`Skipping layer "${key}" with unexpected shape ${JSON.stringify(shape)}.`);
+      continue;
+    }
+    const rawValue = ds.value;
+    if (!ArrayBuffer.isView(rawValue)) {
+      console.warn(`Skipping layer "${key}" — value is not a typed array.`);
+      continue;
+    }
+    layers[key] = {
+      shape: [shape[0], shape[1]],
+      data: rawValue as ArrayLike<number>,
+    };
+  }
+  return layers;
 }
 
 /**
@@ -350,6 +395,9 @@ export async function loadH5adFile(
       return a.statement_id.localeCompare(b.statement_id);
     });
 
+    // --- Read dense layer matrices ---
+    const layers = readLayers(file, obsNames.length);
+
     // --- Read votes from uns/votes ---
     const votesRows = readVotes(file);
 
@@ -358,7 +406,7 @@ export async function loadH5adFile(
     const convIdDs = unsGroup?.get('conversation_id') as Dataset | null;
     const conversationId = convIdDs ? String(convIdDs.value) : undefined;
 
-    return { dataset, statements, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, conversationId };
+    return { dataset, statements, varNames, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, layers, conversationId };
   } finally {
     if (file) {
       file.close();
