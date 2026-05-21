@@ -154,7 +154,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Recompute-projection dialog + in-browser dimensional reduction state
   const [recomputeDialogOpen, setRecomputeDialogOpen] = React.useState(false);
   const [recomputedProjections, setRecomputedProjections] = React.useState<Record<string, [string, [number, number]][]>>({});
-  const { status: druidStatus, result: druidResult, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
+  const { status: druidStatus, result: druidResult, liveCoords: druidLiveCoords, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
   const pendingAlgorithmRef = React.useRef<ReducerAlgorithm>("umap");
 
   // Update current pipeline ID when initialPipelineId prop changes
@@ -949,6 +949,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       }
 
       pendingAlgorithmRef.current = algorithm;
+      setRecomputeDialogOpen(false);
       runReduction(matrix, algorithm, params, knnBackend as import("@/lib/druid-reducer").KnnBackend | undefined, knnParams);
     },
     [preloadedData?.layers, preloadedData?.varNames, preloadedData?.statements, dataset, runReduction]
@@ -977,11 +978,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       return { ...prev, [key]: projection };
     });
 
-    setRecomputeDialogOpen(false);
     resetDruid();
   }, [druidStatus, druidResult, dataset, preloadedData?.pipelineData, resetDruid]);
 
   const wasmSupported = isWebAssemblySupported();
+
+  const druidLiveDataset = React.useMemo(() => {
+    if (!druidLiveCoords || druidLiveCoords.length !== dataset.length) return undefined;
+    return druidLiveCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
+  }, [druidLiveCoords, dataset]);
 
   if (loading) {
     return (
@@ -1015,6 +1020,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         >
           <D3Map
             data={dataset}
+            liveData={druidLiveDataset}
             mode={mode}
             pointColors={effectiveLayerMode === "votes" ? pointVotes :
                         effectiveLayerMode === "metrics" ? pointMetrics : pointGroups}
@@ -1052,6 +1058,27 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           />
         </div>
       </div>
+
+      {/* Reduction progress overlay */}
+      {druidStatus === "running" && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-1.5 min-w-48">
+          {druidProgress === null ? (
+            <p className="text-xs text-white bg-black/60 rounded-full px-3 py-1 animate-pulse">Building KNN graph…</p>
+          ) : (
+            <div className="flex items-center gap-2 bg-black/60 rounded-full px-3 py-1">
+              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-white/30">
+                <div
+                  className="h-full bg-white transition-all duration-300"
+                  style={{ width: `${Math.round(druidProgress * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-white tabular-nums w-8 text-right shrink-0">
+                {Math.round(druidProgress * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Overlay UI */}
       <div className="absolute inset-0 z-50 pointer-events-none">

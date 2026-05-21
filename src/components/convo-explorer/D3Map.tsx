@@ -59,6 +59,8 @@ type D3MapProps = {
   onLoadFile?: () => void;
   /** Callback to trigger downloading participant data as CSV */
   onDownloadObsCsv?: () => void;
+  /** Live intermediate coordinates from an in-progress reduction — overrides data and pipeline selection when set. */
+  liveData?: [string, [number, number]][];
   /** Display mask parallel to data: true = visible, false = hidden. When undefined, all points visible. */
   displayMask?: boolean[];
   /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
@@ -91,6 +93,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   onRecomputeProjection,
   onLoadFile,
   onDownloadObsCsv,
+  liveData,
   displayMask,
   unpaintedColor = UNPAINTED_COLOR,
 }) => {
@@ -323,10 +326,10 @@ export const D3Map: React.FC<D3MapProps> = ({
 
   // --- Prepare points and scales ---
   const { points, xScale, yScale } = React.useMemo(() => {
-    // Use projection data if testAnimation is enabled and data is available, otherwise fall back to original data
-    let currentData = data;
+    // liveData (in-progress reduction) takes precedence over everything else
+    let currentData = liveData ?? data;
 
-    if (testAnimation && selectedPipeline && pipelineData[selectedPipeline]) {
+    if (!liveData && testAnimation && selectedPipeline && pipelineData[selectedPipeline]) {
       // Use pipeline data (works for both Kedro and static)
       currentData = pipelineData[selectedPipeline]!;
     }
@@ -388,7 +391,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     const yScale = d3.scaleLinear().domain(yExtent).range(yRange);
 
     return { points, xScale, yScale };
-  }, [data, flipX, flipY, colorsToFront, pointColors, testAnimation, pipelineData, selectedPipeline]);
+  }, [liveData, data, flipX, flipY, colorsToFront, pointColors, testAnimation, pipelineData, selectedPipeline]);
 
   const quadtree = React.useMemo(
     () => d3.quadtree(points, d => d.x, d => d.y),

@@ -4,6 +4,7 @@
 
 ### Added
 
+- Reduction animates live on the map: the recompute dialog closes when Run is clicked, and intermediate point positions are streamed from the worker every 10 iterations and displayed directly on the map. A progress pill at the bottom of the map shows "Building KNN graph…" then a 0–100 % progress bar during iteration. The final result is registered as a named projection as before.
 - Annoy KNN backend now exposes its parameters (`numTrees`, `maxPointsPerLeaf`, `seed`) in the recompute dialog, matching the HNSW pattern. Switching backends shows that backend's params immediately; values are forwarded as `knn_params` to PaCMAP and LocalMAP. HNSW params expanded to include `m` and `seed`.
 - HNSW `ef` and `ef_construction` inputs in the recompute dialog's Advanced section, shown only when the HNSW KNN backend is selected. Values are forwarded as `knn_params` to PaCMAP and LocalMAP, overriding the library defaults (`ef=50`, `ef_construction=200`).
 - In-browser dimensional reduction via DruidJS. After importing an `.h5ad` file, a "Recompute" button in the projection selector opens a dialog to pick a dense `layers/` matrix as the vote matrix, choose an algorithm (UMAP, PaCMAP, or LocalMAP) and its parameters, and run the reduction in a web worker. The result is added as a new selectable projection and auto-selected. Empty cells in the chosen layer are filled with the column mean before reduction (mean imputation). A progress bar shows iteration progress (0–100 %) while the reduction runs, preceded by a "Building KNN graph…" phase indicator.

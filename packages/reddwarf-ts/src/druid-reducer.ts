@@ -115,7 +115,7 @@ export type ReducerRequest = {
 
 export type ReducerResponse =
   | { type: "done"; coords: [number, number][] }
-  | { type: "progress"; iteration: number; total: number }
+  | { type: "progress"; iteration: number; total: number; coords: [number, number][] }
   | { type: "error"; message: string };
 
 export const REDUCER_DEFAULT_ITERATIONS: Record<ReducerAlgorithm, number> = {
@@ -198,7 +198,8 @@ export function* runReducer(req: ReducerRequest): Generator<ReducerResponse> {
     iteration++;
     lastProjection = projection as number[][];
     if (iteration % PROGRESS_INTERVAL === 0) {
-      yield { type: "progress", iteration, total };
+      const coords = lastProjection.map((row) => [row[0], row[1]] as [number, number]);
+      yield { type: "progress", iteration, total, coords };
     }
   }
 
