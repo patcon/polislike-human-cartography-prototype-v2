@@ -1,4 +1,4 @@
-import { UMAP, PaCMAP, LocalMAP } from "@saehrimnir/druidjs";
+import { UMAP, PaCMAP, LocalMAP, type ParametersUMAP, type ParametersPaCMAP, type ParametersLocalMAP } from "@saehrimnir/druidjs";
 
 export type ReducerAlgorithm = "umap" | "pacmap" | "localmap";
 
@@ -20,7 +20,7 @@ export const REDUCER_PARAM_DEFS: Record<ReducerAlgorithm, Record<string, ParamDe
   umap: {
     n_neighbors: { label: "Neighbors", min: 2, max: 200, step: 1, default: 15 },
     min_dist: { label: "Min dist", min: 0, max: 1, step: 0.01, default: 0.1 },
-    spread: { label: "Spread", min: 0.1, max: 10, step: 0.1, default: 1.0 },
+    _spread: { label: "Spread", min: 0.1, max: 10, step: 0.1, default: 1.0 },
   },
   pacmap: {
     n_neighbors: { label: "Neighbors", min: 2, max: 200, step: 1, default: 10 },
@@ -121,42 +121,30 @@ export function* runReducer(req: ReducerRequest): Generator<ReducerResponse> {
   if (algorithm === "umap") {
     const dr = new UMAP(matrix, {
       d: 2,
+      ...(params as Partial<ParametersUMAP>),
       n_neighbors: nNeighbors,
-      min_dist: params.min_dist,
-      _spread: params.spread,
-      seed: params.seed,
-      local_connectivity: params.local_connectivity,
-      _initial_alpha: params._initial_alpha,
-      _repulsion_strength: params._repulsion_strength,
-      _negative_sample_rate: params._negative_sample_rate,
-      _set_op_mix_ratio: params._set_op_mix_ratio,
       _n_epochs: total,
     });
     gen = dr.generator(total);
   } else if (algorithm === "localmap") {
     const dr = new LocalMAP(matrix, {
       d: 2,
+      ...(params as Partial<ParametersLocalMAP>),
       n_neighbors: nNeighbors,
-      MN_ratio: params.MN_ratio,
-      FP_ratio: params.FP_ratio,
-      low_dist_thres: params.low_dist_thres,
-      seed: params.seed,
-      lr: params.lr,
+      // knn_backend/knn_params are not in DruidJS types but accepted at runtime
       knn_backend: knnBackend ?? "annoy",
       knn_params: knnParams ?? {},
-    });
+    } as Partial<ParametersLocalMAP>);
     gen = dr.generator();
   } else {
     const dr = new PaCMAP(matrix, {
       d: 2,
+      ...(params as Partial<ParametersPaCMAP>),
       n_neighbors: nNeighbors,
-      MN_ratio: params.MN_ratio,
-      FP_ratio: params.FP_ratio,
-      seed: params.seed,
-      lr: params.lr,
+      // knn_backend/knn_params are not in DruidJS types but accepted at runtime
       knn_backend: knnBackend ?? "annoy",
       knn_params: knnParams ?? {},
-    });
+    } as Partial<ParametersPaCMAP>);
     gen = dr.generator();
   }
 

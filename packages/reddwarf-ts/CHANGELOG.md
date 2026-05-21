@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `runReducer` now spreads params directly into DruidJS constructors using the library's own `ParametersUMAP`/`ParametersPaCMAP`/`ParametersLocalMAP` types, replacing manual field-by-field enumeration. The UMAP `spread` param key was renamed to `_spread` to match the DruidJS type.
+
 ## [0.1.0] - 2026-05-16
 
 ### Added
