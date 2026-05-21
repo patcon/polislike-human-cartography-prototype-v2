@@ -1,4 +1,4 @@
-import { UMAP, PaCMAP, LocalMAP, type ParametersUMAP, type ParametersPaCMAP, type ParametersLocalMAP } from "@saehrimnir/druidjs";
+import { UMAP, PaCMAP, LocalMAP, type ParametersUMAP, type ParametersPaCMAP, type ParametersLocalMAP, type ParametersAnnoy, type ParametersHNSW } from "@saehrimnir/druidjs";
 
 export type ReducerAlgorithm = "umap" | "pacmap" | "localmap";
 
@@ -74,16 +74,32 @@ export function defaultAdvancedParamsFor(algorithm: ReducerAlgorithm): Record<st
   );
 }
 
-export const HNSW_PARAM_DEFS: Record<string, ParamDef> = {
-  ef:               { label: "ef (search)",        min: 10,  max: 1000, step: 10,  default: 50  },
-  ef_construction:  { label: "ef_construction",    min: 10,  max: 2000, step: 10,  default: 200 },
+export const KNN_PARAM_DEFS: Record<KnnBackend, Record<string, ParamDef>> = {
+  annoy: {
+    numTrees:         { label: "Num trees",     min: 1,   max: 200,  step: 1,  default: 10  },
+    maxPointsPerLeaf: { label: "Max pts/leaf",  min: 1,   max: 200,  step: 1,  default: 10  },
+    seed:             { label: "Seed",          min: 0,   max: 99999, step: 1, default: 1212 },
+  },
+  hnsw: {
+    ef:               { label: "ef (search)",   min: 10,  max: 1000, step: 10,  default: 50  },
+    ef_construction:  { label: "ef_construct",  min: 10,  max: 2000, step: 10,  default: 200 },
+    m:                { label: "m",             min: 2,   max: 100,  step: 1,   default: 16  },
+    seed:             { label: "Seed",          min: 0,   max: 99999, step: 1,  default: 1212 },
+  },
 };
 
-export function defaultHnswParams(): Record<string, number> {
+export function defaultKnnParamsFor(backend: KnnBackend): Record<string, number> {
   return Object.fromEntries(
-    Object.entries(HNSW_PARAM_DEFS).map(([key, def]) => [key, def.default])
+    Object.entries(KNN_PARAM_DEFS[backend]).map(([key, def]) => [key, def.default])
   );
 }
+
+/** @deprecated Use KNN_PARAM_DEFS["hnsw"] */
+export const HNSW_PARAM_DEFS = KNN_PARAM_DEFS["hnsw"];
+/** @deprecated Use defaultKnnParamsFor("hnsw") */
+export function defaultHnswParams(): Record<string, number> { return defaultKnnParamsFor("hnsw"); }
+
+export type { ParametersAnnoy, ParametersHNSW };
 
 export type ReducerRequest = {
   type: "reduce";
@@ -158,7 +174,7 @@ export function* runReducer(req: ReducerRequest): Generator<ReducerResponse> {
       n_neighbors: nNeighbors,
       // knn_backend/knn_params are not in DruidJS types but accepted at runtime
       knn_backend: knnBackend ?? "annoy",
-      knn_params: knnParams ?? {},
+      knn_params: (knnParams ?? defaultKnnParamsFor(knnBackend ?? "annoy")) as Partial<ParametersAnnoy> | Partial<ParametersHNSW>,
     } as Partial<ParametersLocalMAP>);
     gen = dr.generator();
   } else {
@@ -168,7 +184,7 @@ export function* runReducer(req: ReducerRequest): Generator<ReducerResponse> {
       n_neighbors: nNeighbors,
       // knn_backend/knn_params are not in DruidJS types but accepted at runtime
       knn_backend: knnBackend ?? "annoy",
-      knn_params: knnParams ?? {},
+      knn_params: (knnParams ?? defaultKnnParamsFor(knnBackend ?? "annoy")) as Partial<ParametersAnnoy> | Partial<ParametersHNSW>,
     } as Partial<ParametersPaCMAP>);
     gen = dr.generator();
   }
