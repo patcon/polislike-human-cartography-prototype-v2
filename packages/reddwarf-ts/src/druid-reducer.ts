@@ -107,6 +107,22 @@ export const REDUCER_DEFAULT_ITERATIONS: Record<ReducerAlgorithm, number> = {
 
 export const PROGRESS_INTERVAL = 10;
 
+/** Replaces NaN cells in-place with the column mean of observed values. Falls back to 0 for all-NaN columns. */
+export function imputeColumnMeans(matrix: number[][]): void {
+  const nObs = matrix.length;
+  const nVars = matrix[0]?.length ?? 0;
+  for (let j = 0; j < nVars; j++) {
+    let sum = 0, count = 0;
+    for (let i = 0; i < nObs; i++) {
+      if (!isNaN(matrix[i][j])) { sum += matrix[i][j]; count++; }
+    }
+    const colMean = count > 0 ? sum / count : 0;
+    for (let i = 0; i < nObs; i++) {
+      if (isNaN(matrix[i][j])) matrix[i][j] = colMean;
+    }
+  }
+}
+
 /** Pure generator — yields progress ticks then a final done event. Usable in a web worker or directly in Node.js. */
 export function* runReducer(req: ReducerRequest): Generator<ReducerResponse> {
   const { matrix, algorithm, params, knnBackend, knnParams } = req;

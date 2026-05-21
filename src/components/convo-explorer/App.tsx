@@ -28,6 +28,7 @@ import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import type { ObsColumnInfo, LayerMatrix } from "@/lib/h5ad-loader";
 import { useDruidWorker } from "@/hooks/useDruidWorker";
 import type { ReducerAlgorithm } from "@/lib/druid-reducer";
+import { imputeColumnMeans } from "@/lib/druid-reducer";
 import { RecomputeProjectionDialog } from "./RecomputeProjectionDialog";
 
 // Helper function for ID matching - can be optimized later for performance
@@ -933,17 +934,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         matrix.push(row);
       }
 
-      // Mean imputation: replace NaN cells with the column mean of observed values.
-      for (let j = 0; j < nVars; j++) {
-        let sum = 0, count = 0;
-        for (let i = 0; i < nObs; i++) {
-          if (!isNaN(matrix[i][j])) { sum += matrix[i][j]; count++; }
-        }
-        const colMean = count > 0 ? sum / count : 0;
-        for (let i = 0; i < nObs; i++) {
-          if (isNaN(matrix[i][j])) matrix[i][j] = colMean;
-        }
-      }
+      imputeColumnMeans(matrix);
 
       // Column mask: zero out columns whose var metadata value is truthy.
       if (maskColumn && preloadedData?.varNames) {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `imputeColumnMeans(matrix)` — in-place mean imputation for NaN cells per column, extracted from the main app.
+
 ### Changed
 
 - `runReducer` now spreads params directly into DruidJS constructors using the library's own `ParametersUMAP`/`ParametersPaCMAP`/`ParametersLocalMAP` types, replacing manual field-by-field enumeration. The UMAP `spread` param key was renamed to `_spread` to match the DruidJS type.
