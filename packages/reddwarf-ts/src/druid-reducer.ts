@@ -81,9 +81,9 @@ export const KNN_PARAM_DEFS: Record<KnnBackend, Record<string, ParamDef>> = {
     seed:             { label: "Seed",          min: 0,   max: 99999, step: 1, default: 1212 },
   },
   hnsw: {
-    ef:               { label: "ef (search)",   min: 10,  max: 1000, step: 10,  default: 50  },
+    ef:               { label: "ef (search)",   min: 10,  max: 1000, step: 10,  default: 10  },
     ef_construction:  { label: "ef_construct",  min: 10,  max: 2000, step: 10,  default: 200 },
-    m:                { label: "m",             min: 2,   max: 100,  step: 1,   default: 16  },
+    m:                { label: "m",             min: 2,   max: 100,  step: 1,   default: 12  },
     seed:             { label: "Seed",          min: 0,   max: 99999, step: 1,  default: 1212 },
   },
 };
