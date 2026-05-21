@@ -56,7 +56,8 @@ type RecomputeProjectionDialogProps = {
     params: Record<string, number>,
     knnBackend: KnnBackend | undefined,
     maskColumn: string | null,
-    knnParams: Record<string, number> | undefined
+    knnParams: Record<string, number> | undefined,
+    animateIterations: boolean
   ) => void;
 };
 
@@ -76,6 +77,7 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
   const [algorithm, setAlgorithm] = React.useState<ReducerAlgorithm>("umap");
   const [maskColumn, setMaskColumn] = React.useState<string>("none");
   const [knnBackend, setKnnBackend] = React.useState<KnnBackend>("annoy");
+  const [animateIterations, setAnimateIterations] = React.useState(true);
   const [knnParamsByBackend, setKnnParamsByBackend] = React.useState<Record<KnnBackend, Record<string, number>>>(() => ({
     annoy: defaultKnnParamsFor("annoy"),
     hnsw: defaultKnnParamsFor("hnsw"),
@@ -134,7 +136,8 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
       allParams,
       hasKnnBackend ? knnBackend : undefined,
       maskColumn === "none" ? null : maskColumn,
-      hasKnnBackend ? knnParamsByBackend[knnBackend] : undefined
+      hasKnnBackend ? knnParamsByBackend[knnBackend] : undefined,
+      animateIterations
     );
   };
 
@@ -341,6 +344,15 @@ export const RecomputeProjectionDialog: React.FC<RecomputeProjectionDialogProps>
               )
             )}
           </div>
+          <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={animateIterations}
+              disabled={isRunning}
+              onChange={(e) => setAnimateIterations(e.target.checked)}
+            />
+            Animate
+          </label>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRunning}>
             Cancel
           </Button>

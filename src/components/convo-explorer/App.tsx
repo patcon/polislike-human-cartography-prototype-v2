@@ -157,6 +157,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   const [recomputedProjections, setRecomputedProjections] = React.useState<Record<string, [string, [number, number]][]>>({});
   const { status: druidStatus, coords: druidCoords, error: druidError, progress: druidProgress, runReduction, reset: resetDruid } = useDruidWorker();
   const pendingAlgorithmRef = React.useRef<ReducerAlgorithm>("umap");
+  const animateIterationsRef = React.useRef(true);
 
   // Update current pipeline ID when initialPipelineId prop changes
   React.useEffect(() => {
@@ -916,7 +917,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Reshape a selected layer matrix and kick off in-browser dimensional reduction
   const handleRecomputeRun = React.useCallback(
-    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>, knnBackend: string | undefined, maskColumn: string | null, knnParams?: Record<string, number>) => {
+    (layerKey: string, algorithm: ReducerAlgorithm, params: Record<string, number>, knnBackend: string | undefined, maskColumn: string | null, knnParams?: Record<string, number>, animateIterations = true) => {
       const layer = preloadedData?.layers?.[layerKey];
       if (!layer) return;
       const [nObs, nVars] = layer.shape;
@@ -950,13 +951,21 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       }
 
       pendingAlgorithmRef.current = algorithm;
-      setRecomputeDialogOpen(false);
+      animateIterationsRef.current = animateIterations;
       runReduction(matrix, algorithm, params, knnBackend as import("@/lib/druid-reducer").KnnBackend | undefined, knnParams);
     },
     [preloadedData?.layers, preloadedData?.varNames, preloadedData?.statements, dataset, runReduction]
   );
 
-  // When a reduction finishes, add the result as a new selectable projection
+  // Close dialog as soon as the first coords arrive (KNN graph built) when animating.
+  const hasLiveCoords = druidStatus === "running" && druidCoords !== null;
+  React.useEffect(() => {
+    if (hasLiveCoords && animateIterationsRef.current) {
+      setRecomputeDialogOpen(false);
+    }
+  }, [hasLiveCoords]);
+
+  // When a reduction finishes, add the result as a new selectable projection.
   React.useEffect(() => {
     if (druidStatus !== "done" || !druidCoords) return;
 
@@ -979,12 +988,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       return { ...prev, [key]: projection };
     });
 
+    if (!animateIterationsRef.current) setRecomputeDialogOpen(false);
     resetDruid();
   }, [druidStatus, druidCoords, dataset, preloadedData?.pipelineData, resetDruid]);
 
   const wasmSupported = isWebAssemblySupported();
 
-  const lerpedCoords = useLerpedCoords(druidStatus === "running" ? druidCoords : null);
+  const lerpedCoords = useLerpedCoords(druidStatus === "running" && animateIterationsRef.current ? druidCoords : null);
   const druidLiveDataset = React.useMemo(() => {
     if (!lerpedCoords || lerpedCoords.length !== dataset.length) return undefined;
     return lerpedCoords.map((xy, i) => [dataset[i][0], xy] as [string, [number, number]]);
@@ -1062,7 +1072,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       </div>
 
       {/* Reduction progress overlay */}
-      {druidStatus === "running" && (
+      {druidStatus === "running" && animateIterationsRef.current && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-1.5 min-w-48">
           {druidProgress === null ? (
             <p className="text-xs text-white bg-black/60 rounded-full px-3 py-1 animate-pulse">Building KNN graph…</p>
