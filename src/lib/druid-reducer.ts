@@ -16,5 +16,6 @@ export {
   defaultAdvancedParamsFor,
   defaultHnswParams,
   imputeColumnMeans,
+  zeroMaskedColumns,
   runReducer,
 } from 'reddwarf-ts';

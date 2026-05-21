@@ -28,7 +28,7 @@ import { getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import type { ObsColumnInfo, LayerMatrix } from "@/lib/h5ad-loader";
 import { useDruidWorker } from "@/hooks/useDruidWorker";
 import type { ReducerAlgorithm } from "@/lib/druid-reducer";
-import { imputeColumnMeans } from "@/lib/druid-reducer";
+import { imputeColumnMeans, zeroMaskedColumns } from "@/lib/druid-reducer";
 import { RecomputeProjectionDialog } from "./RecomputeProjectionDialog";
 
 // Helper function for ID matching - can be optimized later for performance
@@ -941,12 +941,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         const stmtByVarId = new Map(
           preloadedData.statements.map((s) => [s.statement_id, s])
         );
-        for (let j = 0; j < nVars; j++) {
-          const stmt = stmtByVarId.get(preloadedData.varNames[j]);
-          if (stmt && (stmt as Record<string, unknown>)[maskColumn]) {
-            for (let i = 0; i < nObs; i++) matrix[i][j] = 0;
-          }
-        }
+        const mask = preloadedData.varNames.map((id) => {
+          const stmt = stmtByVarId.get(id);
+          return !!(stmt && (stmt as Record<string, unknown>)[maskColumn]);
+        });
+        zeroMaskedColumns(matrix, mask);
       }
 
       pendingAlgorithmRef.current = algorithm;

@@ -5,6 +5,7 @@
 ### Added
 
 - `imputeColumnMeans(matrix)` — in-place mean imputation for NaN cells per column, extracted from the main app.
+- `zeroMaskedColumns(matrix, mask)` — zeroes out columns in-place at indices where `mask[j]` is true.
 
 ### Changed
 

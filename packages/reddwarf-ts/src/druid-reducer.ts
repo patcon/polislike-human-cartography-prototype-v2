@@ -107,6 +107,15 @@ export const REDUCER_DEFAULT_ITERATIONS: Record<ReducerAlgorithm, number> = {
 
 export const PROGRESS_INTERVAL = 10;
 
+/** Zeroes out columns in-place at indices where mask[j] is true. */
+export function zeroMaskedColumns(matrix: number[][], mask: boolean[]): void {
+  const nObs = matrix.length;
+  for (let j = 0; j < mask.length; j++) {
+    if (!mask[j]) continue;
+    for (let i = 0; i < nObs; i++) matrix[i][j] = 0;
+  }
+}
+
 /** Replaces NaN cells in-place with the column mean of observed values. Falls back to 0 for all-NaN columns. */
 export function imputeColumnMeans(matrix: number[][]): void {
   const nObs = matrix.length;
