@@ -80,6 +80,9 @@ export const KNN_PARAM_DEFS: Record<KnnBackend, Record<string, ParamDef>> = {
     maxPointsPerLeaf: { label: "Max pts/leaf",  min: 1,   max: 200,  step: 1,  default: 10  },
     seed:             { label: "Seed",          min: 0,   max: 99999, step: 1, default: 1212 },
   },
+  // Defaults match the voyager (Spotify) HNSW library used by pacmap-python:
+  // https://github.com/spotify/voyager/blob/main/cpp/src/TypedIndex.h#L127
+  // https://spotify.github.io/voyager/python/reference.html#voyager.Index
   hnsw: {
     ef:               { label: "ef (search)",   min: 10,  max: 1000, step: 10,  default: 10  },
     ef_construction:  { label: "ef_construct",  min: 10,  max: 2000, step: 10,  default: 200 },
