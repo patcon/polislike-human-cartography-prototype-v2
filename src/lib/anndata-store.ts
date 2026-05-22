@@ -296,8 +296,9 @@ export class AnnDataStore {
         } else if (child instanceof Dataset) {
           try {
             const val = child.value;
+            const shape = child.metadata.shape ?? undefined;
             if (val != null) {
-              dstGroup.create_dataset({ name: key, data: val as Parameters<typeof dstGroup.create_dataset>[0]['data'] });
+              dstGroup.create_dataset({ name: key, data: val as Parameters<typeof dstGroup.create_dataset>[0]['data'], shape });
             }
           } catch { /* skip unreadable datasets */ }
         }
@@ -315,9 +316,19 @@ export class AnnDataStore {
 
       // --- obs group ---
       // Written entirely from AnnDataStore so manual_painted is always current.
+      // Use the original index column name from the source file (e.g. 'voter-id'),
+      // falling back to '_index' when no source is available.
+      let obsIndexColName = '_index';
+      if (srcFile) {
+        const srcObsGroup = srcFile.get('obs') as import('h5wasm').Group | null;
+        if (srcObsGroup) {
+          const indexAttrVal = srcObsGroup.attrs['_index']?.value;
+          if (typeof indexAttrVal === 'string') obsIndexColName = indexAttrVal;
+        }
+      }
       const dstObsGroup = dstFile.create_group('obs') as import('h5wasm').Group;
-      dstObsGroup.create_dataset({ name: '_index', data: this.obsNames });
-      dstObsGroup.create_attribute('_index', '_index');
+      dstObsGroup.create_dataset({ name: obsIndexColName, data: this.obsNames });
+      dstObsGroup.create_attribute('_index', obsIndexColName);
 
       // Preserve group-level HDF5 attributes from the source obs group.
       if (srcFile) {
@@ -361,9 +372,16 @@ export class AnnDataStore {
       // --- var group ---
       // Write the index and the two fields we track, then copy any extra columns
       // from the source file (preserves group-stats, z-scores, etc.).
+      // Use the original index column name (e.g. 'comment-id') when available.
+      let varIndexColName = '_index';
+      if (srcFile) {
+        const srcVarGroup0 = srcFile.get('var') as import('h5wasm').Group | null;
+        const indexAttrVal = srcVarGroup0?.attrs['_index']?.value;
+        if (typeof indexAttrVal === 'string') varIndexColName = indexAttrVal;
+      }
       const dstVarGroup = dstFile.create_group('var') as import('h5wasm').Group;
-      dstVarGroup.create_dataset({ name: '_index', data: this.varNames });
-      dstVarGroup.create_attribute('_index', '_index');
+      dstVarGroup.create_dataset({ name: varIndexColName, data: this.varNames });
+      dstVarGroup.create_attribute('_index', varIndexColName);
       const statByVarId = new Map(this.statements.map(s => [s.statement_id, s]));
       dstVarGroup.create_dataset({
         name: 'content',
@@ -377,8 +395,7 @@ export class AnnDataStore {
       if (srcFile) {
         const srcVarGroup = srcFile.get('var') as import('h5wasm').Group | null;
         if (srcVarGroup) {
-          const indexCol = (srcVarGroup.attrs['_index']?.value as unknown as string) ?? '_index';
-          const handled = new Set([indexCol, '_index', 'content', 'txt', 'moderation_state', 'moderated']);
+          const handled = new Set([varIndexColName, '_index', 'content', 'txt', 'moderation_state', 'moderated']);
           copyGroupContents(srcVarGroup, dstVarGroup, handled);
         }
       }
