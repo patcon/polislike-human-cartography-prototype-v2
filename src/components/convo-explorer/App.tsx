@@ -8,8 +8,9 @@ import { ClearColorsDialog } from "./ClearColorsDialog";
 import { DownloadDialog } from "./DownloadDialog";
 import { FloatingModal } from "./FloatingModal";
 import { INITIAL_ACTION, PALETTE_COLOR_DEFINITIONS, PALETTE_COLORS, VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS, UNPAINTED_VALUE, DISPLAY_MASK_COLUMN } from "@/constants";
-import { getVotesForParticipants, getVoteCountsForAllParticipants, getNonModeratedStatementIds, initializeDuckDB, loadVotesFromMemory, getAllVotes } from "../../lib/duckdb";
-import { resolveAssetPath } from "../../lib/paths";
+import { resolveAssetPath, getAssetUrl } from "../../lib/paths";
+import { AnnDataStore, getAnnDataStore, setAnnDataStore } from "../../lib/anndata-store";
+import { readVoteParquet } from "../../lib/parquet-reader";
 import { isWebAssemblySupported } from "../../lib/wasm-detect";
 import { Spinner } from "../ui/spinner";
 import {
@@ -18,7 +19,7 @@ import {
   getLabelArrayWithOptionalUngrouped,
 } from "../../lib/representative-statements";
 import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
-import { fetchAndProcessKedroData, loadStatementsData, getPrincipalComponentValues } from "@/lib/kedro-api";
+import { fetchAndProcessKedroData, loadStatementsData, getVotesParquetPath, getPrincipalComponentValues } from "@/lib/kedro-api";
 import { useDebugMode } from "../../hooks/useDebugMode";
 import { useShiftKeyTempMode } from "../../hooks/useShiftKeyTempMode";
 import { useLayerModeCycling } from "../../hooks/useLayerModeCycling";
@@ -206,85 +207,112 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Vote stats are now calculated at StatementExplorerDrawer level for better performance
   // Removed global vote stats calculation to avoid calculating stats for all statements
 
-  // Load data and initialize DuckDB on component mount
+  // Helper: sort statements by ID (integer then string fallback)
+  type StatementRow = { statement_id: string; txt: string; moderated: number };
+  const sortStatements = (arr: StatementRow[]): StatementRow[] =>
+    [...arr].sort((a, b) => {
+      const aInt = parseInt(String(a.statement_id), 10);
+      const bInt = parseInt(String(b.statement_id), 10);
+      if (!isNaN(aInt) && !isNaN(bInt)) return aInt - bInt;
+      return String(a.statement_id).localeCompare(String(b.statement_id));
+    });
+
+  // Load data and initialise in-memory AnnDataStore on component mount
   React.useEffect(() => {
     const init = async () => {
       try {
         if (preloadedData) {
-          // Preloaded mode: data already parsed (e.g. from h5ad file)
-          console.log('Using preloaded data');
-
+          // h5ad mode: AnnDataStore was built by the file loader in showcase-lander.
+          // Fall back to building from preloadedData (e.g. Storybook stories).
+          if (!getAnnDataStore()) {
+            const store = AnnDataStore.fromRawData({
+              obsNames: preloadedData.dataset.map(([id]) => id),
+              varNames: preloadedData.varNames ?? preloadedData.statements.map(s => String(s.statement_id)),
+              voteRows: preloadedData.votesRows ?? [],
+              statements: preloadedData.statements,
+              obsColumns: preloadedData.obsColumns,
+              obsm: preloadedData.pipelineData
+                ? Object.fromEntries(Object.entries(preloadedData.pipelineData).map(([k, v]) => [k, v.map(([, c]) => c)]))
+                : {},
+              fullDimensionObsm: preloadedData.fullDimensionEmbeddings
+                ? Object.fromEntries(Object.entries(preloadedData.fullDimensionEmbeddings).map(([k, v]) => [k, v.map(([, c]) => c)]))
+                : {},
+              layers: preloadedData.layers,
+              conversationId: preloadedData.conversationId,
+            });
+            setAnnDataStore(store);
+          }
           setDataset(preloadedData.dataset);
           setStatements(preloadedData.statements);
-
-          // Initialize DuckDB and load votes from memory
-          await initializeDuckDB();
-          if (preloadedData.votesRows.length > 0) {
-            await loadVotesFromMemory(preloadedData.votesRows);
-          }
-          console.log('Preloaded data set and DuckDB initialized');
         } else if (kedroBaseUrl) {
-          // Kedro mode: fetch data from Kedro API
-          console.log('Loading data from Kedro API:', kedroBaseUrl);
-
+          // Kedro mode: fetch projections + statements + votes parquet → AnnDataStore
           const [kedroData, statementsData] = await Promise.all([
             fetchAndProcessKedroData(kedroBaseUrl, initialPipelineId),
-            loadStatementsData(kedroBaseUrl, initialPipelineId)
+            loadStatementsData(kedroBaseUrl, initialPipelineId),
           ]);
 
-          // Kedro data is already sorted in fetchAndProcessKedroData
+          const sortedStatements = sortStatements(statementsData as StatementRow[]);
+          const obsNames = kedroData.map(([id]: [string, [number, number]]) => id);
+          const varNames = sortedStatements.map(s => String(s.statement_id));
+
+          let voteRows: { participant_id: string; comment_id: string; vote: number }[] = [];
+          try {
+            const parquetPath = await getVotesParquetPath(kedroBaseUrl, initialPipelineId);
+            voteRows = await readVoteParquet(`${kedroBaseUrl}/${parquetPath}`);
+          } catch (err) {
+            console.warn('Could not load votes parquet from Kedro:', err);
+          }
+
+          const pipelineKey = initialPipelineId ?? 'default';
+          const store = AnnDataStore.fromRawData({
+            obsNames,
+            varNames,
+            voteRows,
+            statements: sortedStatements,
+            obsm: { [pipelineKey]: kedroData.map(([, c]: [string, [number, number]]) => c) },
+          });
+          setAnnDataStore(store);
           setDataset(kedroData);
-          // Sort statements by statement_id to ensure consistent ordering
-          setStatements([...statementsData].sort((a, b) => {
-            // Try integer sorting first
-            const aInt = parseInt(String(a.statement_id), 10);
-            const bInt = parseInt(String(b.statement_id), 10);
-            if (!isNaN(aInt) && !isNaN(bInt)) {
-              return aInt - bInt;
-            }
-            // Fall back to string sorting
-            return String(a.statement_id).localeCompare(String(b.statement_id));
-          }));
-
-          // Note: DuckDB initialization might not be needed for Kedro mode
-          // depending on whether votes functionality is required
-          await initializeDuckDB();
-          console.log('Kedro data loaded and DuckDB initialized');
+          setStatements(sortedStatements);
         } else {
-          // Normal mode: load local JSON files
-          console.log('Loading data from local JSON files');
-
+          // Local mode: load projections.json + statements.json + votes.parquet → AnnDataStore
           const [projectionsResponse, statementsResponse] = await Promise.all([
             fetch(resolveAssetPath('/projections.json')),
-            fetch(resolveAssetPath('/statements.json'))
+            fetch(resolveAssetPath('/statements.json')),
           ]);
 
-          const projectionsData = await projectionsResponse.json();
+          const projectionsData: [string, [number, number]][] = await projectionsResponse.json();
           const statementsData = await statementsResponse.json();
 
-          // Sort local projection data by participant ID to ensure consistent ordering
-          const sortedProjectionsData = [...projectionsData].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+          const sortedProjections = [...projectionsData].sort(
+            (a, b) => parseInt(String(a[0])) - parseInt(String(b[0]))
+          );
+          const sortedStatements = sortStatements(statementsData as StatementRow[]);
+          const obsNames = sortedProjections.map(([id]) => id);
+          const varNames = sortedStatements.map(s => String(s.statement_id));
 
-          setDataset(sortedProjectionsData);
-          // Sort statements by statement_id to ensure consistent ordering
-          setStatements([...statementsData].sort((a, b) => {
-            // Try integer sorting first
-            const aInt = parseInt(String(a.statement_id), 10);
-            const bInt = parseInt(String(b.statement_id), 10);
-            if (!isNaN(aInt) && !isNaN(bInt)) {
-              return aInt - bInt;
-            }
-            // Fall back to string sorting
-            return String(a.statement_id).localeCompare(String(b.statement_id));
-          }));
+          let voteRows: { participant_id: string; comment_id: string; vote: number }[] = [];
+          try {
+            voteRows = await readVoteParquet(getAssetUrl('/votes.parquet'));
+          } catch (err) {
+            console.warn('Could not load local votes.parquet:', err);
+          }
 
-          await initializeDuckDB();
-          console.log('Local data loaded and DuckDB initialized');
+          const store = AnnDataStore.fromRawData({
+            obsNames,
+            varNames,
+            voteRows,
+            statements: sortedStatements,
+            obsm: { default: sortedProjections.map(([, c]) => c) },
+          });
+          setAnnDataStore(store);
+          setDataset(sortedProjections);
+          setStatements(sortedStatements);
         }
 
         setLoading(false);
       } catch (err) {
-        console.error('Data loading or DuckDB initialization error:', err);
+        console.error('Data loading error:', err);
         setLoading(false);
       }
     };
@@ -314,13 +342,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [currentDisplayState, currentPipelineId]);
 
-  // Derive obs column keys from preloaded data for the "Other" metrics option
+  // Derive obs column keys from the store for the "Other" metrics option
   // Exclude the display mask column so it doesn't appear in the dropdown
   const obsColumnKeys = React.useMemo(() => {
-    if (!preloadedData?.obsColumns) return undefined;
-    const keys = Object.keys(preloadedData.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
+    const store = getAnnDataStore();
+    if (!store || Object.keys(store.obsColumns).length === 0) return undefined;
+    const keys = Object.keys(store.obsColumns).filter(k => k !== DISPLAY_MASK_COLUMN);
     return keys.length > 0 ? keys : undefined;
-  }, [preloadedData?.obsColumns]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset]); // re-derive when dataset changes (new store loaded)
 
   const cycleObsColumn = React.useCallback((direction: 'prev' | 'next') => {
     if (!obsColumnKeys || obsColumnKeys.length === 0) return;
@@ -336,8 +366,9 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Derive legend items for the metrics FloatingModal (categorical columns only)
   const metricsLegendItems = React.useMemo(() => {
     if (metricConfig.type !== 'obs-column') return undefined;
-    if (!preloadedData?.obsColumns) return undefined;
-    const columnInfo = preloadedData.obsColumns[metricConfig.column];
+    const store = getAnnDataStore();
+    if (!store) return undefined;
+    const columnInfo = store.obsColumns[metricConfig.column];
     if (!columnInfo || columnInfo.type !== 'categorical') return undefined;
     const categories = columnInfo.categories ?? [];
     // Hide legend when there are too many categories to be useful
@@ -422,38 +453,26 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Load votes data when switching to votes mode or changing statement ID
   React.useEffect(() => {
     if (layerMode === "votes" && dataset.length > 0) {
-      const loadVotes = async () => {
-        try {
-          // Use the current dataset instead of loading projections from file
-          const participantIds = dataset.map(([id]) => id);
-          const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineIdRef.current);
+      const store = getAnnDataStore();
+      if (!store) return;
 
-          // Create votes color indices array parallel to dataset
-          const newPointVotes = dataset.map(([participantId]) => {
-            const vote = votes.get(participantId) ?? null;
+      const participantIds = dataset.map(([id]) => id);
+      const votes = store.getVotesForStatement(statementId, participantIds);
 
-            if (vote === null) {
-              return null; // Participant has no vote - should be black (unpainted)
-            }
-
-            // Map actual vote values to indices for color lookup
-            switch (vote) {
-              case 1: return 0;    // agree - green
-              case -1: return 1;   // disagree - red
-              case 0: return 2;    // pass - yellow
-              default: return null; // no vote - black
-            }
-          });
-
-          setPointVotes(newPointVotes);
-        } catch (err) {
-          console.error('Error loading votes:', err);
+      const newPointVotes = dataset.map(([participantId]) => {
+        const vote = votes.get(participantId) ?? null;
+        if (vote === null) return null;
+        switch (vote) {
+          case 1: return 0;    // agree - green
+          case -1: return 1;   // disagree - red
+          case 0: return 2;    // pass - yellow
+          default: return null;
         }
-      };
+      });
 
-      loadVotes();
+      setPointVotes(newPointVotes);
     }
-  }, [layerMode, statementId, dataset, kedroBaseUrl]);
+  }, [layerMode, statementId, dataset]);
 
   // Load metrics data when switching to metrics mode or when metric config changes
   React.useEffect(() => {
@@ -463,20 +482,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           if (metricConfig.type === "vote-count") {
             setMetricsType('continuous');
 
-            // Load vote count metrics (existing logic)
-            const EXCLUDE_MODERATED_STATEMENTS = true;
-            let statementIds: string[] | undefined;
+            const store = getAnnDataStore();
+            if (!store) return;
 
-            if (EXCLUDE_MODERATED_STATEMENTS && statements.length > 0) {
-              statementIds = getNonModeratedStatementIds(statements);
-              console.log(`Filtering to ${statementIds?.length || 0} non-moderated statements out of ${statements.length} total`);
-            }
+            const nonModeratedIds = statements.length > 0
+              ? statements.filter(s => s.moderated !== -1).map(s => String(s.statement_id))
+              : undefined;
 
-            const voteCounts = await getVoteCountsForAllParticipants({
-              kedroBaseUrl,
-              pipelineId: currentPipelineIdRef.current,
-              statementIds
-            });
+            const voteCounts = store.getVoteCountsForAllParticipants({ statementIds: nonModeratedIds });
 
             const newPointMetrics = dataset.map(([participantId]) => {
               return voteCounts.get(participantId) ?? null;
@@ -484,13 +497,14 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
             setPointMetrics(newPointMetrics);
           } else if (metricConfig.type === "obs-column") {
-            // Load obs column metrics from preloaded data using type metadata
-            if (preloadedData?.obsColumns) {
-              const columnInfo = preloadedData.obsColumns[metricConfig.column];
+            // Load obs column metrics from the store's obsColumns
+            const obsColStore = getAnnDataStore();
+            if (obsColStore?.obsColumns) {
+              const columnInfo = obsColStore.obsColumns[metricConfig.column];
               if (columnInfo) {
                 setMetricsType(columnInfo.type);
 
-                const obsNames = preloadedData.dataset.map(([id]) => id);
+                const obsNames = obsColStore.obsNames;
                 const valueMap = new Map<string, string | number | null>();
                 for (let i = 0; i < obsNames.length; i++) {
                   if (i < columnInfo.values.length) {
@@ -545,31 +559,29 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             // Load principal component metrics
             const componentIndex = metricConfig.component - 1; // Convert 1-based to 0-based index
 
-            if (preloadedData?.fullDimensionEmbeddings) {
-              // Preloaded mode: extract components from full-dimension embeddings
-              const embKeys = Object.keys(preloadedData.fullDimensionEmbeddings);
-              // Prefer pca_masked_unscaled, then any key containing 'pca', then first available
+            const pcaStore = getAnnDataStore();
+            if (pcaStore && Object.keys(pcaStore.fullDimensionObsm).length > 0) {
+              // Extract components from the store's full-dimension embeddings
+              const embKeys = Object.keys(pcaStore.fullDimensionObsm);
               const pcaKey = embKeys.find(k => k === 'pca_masked_unscaled')
                 || embKeys.find(k => k.includes('pca'))
                 || embKeys[0];
 
               if (pcaKey) {
-                const fullData = preloadedData.fullDimensionEmbeddings[pcaKey];
-                console.log(`Using preloaded PCA embedding "${pcaKey}" (${fullData[0]?.[1]?.length || 0} dimensions)`);
-
-                // Build a map and normalize
+                const fullCoords = pcaStore.fullDimensionObsm[pcaKey];
                 const rawValues = new Map<string, number>();
                 let minValue = Infinity;
                 let maxValue = -Infinity;
 
-                for (const [pid, coords] of fullData) {
-                  if (coords.length > componentIndex) {
+                pcaStore.obsNames.forEach((pid, i) => {
+                  const coords = fullCoords[i];
+                  if (coords && coords.length > componentIndex) {
                     const value = coords[componentIndex];
                     rawValues.set(pid, value);
                     minValue = Math.min(minValue, value);
                     maxValue = Math.max(maxValue, value);
                   }
-                }
+                });
 
                 const range = maxValue - minValue;
                 const newPointMetrics = dataset.map(([participantId]) => {
@@ -577,8 +589,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
                   if (raw === undefined) return null;
                   return range > 0 ? (raw - minValue) / range : 0.5;
                 });
-
-                console.log(`Calculated principal component ${metricConfig.component} for ${rawValues.size} participants (range: ${minValue.toFixed(3)} - ${maxValue.toFixed(3)})`);
                 setPointMetrics(newPointMetrics);
               }
             } else {
@@ -617,40 +627,21 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
 
-  // Calculate representative statements
-  const calculateRepStatements = React.useCallback(async (updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean, mask?: boolean[]) => {
+  // Calculate representative statements (sync — no DuckDB required)
+  const calculateRepStatements = React.useCallback((updatedPointGroups?: number[], updatedIsUnpaintedGrouped?: boolean, mask?: boolean[]) => {
     if (isCalculatingRepStatements) return;
 
-    // Use the provided updated groups or fall back to current state
     const groupsToAnalyze = updatedPointGroups || pointGroups;
-
-    // Use the provided updated unpainted grouped state or fall back to current state
     const unpaintedGroupedToUse = updatedIsUnpaintedGrouped !== undefined ? updatedIsUnpaintedGrouped : isUnpaintedGrouped;
-
-    // Create statement text map
     const statementTextMap = createStatementTextMap(statements);
-
-    // Get label array for analysis - include unpainted as a group if isUnpaintedGrouped is true
-    // Pass display mask to exclude masked participants from analysis
     const labelArray = getLabelArrayWithOptionalUngrouped(groupsToAnalyze, unpaintedGroupedToUse, mask);
 
-    // Check if we can perform analysis - count unique non-unpainted groups
     const uniqueGroups = new Set(labelArray.filter(label => label !== null));
-    const canAnalyze = uniqueGroups.size >= 2;
-
-    console.log(`Found ${uniqueGroups.size} unique groups:`, Array.from(uniqueGroups));
-
-    if (!canAnalyze) {
-      console.log('Cannot analyze: need at least 2 groups, found:', uniqueGroups.size);
-      // Clear representative statements when below threshold to prevent stale data
+    if (uniqueGroups.size < 2) {
       setRepresentativeStatements({});
       setConsensusStatements(null);
       setRepStatementsError(null);
-
-      // Reset drawer to "all" tab when below threshold to prevent showing stale group tabs
-      if (drawerTab !== "all") {
-        setDrawerTab("all");
-      }
+      if (drawerTab !== "all") setDrawerTab("all");
       return;
     }
 
@@ -658,25 +649,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     setRepStatementsError(null);
 
     try {
-      // Get participant IDs from dataset
       const participants = dataset.map(([participantId]) => participantId);
-
-      const result = await calculateRepresentativeStatements(
+      const result = calculateRepresentativeStatements(
         labelArray,
         participants,
         statementTextMap,
-        {
-          includeModerated: false,
-          minVoteCount: 1,
-          maxStatementsCount: 10,
-          kedroBaseUrl,
-          pipelineId: currentPipelineId
-        }
+        { includeModerated: false, minVoteCount: 1, maxStatementsCount: 10 }
       );
-
       setRepresentativeStatements(result.repComments);
       setConsensusStatements(result.consensusStatements);
-      console.log('Representative statements calculated:', result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to calculate representative statements';
       setRepStatementsError(errorMessage);
@@ -689,19 +670,19 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
 
-  // Derive display mask array (parallel to dataset) from obs column
+  // Derive display mask array (parallel to dataset) from the store's obs column
   const displayMask = React.useMemo(() => {
-    if (!preloadedData?.obsColumns) return undefined;
-    const maskCol = preloadedData.obsColumns[DISPLAY_MASK_COLUMN];
+    const store = getAnnDataStore();
+    if (!store) return undefined;
+    const maskCol = store.obsColumns[DISPLAY_MASK_COLUMN];
     if (!maskCol || maskCol.type !== 'boolean') return undefined;
-    // Build map from participant ID to mask value
-    const obsNames = preloadedData.dataset.map(([id]) => id);
     const maskMap = new Map<string, boolean>();
-    for (let i = 0; i < obsNames.length; i++) {
-      maskMap.set(obsNames[i], maskCol.values[i] === 1);
-    }
+    store.obsNames.forEach((pid, i) => {
+      maskMap.set(pid, maskCol.values[i] === 1);
+    });
     return dataset.map(([id]) => maskMap.get(id) ?? false);
-  }, [preloadedData, dataset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset]); // re-derive when dataset changes (new store loaded)
 
   // Effective display mask: respects the "show filtered participants" toggle
   const effectiveDisplayMask = showFilteredParticipants ? undefined : displayMask;
@@ -769,7 +750,8 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   const buildFilename = React.useCallback((base: string, ext: string, prefixDate?: boolean): string => {
     const parts = [];
     if (prefixDate) parts.push(new Date().toISOString().slice(0, 10));
-    if (preloadedData?.conversationId) parts.push(preloadedData.conversationId);
+    const conversationId = getAnnDataStore()?.conversationId ?? preloadedData?.conversationId;
+    if (conversationId) parts.push(conversationId);
     parts.push(base);
     return parts.join('-') + '.' + ext;
   }, [preloadedData?.conversationId]);
@@ -791,18 +773,21 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     URL.revokeObjectURL(url);
   };
 
-  // Clear all painted colors - reset all points to unpainted
+  // Download participants CSV from store (obs columns + painted groups)
   const handleDownloadObsCsv = React.useCallback((prefixDate: boolean) => {
-    const obsColumns = preloadedData?.obsColumns;
-    if (!obsColumns || dataset.length === 0) return;
+    const store = getAnnDataStore();
+    if (!store || dataset.length === 0) return;
 
+    const obsColumns = store.obsColumns;
     const columnNames = Object.keys(obsColumns);
     const header = ['participant_id', 'manual_painted', ...columnNames];
+    const obsIdx = new Map(store.obsNames.map((id, i) => [id, i]));
     const rows = dataset.map(([participantId], idx) => {
       const painted = pointGroups[idx];
       const paintedValue = painted === UNPAINTED_VALUE ? '' : (PALETTE_COLOR_DEFINITIONS[painted]?.name ?? String(painted));
+      const storeRow = obsIdx.get(participantId);
       const values = columnNames.map(col => {
-        const val = obsColumns[col].values[idx];
+        const val = storeRow !== undefined ? obsColumns[col].values[storeRow] : null;
         return val === null || val === undefined ? '' : String(val);
       });
       return [participantId, paintedValue, ...values];
@@ -816,13 +801,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   }, [dataset, pointGroups, preloadedData?.obsColumns, buildFilename]);
 
   // Download vote matrix CSV: rows=participants, columns=statement IDs, values=vote or empty
-  const handleDownloadVoteCsv = React.useCallback(async (prefixDate: boolean) => {
-    if (!preloadedData?.statements || dataset.length === 0) return;
+  const handleDownloadVoteCsv = React.useCallback((prefixDate: boolean) => {
+    const store = getAnnDataStore();
+    if (!store || dataset.length === 0) return;
 
-    const statementIds = preloadedData.statements.map(s => s.statement_id);
-    const allVoteRows = await getAllVotes(kedroBaseUrl, currentPipelineId === 'default' ? undefined : currentPipelineId);
+    const allVoteRows = store.getAllVoteRows();
+    const statementIds = store.varNames;
 
-    // Build lookup: participant_id → Map<comment_id, vote>
     const voteLookup = new Map<string, Map<string, number>>();
     for (const row of allVoteRows) {
       if (!voteLookup.has(row.participant_id)) {
@@ -846,7 +831,29 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
       .join('\n');
 
     downloadCsv(csvContent, buildFilename('vote-matrix', 'csv', prefixDate));
-  }, [dataset, preloadedData?.statements, kedroBaseUrl, currentPipelineId, buildFilename]);
+  }, [dataset, buildFilename]);
+
+  // Download h5ad file — merges current painted groups into obs before serialising
+  const handleDownloadH5ad = React.useCallback(async (prefixDate: boolean) => {
+    const store = getAnnDataStore();
+    if (!store) return;
+    // Strip the [string, [number, number]][] format down to [number, number][] for toH5adBytes
+    const extraObsm: Record<string, [number, number][]> = {};
+    for (const [key, entries] of Object.entries(recomputedProjections)) {
+      extraObsm[key] = entries.map(([, coords]) => coords);
+    }
+    const bytes = await store.toH5adBytes(
+      pointGroups.length > 0 ? pointGroups : undefined,
+      Object.keys(extraObsm).length > 0 ? extraObsm : undefined,
+    );
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = buildFilename('data', 'h5ad', prefixDate);
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [pointGroups, recomputedProjections, buildFilename]);
 
   const handleClearAllColors = React.useCallback(() => {
     setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
@@ -979,11 +986,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         ...Object.keys(prev),
         ...Object.keys(preloadedData?.pipelineData ?? {}),
       ]);
-      const base = `${pendingAlgorithmRef.current}-recomputed`;
+      const base = `${pendingAlgorithmRef.current}_recomputed`;
       let key = base;
       let n = 2;
       while (taken.has(key)) {
-        key = `${base}-${n++}`;
+        key = `${base}_${n++}`;
       }
       return { ...prev, [key]: projection };
     });
@@ -1064,7 +1071,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
                 : undefined
             }
             onLoadFile={onLoadFile}
-            onDownloadObsCsv={preloadedData?.obsColumns ? () => setDownloadObsCsvDialogOpen(true) : undefined}
+            onDownloadObsCsv={() => setDownloadObsCsvDialogOpen(true)}
             displayMask={showFilteredParticipants ? undefined : displayMask}
             unpaintedColor={isUnpaintedGrouped ? undefined : "#cccccc"}
           />
@@ -1129,9 +1136,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           // Debug mode props
           debugMode={debugMode}
           dataset={dataset}
-          // Kedro configuration props
-          kedroBaseUrl={kedroBaseUrl}
-          pipelineId={currentPipelineId}
           wasmSupported={wasmSupported}
         />
       </div>
@@ -1218,11 +1222,12 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         open={downloadObsCsvDialogOpen}
         onOpenChange={setDownloadObsCsvDialogOpen}
         onConfirm={handleDownloadObsCsv}
-        onConfirmVotes={preloadedData?.statements ? handleDownloadVoteCsv : undefined}
+        onConfirmVotes={statements.length > 0 ? handleDownloadVoteCsv : undefined}
+        onConfirmH5ad={handleDownloadH5ad}
         participantCount={dataset.length}
-        columnCount={Object.keys(preloadedData?.obsColumns ?? {}).length}
-        statementCount={preloadedData?.statements?.length}
-        conversationId={preloadedData?.conversationId}
+        columnCount={Object.keys(getAnnDataStore()?.obsColumns ?? {}).length}
+        statementCount={statements.length || undefined}
+        conversationId={getAnnDataStore()?.conversationId ?? preloadedData?.conversationId}
       />
     </div>
   );

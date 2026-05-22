@@ -51,10 +51,6 @@ type MapOverlayProps = {
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
 
-  // Kedro configuration props
-  kedroBaseUrl?: string;
-  pipelineId?: string;
-
   /** Whether WebAssembly is available (false when Lockdown Mode is active) */
   wasmSupported?: boolean;
 };
@@ -96,10 +92,6 @@ export function MapOverlay({
   // Debug mode props
   debugMode = false,
   dataset = [],
-
-  // Kedro configuration props
-  kedroBaseUrl,
-  pipelineId,
 
   wasmSupported = true,
 }: MapOverlayProps) {
@@ -189,8 +181,6 @@ export function MapOverlay({
           onStatementClick={handleStatementClick}
           debugMode={debugMode}
           dataset={dataset}
-          kedroBaseUrl={kedroBaseUrl}
-          pipelineId={pipelineId}
           wasmSupported={wasmSupported}
         />
         <AboutDialog autoOpen />

@@ -4,6 +4,9 @@
 
 ### Added
 
+- In-memory AnnData store (`src/lib/anndata-store.ts`): all imported data (h5ad, Kedro, local files) is normalized at load time into a singleton `AnnDataStore` backed by a dense vote matrix (`Float32Array`). Vote queries are now synchronous typed-array operations — no DuckDB needed.
+- "Download h5ad" button in the download dialog exports the current dataset as a valid `.h5ad` file using h5wasm. Painted group labels are merged into `obs/manual_painted` before writing. The download is a faithful round-trip: all original `var` columns, `uns` fields, full-dimensional `obsm` embeddings (e.g. PCA), and group-level HDF5 attributes are preserved by writing from the raw source bytes. User-computed projections added via Recompute are appended to `obsm`.
+- Kedro and local-file modes now load votes from `votes.parquet` via `hyparquet` (pure-JS Parquet reader) instead of DuckDB, building the same in-memory AnnDataStore as the h5ad import path.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
 - Reduction animates live on the map: the recompute dialog closes when Run is clicked, and intermediate point positions are streamed from the worker every 10 iterations and displayed directly on the map. A progress pill at the bottom of the map shows "Building KNN graph…" then a 0–100 % progress bar during iteration. The final result is registered as a named projection as before.
 - Annoy KNN backend now exposes its parameters (`numTrees`, `maxPointsPerLeaf`, `seed`) in the recompute dialog, matching the HNSW pattern. Switching backends shows that backend's params immediately; values are forwarded as `knn_params` to PaCMAP and LocalMAP. HNSW params expanded to include `m` and `seed`.
@@ -27,6 +30,11 @@
   - `onPrev` / `onNext` are optional injected props — buttons only render when provided, keeping the modal reusable for other contexts.
 
 ### Changed
+
+- Replaced DuckDB-WASM backend with the new `AnnDataStore` for all vote queries (`getVotesForStatement`, `getVoteCountsForAllParticipants`, `getGroupVoteMatrices`). Removes the ~10 MB DuckDB WASM bundle from the production build.
+- `calculateRepresentativeStatements` in `reddwarf-ts` is now synchronous (no DuckDB connection needed). The `reddwarf-ts/db` module exposes a pure functional `getGroupVoteMatrices` that takes a callback rather than a SQL connection.
+- CSV downloads (participants and vote matrix) are now generated directly from the `AnnDataStore` instead of DuckDB queries.
+- `calculateStatementVoteStats` in `src/lib/vote-stats.ts` is now synchronous.
 
 - Removed `RepresentativeStatementsManager` class from `reddwarf-ts` and its app-layer wrapper; the class was never instantiated (App.tsx owns `isCalculatingRepStatements` state directly via `useState`).
 - Split `reddwarf-ts` stats module: pure statistical functions stay in `stats.ts`; DB-layer types (`VoteConnection`, `VoteQueryResult`) and `getGroupVoteMatrices` move to new `db.ts`. Unified `AnalysisOptions` (now includes `commentTextMap`) replaces two divergent options shapes. Collapsed `analyzeLabeledGroups` (was in `stats.ts`) and `calculateRepresentativeStatements` (was a thin wrapper in `representative-statements.ts`) into a single function in `representative-statements.ts`; app adapter updated to fold `commentTextMap` into options.

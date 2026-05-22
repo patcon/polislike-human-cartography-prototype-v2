@@ -19,6 +19,7 @@ type DownloadDialogProps = {
   onOpenChange: (open: boolean) => void;
   onConfirm: (prefixDate: boolean) => void;
   onConfirmVotes?: (prefixDate: boolean) => void;
+  onConfirmH5ad?: (prefixDate: boolean) => void;
   participantCount: number;
   columnCount: number;
   statementCount?: number;
@@ -28,7 +29,7 @@ type DownloadDialogProps = {
 export const DownloadDialog = React.forwardRef<
   React.ElementRef<typeof AlertDialogContent>,
   DownloadDialogProps
->(({ open, onOpenChange, onConfirm, onConfirmVotes, participantCount, columnCount, statementCount, conversationId }, ref) => {
+>(({ open, onOpenChange, onConfirm, onConfirmVotes, onConfirmH5ad, participantCount, columnCount, statementCount, conversationId }, ref) => {
   const [prefixDate, setPrefixDate] = React.useState(false);
 
   return (
@@ -76,6 +77,17 @@ export const DownloadDialog = React.forwardRef<
                 {statementCount !== undefined && (
                   <span className="text-xs opacity-70">({participantCount} × {statementCount})</span>
                 )}
+              </Button>
+            )}
+            {onConfirmH5ad && (
+              <Button
+                onClick={() => onConfirmH5ad(prefixDate)}
+                variant="secondary"
+                className="flex items-center gap-2 justify-center w-full"
+              >
+                <FileDown size={16} />
+                Download h5ad
+                <span className="text-xs opacity-70">(includes painted groups)</span>
               </Button>
             )}
           </div>
