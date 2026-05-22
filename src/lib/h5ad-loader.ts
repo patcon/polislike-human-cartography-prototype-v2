@@ -25,6 +25,8 @@ export type H5adData = {
   layers: Record<string, LayerMatrix>;
   /** Optional conversation identifier from uns['conversation_id'] */
   conversationId?: string;
+  /** Raw HDF5 bytes of the original file, for lossless round-trip export */
+  rawBytes: Uint8Array;
 };
 
 /** A dense 2D matrix from an AnnData layer, stored flat in row-major order. */
@@ -406,7 +408,8 @@ export async function loadH5adFile(
     const convIdDs = unsGroup?.get('conversation_id') as Dataset | null;
     const conversationId = convIdDs ? String(convIdDs.value) : undefined;
 
-    return { dataset, statements, varNames, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, layers, conversationId };
+    const rawBytes = new Uint8Array(buffer);
+    return { dataset, statements, varNames, votesRows, availableEmbeddings, allEmbeddings, fullDimensionEmbeddings, obsColumns, layers, conversationId, rawBytes };
   } finally {
     if (file) {
       file.close();

@@ -42,6 +42,8 @@ export class AnnDataStore {
   readonly fullDimensionObsm: Record<string, number[][]>;
   readonly layers: Record<string, LayerMatrix>;
   readonly conversationId?: string;
+  /** Raw HDF5 bytes of the original file. When present, used as the base for export. */
+  readonly rawH5adBytes?: Uint8Array;
 
   constructor(params: {
     obsNames: string[];
@@ -53,6 +55,7 @@ export class AnnDataStore {
     fullDimensionObsm: Record<string, number[][]>;
     layers: Record<string, LayerMatrix>;
     conversationId?: string;
+    rawH5adBytes?: Uint8Array;
   }) {
     this.obsNames = params.obsNames;
     this.varNames = params.varNames;
@@ -65,6 +68,7 @@ export class AnnDataStore {
     this.fullDimensionObsm = params.fullDimensionObsm;
     this.layers = params.layers;
     this.conversationId = params.conversationId;
+    this.rawH5adBytes = params.rawH5adBytes;
   }
 
   // ---------------------------------------------------------------------------
@@ -117,6 +121,7 @@ export class AnnDataStore {
       fullDimensionObsm,
       layers: data.layers,
       conversationId: data.conversationId,
+      rawH5adBytes: data.rawBytes,
     });
   }
 
@@ -262,20 +267,74 @@ export class AnnDataStore {
   async toH5adBytes(paintedGroups?: number[]): Promise<Uint8Array> {
     const h5wasm = await import('h5wasm');
     const { FS } = await h5wasm.ready;
-    const { File: H5File } = await import('h5wasm');
+    const { File: H5File, Group, Dataset } = await import('h5wasm');
 
-    const filename = `export-${Date.now()}.h5ad`;
-    const file = new H5File(filename, 'w');
+    const ts = Date.now();
+    const srcFilename = `src-${ts}.h5ad`;
+    const dstFilename = `dst-${ts}.h5ad`;
+
+    // Copy readable children and attributes from srcGroup → dstGroup, skipping skipKeys.
+    // Handles both plain datasets and sub-groups (e.g. AnnData categorical columns).
+    function copyGroupContents(
+      srcGroup: import('h5wasm').Group,
+      dstGroup: import('h5wasm').Group,
+      skipKeys: Set<string> = new Set(),
+    ) {
+      // Copy HDF5 attributes (encoding-type, encoding-version, _index, etc.)
+      for (const [attrName, attrVal] of Object.entries(srcGroup.attrs)) {
+        try {
+          dstGroup.create_attribute(attrName, attrVal.value as unknown as Parameters<typeof dstGroup.create_attribute>[1]);
+        } catch { /* skip unwritable attrs */ }
+      }
+      for (const key of srcGroup.keys()) {
+        if (skipKeys.has(key)) continue;
+        const child = srcGroup.get(key);
+        if (!child) continue;
+        if (child instanceof Group) {
+          const subDst = dstGroup.create_group(key) as import('h5wasm').Group;
+          copyGroupContents(child, subDst);
+        } else if (child instanceof Dataset) {
+          try {
+            const val = child.value;
+            if (val != null) {
+              dstGroup.create_dataset({ name: key, data: val as Parameters<typeof dstGroup.create_dataset>[0]['data'] });
+            }
+          } catch { /* skip unreadable datasets */ }
+        }
+      }
+    }
+
+    let srcFile: import('h5wasm').File | null = null;
+    const dstFile = new H5File(dstFilename, 'w');
 
     try {
+      if (this.rawH5adBytes) {
+        FS.writeFile(srcFilename, this.rawH5adBytes);
+        srcFile = new H5File(srcFilename, 'r');
+      }
+
       // --- obs group ---
-      const obsGroup = file.create_group('obs') as import('h5wasm').Group;
-      obsGroup.create_dataset({ name: '_index', data: this.obsNames });
-      obsGroup.create_attribute('_index', '_index');
+      // Written entirely from AnnDataStore so manual_painted is always current.
+      const dstObsGroup = dstFile.create_group('obs') as import('h5wasm').Group;
+      dstObsGroup.create_dataset({ name: '_index', data: this.obsNames });
+      dstObsGroup.create_attribute('_index', '_index');
+
+      // Preserve group-level HDF5 attributes from the source obs group.
+      if (srcFile) {
+        const srcObsGroup = srcFile.get('obs') as import('h5wasm').Group | null;
+        if (srcObsGroup) {
+          for (const [attrName, attrVal] of Object.entries(srcObsGroup.attrs)) {
+            if (attrName === '_index') continue;
+            try {
+              dstObsGroup.create_attribute(attrName, attrVal.value as unknown as Parameters<typeof dstObsGroup.create_attribute>[1]);
+            } catch { /* skip */ }
+          }
+        }
+      }
 
       for (const [colName, colInfo] of Object.entries(this.obsColumns)) {
         if (colInfo.type === 'categorical') {
-          const catGroup = obsGroup.create_group(colName) as import('h5wasm').Group;
+          const catGroup = dstObsGroup.create_group(colName) as import('h5wasm').Group;
           const codes = colInfo.values.map(v => {
             if (v === null) return -1;
             const idx = colInfo.categories?.indexOf(v as string | number) ?? -1;
@@ -285,7 +344,7 @@ export class AnnDataStore {
           catGroup.create_dataset({ name: 'categories', data: (colInfo.categories ?? []).map(String) });
         } else {
           const values = colInfo.values.map(v => (v === null ? NaN : Number(v)));
-          obsGroup.create_dataset({ name: colName, data: new Float64Array(values) });
+          dstObsGroup.create_dataset({ name: colName, data: new Float64Array(values) });
         }
       }
 
@@ -293,63 +352,108 @@ export class AnnDataStore {
         const paintedValues = paintedGroups.map(g =>
           g === UNPAINTED_VALUE ? '' : (PALETTE_COLOR_DEFINITIONS[g]?.name ?? String(g))
         );
-        obsGroup.create_dataset({ name: 'manual_painted', data: paintedValues });
+        // manual_painted is already omitted from obsColumns (loaded as a column but
+        // overwritten here so the current painting state always wins).
+        try { dstObsGroup.create_dataset({ name: 'manual_painted', data: paintedValues }); }
+        catch { /* column already written from obsColumns — shouldn't happen */ }
       }
 
       // --- var group ---
-      const varGroup = file.create_group('var') as import('h5wasm').Group;
-      varGroup.create_dataset({ name: '_index', data: this.varNames });
-      varGroup.create_attribute('_index', '_index');
+      // Write the index and the two fields we track, then copy any extra columns
+      // from the source file (preserves group-stats, z-scores, etc.).
+      const dstVarGroup = dstFile.create_group('var') as import('h5wasm').Group;
+      dstVarGroup.create_dataset({ name: '_index', data: this.varNames });
+      dstVarGroup.create_attribute('_index', '_index');
       const statByVarId = new Map(this.statements.map(s => [s.statement_id, s]));
-      varGroup.create_dataset({
+      dstVarGroup.create_dataset({
         name: 'content',
         data: this.varNames.map(id => statByVarId.get(id)?.txt ?? ''),
       });
-      varGroup.create_dataset({
+      dstVarGroup.create_dataset({
         name: 'moderation_state',
         data: new Int8Array(this.varNames.map(id => statByVarId.get(id)?.moderated ?? 0)),
       });
 
+      if (srcFile) {
+        const srcVarGroup = srcFile.get('var') as import('h5wasm').Group | null;
+        if (srcVarGroup) {
+          const indexCol = (srcVarGroup.attrs['_index']?.value as unknown as string) ?? '_index';
+          const handled = new Set([indexCol, '_index', 'content', 'txt', 'moderation_state', 'moderated']);
+          copyGroupContents(srcVarGroup, dstVarGroup, handled);
+        }
+      }
+
       // --- obsm group ---
-      const obsmGroup = file.create_group('obsm') as import('h5wasm').Group;
+      // Write full-dimensional embeddings where available, then 2D for the rest.
+      // Any obsm key in the source that isn't in AnnDataStore is also copied through.
+      const dstObsmGroup = dstFile.create_group('obsm') as import('h5wasm').Group;
+      const writtenObsmKeys = new Set<string>();
+
+      // Full-dimensional embeddings (PCA etc.) take priority.
+      for (const [key, coordRows] of Object.entries(this.fullDimensionObsm)) {
+        const h5Key = `X_${key}`;
+        const nObs = coordRows.length;
+        const nDims = coordRows[0]?.length ?? 0;
+        const flat = new Float32Array(nObs * nDims);
+        for (let i = 0; i < nObs; i++) {
+          for (let d = 0; d < nDims; d++) flat[i * nDims + d] = coordRows[i][d];
+        }
+        dstObsmGroup.create_dataset({ name: h5Key, data: flat, shape: [nObs, nDims] });
+        writtenObsmKeys.add(h5Key);
+      }
+
+      // 2D-only embeddings (user-computed projections that have no high-dim counterpart).
       for (const [key, coords] of Object.entries(this.obsm)) {
+        const h5Key = `X_${key}`;
+        if (writtenObsmKeys.has(h5Key)) continue;
         const nObs = coords.length;
         const flat = new Float32Array(nObs * 2);
-        for (let i = 0; i < nObs; i++) {
-          flat[i * 2] = coords[i][0];
-          flat[i * 2 + 1] = coords[i][1];
-        }
-        obsmGroup.create_dataset({ name: `X_${key}`, data: flat, shape: [nObs, 2] });
+        for (let i = 0; i < nObs; i++) { flat[i * 2] = coords[i][0]; flat[i * 2 + 1] = coords[i][1]; }
+        dstObsmGroup.create_dataset({ name: h5Key, data: flat, shape: [nObs, 2] });
+        writtenObsmKeys.add(h5Key);
+      }
+
+      // Copy any obsm entries from the source that weren't in AnnDataStore.
+      if (srcFile) {
+        const srcObsmGroup = srcFile.get('obsm') as import('h5wasm').Group | null;
+        if (srcObsmGroup) copyGroupContents(srcObsmGroup, dstObsmGroup, writtenObsmKeys);
       }
 
       // --- layers group ---
-      const layersGroup = file.create_group('layers') as import('h5wasm').Group;
+      const dstLayersGroup = dstFile.create_group('layers') as import('h5wasm').Group;
       for (const [key, layer] of Object.entries(this.layers)) {
         const data = layer.data instanceof Float32Array
           ? layer.data
           : new Float32Array(layer.data as ArrayLike<number>);
-        layersGroup.create_dataset({ name: key, data, shape: layer.shape });
+        dstLayersGroup.create_dataset({ name: key, data, shape: layer.shape });
       }
 
       // --- uns group ---
-      const unsGroup = file.create_group('uns') as import('h5wasm').Group;
+      // Write votes + conversation_id from AnnDataStore; copy remaining uns from source.
+      const dstUnsGroup = dstFile.create_group('uns') as import('h5wasm').Group;
       if (this.conversationId) {
-        unsGroup.create_dataset({ name: 'conversation_id', data: [this.conversationId] });
+        dstUnsGroup.create_dataset({ name: 'conversation_id', data: [this.conversationId] });
       }
-
-      const votesGroup = unsGroup.create_group('votes') as import('h5wasm').Group;
+      const votesGroup = dstUnsGroup.create_group('votes') as import('h5wasm').Group;
       const allVoteRows = this.getAllVoteRows();
       if (allVoteRows.length > 0) {
         votesGroup.create_dataset({ name: 'voter_id', data: allVoteRows.map(r => r.participant_id) });
         votesGroup.create_dataset({ name: 'comment_id', data: allVoteRows.map(r => r.comment_id) });
         votesGroup.create_dataset({ name: 'vote', data: new Int8Array(allVoteRows.map(r => r.vote)) });
       }
+
+      if (srcFile) {
+        const srcUnsGroup = srcFile.get('uns') as import('h5wasm').Group | null;
+        if (srcUnsGroup) copyGroupContents(srcUnsGroup, dstUnsGroup, new Set(['conversation_id', 'votes']));
+      }
     } finally {
-      file.close();
+      dstFile.close();
+      srcFile?.close();
     }
 
-    const bytes = FS.readFile(filename) as Uint8Array;
-    try { FS.unlink(filename); } catch { /* ignore */ }
+    const bytes = FS.readFile(dstFilename) as Uint8Array;
+    try { FS.unlink(dstFilename); } catch { /* ignore */ }
+    if (this.rawH5adBytes) try { FS.unlink(srcFilename); } catch { /* ignore */ }
     return bytes;
   }
 }

@@ -5,7 +5,7 @@
 ### Added
 
 - In-memory AnnData store (`src/lib/anndata-store.ts`): all imported data (h5ad, Kedro, local files) is normalized at load time into a singleton `AnnDataStore` backed by a dense vote matrix (`Float32Array`). Vote queries are now synchronous typed-array operations — no DuckDB needed.
-- "Download h5ad" button in the download dialog exports the current dataset as a valid `.h5ad` file using h5wasm. Painted group labels are merged into `obs/manual_painted` before writing.
+- "Download h5ad" button in the download dialog exports the current dataset as a valid `.h5ad` file using h5wasm. Painted group labels are merged into `obs/manual_painted` before writing. The download is a faithful round-trip: all original `var` columns, `uns` fields, full-dimensional `obsm` embeddings (e.g. PCA), and group-level HDF5 attributes are preserved by writing from the raw source bytes. User-computed projections added via Recompute are appended to `obsm`.
 - Kedro and local-file modes now load votes from `votes.parquet` via `hyparquet` (pure-JS Parquet reader) instead of DuckDB, building the same in-memory AnnDataStore as the h5ad import path.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
 - Reduction animates live on the map: the recompute dialog closes when Run is clicked, and intermediate point positions are streamed from the worker every 10 iterations and displayed directly on the map. A progress pill at the bottom of the map shows "Building KNN graph…" then a 0–100 % progress bar during iteration. The final result is registered as a named projection as before.
