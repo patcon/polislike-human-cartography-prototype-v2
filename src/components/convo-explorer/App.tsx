@@ -837,7 +837,15 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   const handleDownloadH5ad = React.useCallback(async (prefixDate: boolean) => {
     const store = getAnnDataStore();
     if (!store) return;
-    const bytes = await store.toH5adBytes(pointGroups.length > 0 ? pointGroups : undefined);
+    // Strip the [string, [number, number]][] format down to [number, number][] for toH5adBytes
+    const extraObsm: Record<string, [number, number][]> = {};
+    for (const [key, entries] of Object.entries(recomputedProjections)) {
+      extraObsm[key] = entries.map(([, coords]) => coords);
+    }
+    const bytes = await store.toH5adBytes(
+      pointGroups.length > 0 ? pointGroups : undefined,
+      Object.keys(extraObsm).length > 0 ? extraObsm : undefined,
+    );
     const blob = new Blob([bytes], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -845,7 +853,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     link.download = buildFilename('data', 'h5ad', prefixDate);
     link.click();
     URL.revokeObjectURL(url);
-  }, [pointGroups, buildFilename]);
+  }, [pointGroups, recomputedProjections, buildFilename]);
 
   const handleClearAllColors = React.useCallback(() => {
     setPointGroups(Array(dataset.length).fill(UNPAINTED_VALUE));
@@ -978,11 +986,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         ...Object.keys(prev),
         ...Object.keys(preloadedData?.pipelineData ?? {}),
       ]);
-      const base = `${pendingAlgorithmRef.current}-recomputed`;
+      const base = `${pendingAlgorithmRef.current}_recomputed`;
       let key = base;
       let n = 2;
       while (taken.has(key)) {
-        key = `${base}-${n++}`;
+        key = `${base}_${n++}`;
       }
       return { ...prev, [key]: projection };
     });

@@ -263,8 +263,13 @@ export class AnnDataStore {
   /**
    * Serialize the store to an h5ad-compatible HDF5 binary.
    * If paintedGroups is provided, merges a 'manual_painted' column into obs before writing.
+   * extraObsm keys are written to obsm in addition to what the store already tracks
+   * (intended for user-recomputed projections that live only in React state).
    */
-  async toH5adBytes(paintedGroups?: number[]): Promise<Uint8Array> {
+  async toH5adBytes(
+    paintedGroups?: number[],
+    extraObsm?: Record<string, [number, number][]>,
+  ): Promise<Uint8Array> {
     const h5wasm = await import('h5wasm');
     const { FS } = await h5wasm.ready;
     const { File: H5File, Group, Dataset } = await import('h5wasm');
@@ -421,6 +426,17 @@ export class AnnDataStore {
 
       // 2D-only embeddings (user-computed projections that have no high-dim counterpart).
       for (const [key, coords] of Object.entries(this.obsm)) {
+        const h5Key = `X_${key}`;
+        if (writtenObsmKeys.has(h5Key)) continue;
+        const nObs = coords.length;
+        const flat = new Float32Array(nObs * 2);
+        for (let i = 0; i < nObs; i++) { flat[i * 2] = coords[i][0]; flat[i * 2 + 1] = coords[i][1]; }
+        dstObsmGroup.create_dataset({ name: h5Key, data: flat, shape: [nObs, 2] });
+        writtenObsmKeys.add(h5Key);
+      }
+
+      // Extra obsm entries (user-recomputed projections from React state).
+      for (const [key, coords] of Object.entries(extraObsm ?? {})) {
         const h5Key = `X_${key}`;
         if (writtenObsmKeys.has(h5Key)) continue;
         const nObs = coords.length;
