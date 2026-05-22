@@ -1128,9 +1128,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           // Debug mode props
           debugMode={debugMode}
           dataset={dataset}
-          // Kedro configuration props
-          kedroBaseUrl={kedroBaseUrl}
-          pipelineId={currentPipelineId}
           wasmSupported={wasmSupported}
         />
       </div>

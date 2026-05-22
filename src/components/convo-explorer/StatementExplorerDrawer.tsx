@@ -72,10 +72,6 @@ type StatementExplorerDrawerProps = {
   debugMode?: boolean;
   dataset?: [string, [number, number]][];
 
-  // Kedro configuration props
-  kedroBaseUrl?: string;
-  pipelineId?: string;
-
   /** Whether WebAssembly is available (false when Lockdown Mode is active) */
   wasmSupported?: boolean;
 };
@@ -106,10 +102,6 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
   // Debug mode props
   debugMode = false,
   dataset = [],
-
-  // Kedro configuration props
-  kedroBaseUrl,
-  pipelineId,
 
   wasmSupported = true,
 }) => {
