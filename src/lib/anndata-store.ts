@@ -446,6 +446,14 @@ export class AnnDataStore {
         const srcUnsGroup = srcFile.get('uns') as import('h5wasm').Group | null;
         if (srcUnsGroup) copyGroupContents(srcUnsGroup, dstUnsGroup, new Set(['conversation_id', 'votes']));
       }
+
+      // --- pass-through: copy all other top-level groups/datasets from source ---
+      // Handles X, varm, varp, obsp, obsp, raw, and any other groups the app
+      // doesn't explicitly track.
+      if (srcFile) {
+        const handledTopLevel = new Set(['obs', 'var', 'obsm', 'layers', 'uns']);
+        copyGroupContents(srcFile as unknown as import('h5wasm').Group, dstFile as unknown as import('h5wasm').Group, handledTopLevel);
+      }
     } finally {
       dstFile.close();
       srcFile?.close();
