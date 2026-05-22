@@ -1,4 +1,4 @@
-import { getVotesForParticipants } from './duckdb';
+import { getAnnDataStore } from './anndata-store';
 
 export type VoteStats = {
   agree: number;
@@ -12,25 +12,18 @@ export type StatementVoteStats = Record<number, VoteStats>; // groupIndex -> sta
 /**
  * Calculate vote statistics for a statement across all groups
  */
-export async function calculateStatementVoteStats(
+export function calculateStatementVoteStats(
   statementId: number,
   dataset: [string, [number, number]][],
   pointGroups: number[],
   activeColors: number[],
-  kedroBaseUrl?: string,
-  pipelineId?: string
-): Promise<StatementVoteStats> {
+): StatementVoteStats {
   try {
-    // Get all participant IDs from dataset
+    const store = getAnnDataStore();
     const participantIds = dataset.map(([id]) => id);
-
-    // Get votes for all participants for this statement
-    const votes = await getVotesForParticipants(
-      statementId.toString(),
-      participantIds,
-      kedroBaseUrl,
-      pipelineId
-    );
+    const votes = store
+      ? store.getVotesForStatement(statementId.toString(), participantIds)
+      : new Map<string, number>();
 
     // Initialize stats for each active group
     const stats: StatementVoteStats = {};
@@ -76,15 +69,9 @@ export async function calculateStatementVoteStats(
     return stats;
   } catch (error) {
     console.error(`Error calculating vote stats for statement ${statementId}:`, error);
-    // Return empty stats on error
     const emptyStats: StatementVoteStats = {};
     activeColors.forEach(groupIndex => {
-      emptyStats[groupIndex] = {
-        agree: 0,
-        disagree: 0,
-        pass: 0,
-        total: 0
-      };
+      emptyStats[groupIndex] = { agree: 0, disagree: 0, pass: 0, total: 0 };
     });
     return emptyStats;
   }

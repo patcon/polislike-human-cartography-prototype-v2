@@ -12,15 +12,12 @@ import type {
   ConsensusStatement,
   GroupVoteMatrix,
 } from './stats.js';
-import { getGroupVoteMatrices } from './db.js';
-import type { VoteConnection } from './db.js';
 
 // Re-export types so consumers only need one import
 export type {
   FinalizedCommentStats,
   ConsensusStatement,
   GroupVoteMatrix,
-  VoteConnection,
 };
 
 /** Sentinel value indicating a participant has no group assignment. */
@@ -40,15 +37,13 @@ export interface AnalysisOptions {
 }
 
 /**
- * Fetch votes from the DB, then compute representative and consensus statements.
- * The caller must ensure the votes table is loaded in `conn` before calling.
+ * Compute representative and consensus statements from pre-built group vote matrices.
+ * Callers should build `groupVotes` via `AnnDataStore.getGroupVoteMatrices`.
  */
-export async function calculateRepresentativeStatements(
-  conn: VoteConnection,
-  labelArray: (string | null)[],
-  participants: string[],
+export function calculateRepresentativeStatements(
+  groupVotes: Record<string, GroupVoteMatrix>,
   options: AnalysisOptions = {}
-): Promise<RepresentativeStatementsResult> {
+): RepresentativeStatementsResult {
   const {
     includeModerated = false,
     minVoteCount = 1,
@@ -56,7 +51,6 @@ export async function calculateRepresentativeStatements(
     commentTextMap = {},
   } = options;
 
-  const groupVotes = await getGroupVoteMatrices(conn, labelArray, participants);
   const repComments = calculateRepresentativeComments(groupVotes, undefined, {
     includeModerated,
     minVoteCount,

@@ -60,8 +60,14 @@ const App: React.FC = () => {
 
     try {
       const { loadH5adFile } = await import('@/lib/h5ad-loader');
+      const { AnnDataStore, setAnnDataStore } = await import('@/lib/anndata-store');
       const buffer = await file.arrayBuffer();
       const parsed = await loadH5adFile(buffer);
+
+      // Build and register the in-memory AnnDataStore before passing data to the app
+      const store = AnnDataStore.fromH5adData(parsed);
+      setAnnDataStore(store);
+
       setH5adData({
         dataset: parsed.dataset,
         statements: parsed.statements,
@@ -70,6 +76,7 @@ const App: React.FC = () => {
         fullDimensionEmbeddings: parsed.fullDimensionEmbeddings,
         obsColumns: parsed.obsColumns,
         layers: parsed.layers,
+        varNames: parsed.varNames,
         conversationId: parsed.conversationId,
       });
     } catch (err) {

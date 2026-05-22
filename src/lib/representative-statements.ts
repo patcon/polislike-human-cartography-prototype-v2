@@ -1,6 +1,6 @@
 /**
- * App-layer adapter: wires the reddwarf-ts package to DuckDB and exposes
- * the same public API that app components depend on.
+ * App-layer adapter: wires the reddwarf-ts package to the AnnDataStore and
+ * exposes the same public API that app components depend on.
  */
 
 import {
@@ -19,6 +19,7 @@ import type {
   AnalysisOptions as PackageAnalysisOptions,
   RepresentativeStatementsResult,
 } from 'reddwarf-ts';
+import { getAnnDataStore } from '@/lib/anndata-store';
 
 // Re-export types and pure helpers for app consumers
 export type { FinalizedCommentStats, ConsensusStatement, GroupVoteMatrix, RepresentativeStatementsResult };
@@ -34,35 +35,22 @@ export {
 // (UNGROUPED_VALUE = -1 in the package; UNPAINTED_VALUE = -1 in the app)
 export { UNPAINTED_VALUE };
 
-export interface AnalysisOptions extends PackageAnalysisOptions {
-  kedroBaseUrl?: string;
-  pipelineId?: string;
-}
+export type AnalysisOptions = PackageAnalysisOptions;
 
 /**
- * Calculate representative statements for the app.
- * Handles DuckDB connection and votes-table loading before delegating to the package.
+ * Calculate representative statements using the in-memory AnnDataStore.
  */
-export async function calculateRepresentativeStatements(
+export function calculateRepresentativeStatements(
   labelArray: (string | null)[],
   participants: string[],
   commentTextMap: Record<string | number, unknown>,
   options: AnalysisOptions = {}
-): Promise<RepresentativeStatementsResult> {
-  const {
-    kedroBaseUrl,
-    pipelineId,
-    ...packageOptions
-  } = options;
-
-  const { ensureVotesTableLoaded, getConnection } = await import('@/lib/duckdb');
-  await ensureVotesTableLoaded(kedroBaseUrl, pipelineId);
-
-  const conn = getConnection();
-  if (!conn) {
-    throw new Error('Database connection not available');
+): RepresentativeStatementsResult {
+  const store = getAnnDataStore();
+  if (!store) {
+    throw new Error('AnnDataStore not initialised — load data before calculating representative statements');
   }
 
-  return _calculateRepresentativeStatements(conn, labelArray, participants, { ...packageOptions, commentTextMap });
+  const groupVotes = store.getGroupVoteMatrices(labelArray, participants);
+  return _calculateRepresentativeStatements(groupVotes, { ...options, commentTextMap });
 }
-

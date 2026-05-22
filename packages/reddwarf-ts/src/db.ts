@@ -1,27 +1,21 @@
 import type { GroupVoteMatrix } from './stats.js';
 
-/**
- * Minimal structural interface for a DuckDB-WASM query result.
- * Any object satisfying this shape can be passed to the DB-dependent functions.
- */
-export interface VoteQueryResult {
-  numRows: number;
-  getChild(name: string): { get(i: number): unknown } | null | undefined;
-}
-
-export interface VoteConnection {
-  query(sql: string): Promise<VoteQueryResult>;
-}
+export type { GroupVoteMatrix };
 
 /**
- * Query votes for each label group from a DuckDB-compatible connection.
- * The caller is responsible for ensuring the votes table is loaded before calling this.
+ * Build per-group vote matrices from a pre-built lookup function.
+ * Replaces the former DuckDB-based SQL implementation.
+ *
+ * @param getVotesForParticipants - Function that returns votes for a list of participant IDs.
+ *   Keys are participant IDs; values are objects mapping statement ID → vote (-1/0/1).
+ * @param labelArray - Parallel to `participants`; null means "exclude from analysis".
+ * @param participants - Participant ID at each index.
  */
-export async function getGroupVoteMatrices(
-  conn: VoteConnection,
+export function getGroupVoteMatrices(
+  getVotesForParticipants: (participantIds: string[]) => GroupVoteMatrix,
   labelArray: (string | null)[],
   participants?: string[],
-): Promise<Record<string, GroupVoteMatrix>> {
+): Record<string, GroupVoteMatrix> {
   const groups: Record<string, string[]> = {};
   labelArray.forEach((label, index) => {
     if (label != null) {
@@ -34,30 +28,8 @@ export async function getGroupVoteMatrices(
   });
 
   const groupVotes: Record<string, GroupVoteMatrix> = {};
-  for (const [label, indices] of Object.entries(groups)) {
-    const quotedIndices = indices.map((pid) => `'${pid}'`);
-    const result = await conn.query(`
-      SELECT participant_id, comment_id, vote
-      FROM votes
-      WHERE participant_id IN(${quotedIndices.join(",")})
-    `);
-
-    const voteMatrix: GroupVoteMatrix = {};
-    for (let i = 0; i < result.numRows; i++) {
-      const pid = result.getChild('participant_id')?.get(i)?.toString();
-      const cid = result.getChild('comment_id')?.get(i)?.toString();
-      const rawVote = result.getChild('vote')?.get(i);
-
-      const vote = typeof rawVote === 'bigint' ? Number(rawVote) : rawVote as number;
-
-      if (pid && cid && vote !== undefined) {
-        if (!voteMatrix[pid]) voteMatrix[pid] = {};
-        voteMatrix[pid][cid] = vote;
-      }
-    }
-
-    groupVotes[label] = voteMatrix;
+  for (const [label, pids] of Object.entries(groups)) {
+    groupVotes[label] = getVotesForParticipants(pids);
   }
-
   return groupVotes;
 }

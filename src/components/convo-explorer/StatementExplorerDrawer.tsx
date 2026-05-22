@@ -166,13 +166,11 @@ export const StatementExplorerDrawer: React.FC<StatementExplorerDrawerProps> = (
       // Calculate stats only for requested statements
       for (const statementId of statementIds) {
         try {
-          const stats = await calculateStatementVoteStats(
+          const stats = calculateStatementVoteStats(
             statementId,
             dataset,
             pointGroups,
             activeColors,
-            kedroBaseUrl,
-            pipelineId
           );
           newStats[statementId] = stats;
         } catch (error) {

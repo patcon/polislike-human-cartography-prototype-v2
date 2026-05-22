@@ -22,9 +22,7 @@
     "chromatic": "pnpm dlx chromatic --project-token=chpt_38c770d91124bfb"
   },
   "dependencies": {
-    "reddwarf-ts": "workspace:*",
     "@duckdb/duckdb-wasm": "^1.30.0",
-    "@saehrimnir/druidjs": "github:patcon/DruidJS#add-pacmap-support",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -38,6 +36,7 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@saehrimnir/druidjs": "github:patcon/DruidJS#add-pacmap-support",
     "@tailwindcss/vite": "^4.1.13",
     "@types/concaveman": "^1.1.6",
     "class-variance-authority": "^0.7.1",
@@ -46,9 +45,12 @@
     "concaveman": "^2.0.0",
     "d3": "^7.9.0",
     "h5wasm": "^0.8.11",
+    "hyparquet": "^1.25.8",
+    "hyparquet-compressors": "^1.1.1",
     "lucide-react": "^0.543.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "reddwarf-ts": "workspace:*",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.13",
     "vaul": "^1.1.2"
