@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/patcon/polislike-human-cartography-prototype-v2/commits/main) (YYYY-MM-DD)
 
+### Changed
+
+- Extracted three custom hooks from `convo-explorer/App.tsx` to reduce its size from ~1230 to ~830 lines: `useRepresentativeStatements` (rep-statements state + async calculation), `useRecomputeDialog` (in-browser reduction dialog + DruidJS state), and `useMetricsLayer` (metrics layer state, loading, and obs-column cycling). Each hook is covered by a new unit test suite using `renderHook`.
+
 ### Added
 
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
