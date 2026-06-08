@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 
 type Statement = {
   txt: string;
@@ -25,23 +26,18 @@ type FloatingModalV2Props = {
   onNext?: () => void;
 } & React.ComponentPropsWithoutRef<typeof Card>;
 
-const variantBorder: Record<FloatingModalV2Variant, string> = {
-  unstyled:  "border-gray-200 dark:border-gray-700",
-  agree:     "border-green-400 dark:border-green-600",
-  disagree:  "border-red-400 dark:border-red-600",
-  pass:      "border-yellow-400 dark:border-yellow-600",
-};
-
-const variantIdText: Record<FloatingModalV2Variant, string> = {
-  unstyled:  "text-gray-400",
-  agree:     "text-green-600 dark:text-green-400",
-  disagree:  "text-red-600 dark:text-red-400",
-  pass:      "text-yellow-600 dark:text-yellow-400",
+const variantAccentColor: Record<FloatingModalV2Variant, string | null> = {
+  unstyled:  null,
+  agree:     VOTE_COLORS.agree,
+  disagree:  VOTE_COLORS.disagree,
+  pass:      VOTE_COLORS_HIGHLIGHT_PASS.pass,
 };
 
 export const FloatingModalV2 = React.forwardRef<HTMLDivElement, FloatingModalV2Props>(
-  ({ statement, title, legendItems, isVisible = true, variant = "unstyled", onClose, onPrev, onNext, className, ...props }, ref) => {
+  ({ statement, title, legendItems, isVisible = true, variant = "unstyled", onClose, onPrev, onNext, className, style, ...props }, ref) => {
     if (!isVisible) return null;
+
+    const accentColor = variantAccentColor[variant];
 
     const insertBreaks = (val: string | null | undefined) => {
       if (!val) return "";
@@ -59,7 +55,8 @@ export const FloatingModalV2 = React.forwardRef<HTMLDivElement, FloatingModalV2P
     return (
       <Card
         ref={ref}
-        className={`bg-white dark:bg-gray-900 shadow-lg ${variantBorder[variant]} ${cardPadding} ${cardMinH} ${className ?? ""}`}
+        className={`bg-white dark:bg-gray-900 shadow-lg ${accentColor ? "border-2" : "border border-gray-200 dark:border-gray-700"} ${cardPadding} ${cardMinH} ${className ?? ""}`}
+        style={{ ...(accentColor ? { borderColor: accentColor } : {}), ...style }}
         {...props}
       >
         {onClose && (
@@ -95,7 +92,10 @@ export const FloatingModalV2 = React.forwardRef<HTMLDivElement, FloatingModalV2P
         {statement ? (
           <div className="flex gap-2 items-start">
             <div className="flex-shrink-0 pt-0.5">
-              <span className={`text-[12px] font-mono inline-block text-right ${variantIdText[variant]} ${hasNav ? "min-w-[3rem]" : "w-10"}`}>
+              <span
+                className={`text-[12px] font-mono inline-block text-right ${accentColor ? "" : "text-gray-400"} ${hasNav ? "min-w-[3rem]" : "w-10"}`}
+                style={accentColor ? { color: accentColor } : undefined}
+              >
                 #{statement.statement_id}
               </span>
             </div>
