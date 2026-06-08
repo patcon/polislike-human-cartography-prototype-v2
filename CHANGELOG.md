@@ -8,6 +8,7 @@
 
 ### Added
 
+- `SpotlightRepresentativeStatements` story: D3Map in spotlight mode continuously calculates top representative statements for the selected participants (debounced 400 ms) and displays up to 3 via `FloatingModalV2Stack`.
 - `FloatingModalV2` component with `agree` (green), `disagree` (red), `pass` (yellow), and `unstyled` variants — accent color applied to border and statement ID; X button remains optional.
 - `FloatingModalV2Stack` for vertically stacking `FloatingModalV2` modals with animated horizontal alignment: agree items slide right, disagree items slide left, pass/unstyled items stay centered.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
