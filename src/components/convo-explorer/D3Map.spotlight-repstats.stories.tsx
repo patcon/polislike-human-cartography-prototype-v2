@@ -57,7 +57,9 @@ function SpotlightRepStatementsDemo() {
       try {
         const participants = dataset.map(([id]) => id);
         const selectedSet = new Set(selectedIds.map(String));
-        const labelArray = participants.map((id) => (selectedSet.has(id) ? "0" : null));
+        // Label unselected participants as "1" so repness has a comparison group;
+        // with only nulls (excluded), significance tests fail and only 1 fallback statement is returned.
+        const labelArray = participants.map((id) => (selectedSet.has(id) ? "0" : "1"));
         const commentTextMap = createStatementTextMap(statements);
 
         const result = await calculateRepresentativeStatements(
