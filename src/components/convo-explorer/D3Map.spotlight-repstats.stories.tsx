@@ -9,11 +9,11 @@ import {
   type FinalizedCommentStats,
 } from "@/lib/representative-statements";
 import { initializeDuckDB, getVotesForParticipants } from "@/lib/duckdb";
-import { VOTE_COLORS } from "@/constants";
+import { VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 
 type Statement = { statement_id: number; txt: string; moderated?: number };
 
-const VOTE_PALETTE = [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass];
+const VOTE_PALETTE = [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass];
 
 const meta: Meta = {
   title: "Components/D3Map",

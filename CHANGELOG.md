@@ -37,6 +37,7 @@
 - `SpotlightRepresentativeStatements` story: D3Map in spotlight mode continuously calculates top representative statements for the selected participants (debounced 400 ms) and displays up to 3 via `FloatingModalV2Stack`.
 - Spotlight mode (desktop): clicking the canvas locks the circle in place; clicking again unlocks it. The ring switches from dashed to solid while locked and the cursor changes to a crosshair.
 - `FloatingModalV2` renders `cursor-pointer` when an `onClick` prop is provided; `StackItem` type in `FloatingModalV2Stack` now includes an optional `onClick`. `SpotlightRepresentativeStatements` story: clicking a statement card overlays per-participant vote colors on the map; clicking again clears the overlay.
+- `SpotlightRepresentativeStatements` story now uses `VOTE_COLORS_HIGHLIGHT_PASS` palette so pass votes render as yellow instead of near-invisible light gray.
 
 ### Changed
 
