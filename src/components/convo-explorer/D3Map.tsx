@@ -19,7 +19,9 @@ const MIN_CIRCLE_RADIUS = 0.5; // prevent sub-pixel circles that vanish on mobil
 type D3MapProps = {
   /** Dataset points in the format [[i, [x, y]], ...] */
   data: [string, [number, number]][];
-  mode?: "move" | "paint";
+  mode?: "move" | "paint" | "spotlight";
+  /** Radius in SVG pixels for the spotlight selection circle (spotlight mode only) */
+  spotlightRadius?: number;
   /** Color indices parallel to data: null = default color, number = palette index (groups/votes) or 0-1 values (metrics) */
   pointColors?: (number | null)[];
   /** Color palette to use for rendering points */
@@ -65,6 +67,13 @@ type D3MapProps = {
   displayMask?: boolean[];
   /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
   unpaintedColor?: string;
+  /** When true, the spotlight circle stays in place after all fingers lift; the next touch moves it again (spotlight mode only) */
+  spotlightPersist?: boolean;
+  /** Called whenever the spotlight radius changes internally (wheel or pinch), so the parent can sync a slider.
+   *  Primarily useful for Storybook/debug UIs — likely not needed in the app itself. */
+  onSpotlightRadiusChange?: (radius: number) => void;
+  /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
+  onSpotlightDebug?: (state: { event: string; touchCount: number; currentRadius: number; cx: number; cy: number; grabOffsetX: number; grabOffsetY: number }) => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -96,11 +105,46 @@ export const D3Map: React.FC<D3MapProps> = ({
   liveData,
   displayMask,
   unpaintedColor = UNPAINTED_COLOR,
+  spotlightRadius = 60,
+  spotlightPersist = false,
+  onSpotlightRadiusChange,
+  onSpotlightDebug,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
+
+  // Spotlight: mutable touch state lives in a ref so it survives effect re-runs
+  const spotlightStateRef = React.useRef({
+    currentRadius: spotlightRadius,
+    currentCx: -9999,
+    currentCy: -9999,
+    persist: spotlightPersist,
+    // single-touch grab: offset from circle center to touch landing point
+    grabOffsetX: 0,
+    grabOffsetY: 0,
+    // two-touch transform: previous SVG positions keyed by touch identifier
+    touchPrevPositions: new Map<number, [number, number]>(),
+  });
+  // Keep callback refs so spotlight effect doesn't re-run when they change identity
+  const onSelectionChangeRef = React.useRef(onSelectionChange);
+  const onSpotlightDebugRef = React.useRef(onSpotlightDebug);
+  const onSpotlightRadiusChangeRef = React.useRef(onSpotlightRadiusChange);
+  const displayMaskRef = React.useRef(displayMask);
+  React.useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
+  React.useEffect(() => { onSpotlightDebugRef.current = onSpotlightDebug; }, [onSpotlightDebug]);
+  React.useEffect(() => { onSpotlightRadiusChangeRef.current = onSpotlightRadiusChange; }, [onSpotlightRadiusChange]);
+  React.useEffect(() => { displayMaskRef.current = displayMask; }, [displayMask]);
+  // Tracks whether the most recent spotlightRadius change was reported outward by a gesture.
+  // If so, the sync effect must not write back — doing so would overwrite a newer gesture value.
+  const radiusFromGestureRef = React.useRef(false);
+  // Sync prop values into state ref without re-running the spotlight effect
+  React.useEffect(() => {
+    if (radiusFromGestureRef.current) { radiusFromGestureRef.current = false; return; }
+    spotlightStateRef.current.currentRadius = spotlightRadius;
+  }, [spotlightRadius]);
+  React.useEffect(() => { spotlightStateRef.current.persist = spotlightPersist; }, [spotlightPersist]);
   const lassoStateRef = React.useRef<{
     path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
     coords: [number, number][];
@@ -593,6 +637,8 @@ export const D3Map: React.FC<D3MapProps> = ({
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 15])
       .filter((event) => {
+        // Spotlight mode owns all pointer interactions — block pan/zoom entirely
+        if (modeRef.current === "spotlight") return false;
         /**
          * Here's what we do for every zoom event:
          * - all wheel events = YES, in any mode
@@ -823,6 +869,245 @@ export const D3Map: React.FC<D3MapProps> = ({
       lassoStateRef.current.cleanup = null;
     }
   }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
+
+  // --- Spotlight mode ---
+  React.useEffect(() => {
+    if (!svgRef.current || !containerRef.current) return;
+    if (mode !== "spotlight") return;
+
+    const svg = d3.select(svgRef.current);
+    const container = containerRef.current;
+    const svgNode = svgRef.current;
+
+    // Prevent native touch scroll/pan while spotlight is active
+    svgNode.style.touchAction = "none";
+
+    const ring = svg.append("circle")
+      .attr("class", "spotlight-ring")
+      .attr("fill", "rgba(255, 220, 0, 0.08)")
+      .attr("stroke", "#FFCC00")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "6 3")
+      .attr("cx", -9999)
+      .attr("cy", -9999)
+      .attr("r", spotlightStateRef.current.currentRadius)
+      .style("pointer-events", "none");
+
+    // All mutable touch state lives in spotlightStateRef so it survives effect re-runs.
+    // Callbacks are accessed via refs so they never appear in deps and never trigger re-runs.
+    const s = spotlightStateRef.current;
+
+    function debug(eventName: string, touchCount: number) {
+      onSpotlightDebugRef.current?.({ event: eventName, touchCount, currentRadius: s.currentRadius, cx: s.currentCx, cy: s.currentCy, grabOffsetX: s.grabOffsetX, grabOffsetY: s.grabOffsetY });
+    }
+
+    function touchToSVG(touch: Touch): [number, number] {
+      const rect = svgNode.getBoundingClientRect();
+      return [touch.clientX - rect.left, touch.clientY - rect.top];
+    }
+
+    function updateSelection(cx: number, cy: number, radius: number) {
+      s.currentCx = cx;
+      s.currentCy = cy;
+      ring.attr("cx", cx).attr("cy", cy).attr("r", radius);
+      const transform = d3.zoomTransform(container.node()!);
+      const selected = (container.selectAll("circle").data() as any[]).filter((d: any) => {
+        if (displayMaskRef.current && !displayMaskRef.current[d.originalIndex]) return false;
+        const sx = transform.applyX((container as any).xScale(d.x));
+        const sy = transform.applyY((container as any).yScale(d.y));
+        return Math.sqrt((sx - cx) ** 2 + (sy - cy) ** 2) <= radius;
+      });
+      onSelectionChangeRef.current?.(selected.map((d: any) => d.i));
+    }
+
+    function resetAllTouches() {
+      s.touchPrevPositions.clear();
+      if (!s.persist) {
+        ring.attr("cx", -9999).attr("cy", -9999);
+        s.currentCx = -9999;
+        s.currentCy = -9999;
+        onSelectionChangeRef.current?.([]);
+      }
+    }
+
+    function captureAllTouches(touches: TouchList) {
+      s.touchPrevPositions.clear();
+      for (let i = 0; i < touches.length; i++) {
+        s.touchPrevPositions.set(touches[i].identifier, touchToSVG(touches[i]));
+      }
+    }
+
+    function setupGrabOffset(touch: Touch) {
+      const [tx, ty] = touchToSVG(touch);
+      s.grabOffsetX = s.currentCx === -9999 ? 0 : s.currentCx - tx;
+      s.grabOffsetY = s.currentCy === -9999 ? 0 : s.currentCy - ty;
+    }
+
+    // --- Touch Events (handles multi-touch reliably via event.touches) ---
+    function handleTouchStart(event: TouchEvent) {
+      event.preventDefault();
+      const n = event.touches.length;
+      captureAllTouches(event.touches);
+
+      if (n === 1) {
+        const [tx, ty] = touchToSVG(event.touches[0]);
+        if (s.currentCx === -9999) {
+          // First placement — center circle on the touch point
+          updateSelection(tx, ty, s.currentRadius);
+          s.grabOffsetX = 0;
+          s.grabOffsetY = 0;
+        } else {
+          s.grabOffsetX = s.currentCx - tx;
+          s.grabOffsetY = s.currentCy - ty;
+        }
+      } else if (n === 2 && s.currentCx === -9999) {
+        // Two fingers on an unpositioned circle — place center at midpoint
+        const [ax, ay] = touchToSVG(event.touches[0]);
+        const [bx, by] = touchToSVG(event.touches[1]);
+        updateSelection((ax + bx) / 2, (ay + by) / 2, s.currentRadius);
+      }
+      debug(`touch:start:${n}`, n);
+    }
+
+    function handleTouchMove(event: TouchEvent) {
+      event.preventDefault();
+      const n = event.touches.length;
+
+      if (n === 1) {
+        const touch = event.touches[0];
+        const [tx, ty] = touchToSVG(touch);
+        updateSelection(tx + s.grabOffsetX, ty + s.grabOffsetY, s.currentRadius);
+        s.touchPrevPositions.set(touch.identifier, [tx, ty]);
+        debug("touch:move:1", n);
+      } else if (n >= 2) {
+        const tA = event.touches[0];
+        const tB = event.touches[1];
+        const currA = touchToSVG(tA);
+        const currB = touchToSVG(tB);
+        const prevA = s.touchPrevPositions.get(tA.identifier);
+        const prevB = s.touchPrevPositions.get(tB.identifier);
+
+        if (!prevA || !prevB) {
+          // Shouldn't normally happen — capture and wait for next frame
+          s.touchPrevPositions.set(tA.identifier, currA);
+          s.touchPrevPositions.set(tB.identifier, currB);
+          return;
+        }
+
+        const prevDist = Math.hypot(prevA[0] - prevB[0], prevA[1] - prevB[1]);
+        const currDist = Math.hypot(currA[0] - currB[0], currA[1] - currB[1]);
+        if (prevDist < 1) {
+          s.touchPrevPositions.set(tA.identifier, currA);
+          s.touchPrevPositions.set(tB.identifier, currB);
+          return;
+        }
+
+        const scale = currDist / prevDist;
+        const prevMidX = (prevA[0] + prevB[0]) / 2;
+        const prevMidY = (prevA[1] + prevB[1]) / 2;
+        const currMidX = (currA[0] + currB[0]) / 2;
+        const currMidY = (currA[1] + currB[1]) / 2;
+        const rotation = Math.atan2(currB[1] - currA[1], currB[0] - currA[0])
+                       - Math.atan2(prevB[1] - prevA[1], prevB[0] - prevA[0]);
+
+        // Apply similarity transform (scale + rotation + translation) to circle center
+        const dx = s.currentCx - prevMidX;
+        const dy = s.currentCy - prevMidY;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const newCx = currMidX + scale * (dx * cos - dy * sin);
+        const newCy = currMidY + scale * (dx * sin + dy * cos);
+
+        s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
+        updateSelection(newCx, newCy, s.currentRadius);
+        radiusFromGestureRef.current = true;
+        onSpotlightRadiusChangeRef.current?.(s.currentRadius);
+
+        s.touchPrevPositions.set(tA.identifier, currA);
+        s.touchPrevPositions.set(tB.identifier, currB);
+        debug("touch:move:2", n);
+      }
+    }
+
+    function handleTouchEnd(event: TouchEvent) {
+      const n = event.touches.length;
+      if (n === 0) {
+        resetAllTouches();
+        debug("touch:end:0", n);
+      } else {
+        captureAllTouches(event.touches);
+        if (n === 1) setupGrabOffset(event.touches[0]);
+        debug(`touch:end:${n}`, n);
+      }
+    }
+
+    function handleTouchCancel(event: TouchEvent) {
+      // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
+      debug(`touch:cancel:${event.touches.length}`, event.touches.length);
+      if (event.touches.length === 0) {
+        resetAllTouches();
+      } else {
+        captureAllTouches(event.touches);
+        if (event.touches.length === 1) setupGrabOffset(event.touches[0]);
+      }
+    }
+
+    // --- Mouse (Pointer Events, mouse only) ---
+    function handlePointerEnter(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      const [px, py] = d3.pointer(event, svgNode);
+      updateSelection(px, py, s.currentRadius);
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      const [px, py] = d3.pointer(event, svgNode);
+      updateSelection(px, py, s.currentRadius);
+    }
+
+    function handlePointerLeave(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      ring.attr("cx", -9999).attr("cy", -9999);
+      s.currentCx = -9999;
+      s.currentCy = -9999;
+      onSelectionChangeRef.current?.([]);
+    }
+
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault();
+      const factor = event.deltaMode === 0 ? 0.002 : 0.06;
+      s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * (1 - event.deltaY * factor)));
+      if (s.currentCx !== -9999) {
+        updateSelection(s.currentCx, s.currentCy, s.currentRadius);
+      } else {
+        ring.attr("r", s.currentRadius);
+      }
+      radiusFromGestureRef.current = true;
+      onSpotlightRadiusChangeRef.current?.(s.currentRadius);
+    }
+
+    svgNode.addEventListener("touchstart", handleTouchStart, { passive: false });
+    svgNode.addEventListener("touchmove", handleTouchMove, { passive: false });
+    svgNode.addEventListener("touchend", handleTouchEnd);
+    svgNode.addEventListener("touchcancel", handleTouchCancel);
+    svgNode.addEventListener("pointerenter", handlePointerEnter);
+    svgNode.addEventListener("pointermove", handlePointerMove);
+    svgNode.addEventListener("pointerleave", handlePointerLeave);
+    svgNode.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      ring.remove();
+      svgNode.style.touchAction = "";
+      svgNode.removeEventListener("touchstart", handleTouchStart);
+      svgNode.removeEventListener("touchmove", handleTouchMove);
+      svgNode.removeEventListener("touchend", handleTouchEnd);
+      svgNode.removeEventListener("touchcancel", handleTouchCancel);
+      svgNode.removeEventListener("pointerenter", handlePointerEnter);
+      svgNode.removeEventListener("pointermove", handlePointerMove);
+      svgNode.removeEventListener("pointerleave", handlePointerLeave);
+      svgNode.removeEventListener("wheel", handleWheel);
+    };
+  }, [mode]); // callbacks + display state accessed via refs — no re-run needed when they change
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {

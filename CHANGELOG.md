@@ -29,6 +29,9 @@
 - Prev/next navigation buttons on `FloatingModal` for touch-friendly statement cycling in votes layer mode ([#27](https://github.com/patcon/polislike-human-cartography-prototype-v2/issues/27)).
   - Extracted shared `cycleStatement` callback so keyboard arrow keys and buttons use the same logic.
   - `onPrev` / `onNext` are optional injected props — buttons only render when provided, keeping the modal reusable for other contexts.
+- Spotlight mode for D3Map: a circle-follows-cursor selection tool where hovering selects all points within the circle radius; on touch, single-finger tracks the ring and two-finger pinch resizes it. Exposed via `mode="spotlight"` and `spotlightRadius` props; explored in the new `SpotlightModeSelection` Storybook story.
+- `spotlightPersist` prop for spotlight mode: when enabled, the circle and its selection stay frozen after all fingers lift; the next touch resumes from the last position. Story panel includes a matching checkbox toggle.
+- Spotlight touch mechanic reworked as a similarity transform: single touch grabs at the contact point (preserving offset from circle center), two touches apply an incremental scale + rotation + translation each frame so the circle behaves like a sticker layer rather than anchoring to the first finger. No special "primary touch" — both fingers are treated symmetrically.
 
 ### Changed
 
