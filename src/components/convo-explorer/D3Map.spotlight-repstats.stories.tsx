@@ -8,9 +8,12 @@ import {
   createStatementTextMap,
   type FinalizedCommentStats,
 } from "@/lib/representative-statements";
-import { initializeDuckDB } from "@/lib/duckdb";
+import { initializeDuckDB, getVotesForParticipants } from "@/lib/duckdb";
+import { VOTE_COLORS } from "@/constants";
 
 type Statement = { statement_id: number; txt: string; moderated?: number };
+
+const VOTE_PALETTE = [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass];
 
 const meta: Meta = {
   title: "Components/D3Map",
@@ -27,10 +30,12 @@ function SpotlightRepStatementsDemo() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [dbReady, setDbReady] = useState(false);
   const [stackItems, setStackItems] = useState<
-    { id: string | number; statement: Statement; variant: "agree" | "disagree" }[]
+    { id: string | number; statement: Statement; variant: "agree" | "disagree"; onClick: () => void }[]
   >([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [selectionCount, setSelectionCount] = useState(0);
+  const [activeStatementId, setActiveStatementId] = useState<string | null>(null);
+  const [pointVotes, setPointVotes] = useState<(number | null)[]>([]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestIdsRef = useRef<(string | number)[]>([]);
@@ -46,6 +51,47 @@ function SpotlightRepStatementsDemo() {
       .catch(console.error);
   }, []);
 
+  const handleStatementClick = useCallback(
+    async (statementId: string) => {
+      if (!dataset) return;
+
+      if (activeStatementId === statementId) {
+        setActiveStatementId(null);
+        setPointVotes([]);
+        return;
+      }
+
+      setActiveStatementId(statementId);
+      const participantIds = dataset.map(([id]) => id);
+      const votes = await getVotesForParticipants(statementId, participantIds);
+      setPointVotes(
+        dataset.map(([participantId]) => {
+          switch (votes.get(participantId) ?? null) {
+            case 1:  return 0; // agree
+            case -1: return 1; // disagree
+            case 0:  return 2; // pass
+            default: return null;
+          }
+        })
+      );
+    },
+    [dataset, activeStatementId]
+  );
+
+  const buildStackItems = useCallback(
+    (top3: FinalizedCommentStats[], commentTextMap: Record<string | number, unknown>) =>
+      top3.map((stat) => ({
+        id: stat.tid,
+        statement: {
+          statement_id: Number(stat.tid),
+          txt: String(commentTextMap[stat.tid] ?? ""),
+        },
+        variant: (stat.repful_for === "agree" ? "agree" : "disagree") as "agree" | "disagree",
+        onClick: () => handleStatementClick(String(stat.tid)),
+      })),
+    [handleStatementClick]
+  );
+
   const runCalculation = useCallback(
     async (selectedIds: (string | number)[]) => {
       if (!dataset || !dbReady || selectedIds.length < 2) {
@@ -57,8 +103,6 @@ function SpotlightRepStatementsDemo() {
       try {
         const participants = dataset.map(([id]) => id);
         const selectedSet = new Set(selectedIds.map(String));
-        // Label unselected participants as "1" so repness has a comparison group;
-        // with only nulls (excluded), significance tests fail and only 1 fallback statement is returned.
         const labelArray = participants.map((id) => (selectedSet.has(id) ? "0" : "1"));
         const commentTextMap = createStatementTextMap(statements);
 
@@ -70,16 +114,10 @@ function SpotlightRepStatementsDemo() {
         );
 
         const top3: FinalizedCommentStats[] = result.repComments["0"]?.slice(0, 3) ?? [];
-        setStackItems(
-          top3.map((stat) => ({
-            id: stat.tid,
-            statement: {
-              statement_id: Number(stat.tid),
-              txt: String(commentTextMap[stat.tid] ?? ""),
-            },
-            variant: stat.repful_for === "agree" ? "agree" : "disagree",
-          }))
-        );
+        setStackItems(buildStackItems(top3, commentTextMap));
+        // Clear vote overlay when spotlight moves to a new region
+        setActiveStatementId(null);
+        setPointVotes([]);
       } catch (err) {
         console.error("Rep statements error:", err);
         setStackItems([]);
@@ -87,7 +125,7 @@ function SpotlightRepStatementsDemo() {
         setIsCalculating(false);
       }
     },
-    [dataset, dbReady, statements]
+    [dataset, dbReady, statements, buildStackItems]
   );
 
   const handleSelectionChange = useCallback(
@@ -114,6 +152,9 @@ function SpotlightRepStatementsDemo() {
         mode="spotlight"
         spotlightPersist={true}
         onSelectionChange={handleSelectionChange}
+        layerMode={activeStatementId ? "votes" : "groups"}
+        pointColors={activeStatementId ? pointVotes : undefined}
+        palette={VOTE_PALETTE}
       />
 
       {/* Status overlay */}
@@ -136,6 +177,8 @@ function SpotlightRepStatementsDemo() {
           ? "Initialising database…"
           : isCalculating
           ? `Calculating… (${selectionCount} selected)`
+          : activeStatementId
+          ? `Showing votes for statement #${activeStatementId} — click card to dismiss`
           : selectionCount < 2
           ? "Move the spotlight over participants"
           : `${selectionCount} selected — ${stackItems.length} rep statements`}

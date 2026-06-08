@@ -34,7 +34,7 @@ const variantAccentColor: Record<FloatingModalV2Variant, string | null> = {
 };
 
 export const FloatingModalV2 = React.forwardRef<HTMLDivElement, FloatingModalV2Props>(
-  ({ statement, title, legendItems, isVisible = true, variant = "unstyled", onClose, onPrev, onNext, className, style, ...props }, ref) => {
+  ({ statement, title, legendItems, isVisible = true, variant = "unstyled", onClose, onPrev, onNext, onClick, className, style, ...props }, ref) => {
     if (!isVisible) return null;
 
     const accentColor = variantAccentColor[variant];
@@ -55,8 +55,9 @@ export const FloatingModalV2 = React.forwardRef<HTMLDivElement, FloatingModalV2P
     return (
       <Card
         ref={ref}
-        className={`bg-white dark:bg-gray-900 shadow-lg ${accentColor ? "border-2" : "border border-gray-200 dark:border-gray-700"} ${cardPadding} ${cardMinH} ${className ?? ""}`}
+        className={`bg-white dark:bg-gray-900 shadow-lg ${accentColor ? "border-2" : "border border-gray-200 dark:border-gray-700"} ${cardPadding} ${cardMinH} ${onClick ? "cursor-pointer" : ""} ${className ?? ""}`}
         style={{ ...(accentColor ? { borderColor: accentColor } : {}), ...style }}
+        onClick={onClick}
         {...props}
       >
         {onClose && (

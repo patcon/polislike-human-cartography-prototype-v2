@@ -19,6 +19,7 @@ export type StackItem = {
   onClose?: () => void;
   onPrev?: () => void;
   onNext?: () => void;
+  onClick?: () => void;
 };
 
 type FloatingModalV2StackProps = {
