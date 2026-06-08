@@ -947,18 +947,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       } else if (n >= 2) {
         const primary = findTouch(event.touches, s.primaryTouchId) ?? event.touches[0];
         const secondary = [...event.touches].find(t => t.identifier !== primary.identifier);
-        if (!secondary) return;
-
-        if (s.pinchRefDistance === null || s.pinchRefRadius === null) {
-          const [p1x, p1y] = touchToSVG(primary);
-          const [p2x, p2y] = touchToSVG(secondary);
-          const dx = p1x - p2x;
-          const dy = p1y - p2y;
-          s.pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-          s.pinchRefRadius = s.currentRadius;
-          debug("touch:move:2:ref", n);
-          return;
-        }
+        if (!secondary || s.pinchRefDistance === null || s.pinchRefRadius === null) return;
 
         const [p1x, p1y] = touchToSVG(primary);
         const [p2x, p2y] = touchToSVG(secondary);
