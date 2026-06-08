@@ -192,6 +192,7 @@ export const SpotlightModeSelection: Story = {
           spotlightRadius={radius}
           spotlightPersist={persist}
           onSelectionChange={(ids: (string | number)[]) => setSelectedIds(ids as number[])}
+          onSpotlightRadiusChange={setRadius}
           onSpotlightDebug={handleDebug}
         />
         <div
@@ -212,25 +213,14 @@ export const SpotlightModeSelection: Story = {
             userSelect: "none",
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span>Radius (slider): {radius}px</span>
-            <input
-              type="range"
-              min={20}
-              max={200}
-              value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
-              style={{ width: 180 }}
-            />
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={persist}
-              onChange={(e) => setPersist(e.target.checked)}
-            />
-            Persist circle between touches
-          </label>
+          <details>
+            <summary style={{ cursor: "pointer" }}>
+              Selected: {selectedIds.length} points
+            </summary>
+            <div style={{ marginTop: 4, wordBreak: "break-all", color: "#555" }}>
+              {selectedIds.join(", ") || "none"}
+            </div>
+          </details>
           <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
           {debugState ? (
             <>
@@ -284,14 +274,25 @@ export const SpotlightModeSelection: Story = {
             }
           </div>
           <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
-          <details>
-            <summary style={{ cursor: "pointer" }}>
-              Selected: {selectedIds.length} points
-            </summary>
-            <div style={{ marginTop: 4, wordBreak: "break-all", color: "#555" }}>
-              {selectedIds.join(", ") || "none"}
-            </div>
-          </details>
+          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span>Radius: {Math.round(radius)}px</span>
+            <input
+              type="range"
+              min={10}
+              max={500}
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              style={{ width: 180 }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={persist}
+              onChange={(e) => setPersist(e.target.checked)}
+            />
+            Persist circle between touches
+          </label>
         </div>
       </>
     );

@@ -69,6 +69,9 @@ type D3MapProps = {
   unpaintedColor?: string;
   /** When true, the spotlight circle stays in place after all fingers lift; the next touch moves it again (spotlight mode only) */
   spotlightPersist?: boolean;
+  /** Called whenever the spotlight radius changes internally (wheel or pinch), so the parent can sync a slider.
+   *  Primarily useful for Storybook/debug UIs — likely not needed in the app itself. */
+  onSpotlightRadiusChange?: (radius: number) => void;
   /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
   onSpotlightDebug?: (state: { event: string; touchCount: number; currentRadius: number; cx: number; cy: number; grabOffsetX: number; grabOffsetY: number }) => void;
 };
@@ -104,6 +107,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   unpaintedColor = UNPAINTED_COLOR,
   spotlightRadius = 60,
   spotlightPersist = false,
+  onSpotlightRadiusChange,
   onSpotlightDebug,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
@@ -126,12 +130,20 @@ export const D3Map: React.FC<D3MapProps> = ({
   // Keep callback refs so spotlight effect doesn't re-run when they change identity
   const onSelectionChangeRef = React.useRef(onSelectionChange);
   const onSpotlightDebugRef = React.useRef(onSpotlightDebug);
+  const onSpotlightRadiusChangeRef = React.useRef(onSpotlightRadiusChange);
   const displayMaskRef = React.useRef(displayMask);
   React.useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   React.useEffect(() => { onSpotlightDebugRef.current = onSpotlightDebug; }, [onSpotlightDebug]);
+  React.useEffect(() => { onSpotlightRadiusChangeRef.current = onSpotlightRadiusChange; }, [onSpotlightRadiusChange]);
   React.useEffect(() => { displayMaskRef.current = displayMask; }, [displayMask]);
+  // Tracks whether the most recent spotlightRadius change was reported outward by a gesture.
+  // If so, the sync effect must not write back — doing so would overwrite a newer gesture value.
+  const radiusFromGestureRef = React.useRef(false);
   // Sync prop values into state ref without re-running the spotlight effect
-  React.useEffect(() => { spotlightStateRef.current.currentRadius = spotlightRadius; }, [spotlightRadius]);
+  React.useEffect(() => {
+    if (radiusFromGestureRef.current) { radiusFromGestureRef.current = false; return; }
+    spotlightStateRef.current.currentRadius = spotlightRadius;
+  }, [spotlightRadius]);
   React.useEffect(() => { spotlightStateRef.current.persist = spotlightPersist; }, [spotlightPersist]);
   const lassoStateRef = React.useRef<{
     path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
@@ -1008,6 +1020,8 @@ export const D3Map: React.FC<D3MapProps> = ({
 
         s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
         updateSelection(newCx, newCy, s.currentRadius);
+        radiusFromGestureRef.current = true;
+        onSpotlightRadiusChangeRef.current?.(s.currentRadius);
 
         s.touchPrevPositions.set(tA.identifier, currA);
         s.touchPrevPositions.set(tB.identifier, currB);
@@ -1068,6 +1082,8 @@ export const D3Map: React.FC<D3MapProps> = ({
       } else {
         ring.attr("r", s.currentRadius);
       }
+      radiusFromGestureRef.current = true;
+      onSpotlightRadiusChangeRef.current?.(s.currentRadius);
     }
 
     svgNode.addEventListener("touchstart", handleTouchStart, { passive: false });
