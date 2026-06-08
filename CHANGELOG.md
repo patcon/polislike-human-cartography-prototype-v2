@@ -8,6 +8,7 @@
 
 ### Added
 
+- Spotlight mode for D3Map: a circle-follows-cursor selection tool where hovering selects all points within the circle radius; on touch, single-finger tracks the ring and two-finger pinch resizes it. Exposed via `mode="spotlight"` and `spotlightRadius` props; explored in the new `SpotlightModeSelection` Storybook story.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
 - Reduction animates live on the map: the recompute dialog closes when Run is clicked, and intermediate point positions are streamed from the worker every 10 iterations and displayed directly on the map. A progress pill at the bottom of the map shows "Building KNN graph…" then a 0–100 % progress bar during iteration. The final result is registered as a named projection as before.
 - Annoy KNN backend now exposes its parameters (`numTrees`, `maxPointsPerLeaf`, `seed`) in the recompute dialog, matching the HNSW pattern. Switching backends shows that backend's params immediately; values are forwarded as `knn_params` to PaCMAP and LocalMAP. HNSW params expanded to include `m` and `seed`.

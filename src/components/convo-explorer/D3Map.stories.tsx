@@ -20,7 +20,7 @@ const meta: Meta<D3MapStoryArgs> = {
   argTypes: {
     mode: {
       control: { type: "radio" },
-      options: ["move", "paint"],
+      options: ["move", "paint", "spotlight"],
       description: "Map interaction mode",
     },
     kedroBaseUrl: {
@@ -127,6 +127,101 @@ export const PaintModeWithSelection: Story = {
           }}
         >
           Selected IDs: {selectedIds.join(", ")}
+        </div>
+      </>
+    );
+  },
+};
+
+/** Circle-follows-cursor selection: hover to select, pinch to resize on touch */
+export const SpotlightModeSelection: Story = {
+  render: (args) => {
+    const decodedArgs = decodeStorybookArgs(args);
+    const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
+    const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
+    const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
+    const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
+    const [radius, setRadius] = React.useState(60);
+    const [debugState, setDebugState] = React.useState<{
+      event: string;
+      touchCount: number;
+      primaryId: number | null;
+      pinchRefDistance: number | null;
+      pinchRefRadius: number | null;
+      currentRadius: number;
+    } | null>(null);
+
+    React.useEffect(() => {
+      if (pipelines.length > 0) {
+        console.log('Available pipelines:', pipelines);
+      }
+    }, [pipelines]);
+
+    if (loading || pipelinesLoading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error}</div>;
+    if (!dataset) return <div>No data available</div>;
+
+    return (
+      <>
+        <D3Map
+          {...d3MapArgs}
+          data={dataset}
+          mode="spotlight"
+          spotlightRadius={radius}
+          onSelectionChange={(ids: (string | number)[]) => setSelectedIds(ids as number[])}
+          onSpotlightDebug={setDebugState}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: 10,
+            left: 10,
+            background: "rgba(255,255,255,0.9)",
+            padding: 8,
+            fontSize: 11,
+            fontFamily: "monospace",
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            borderRadius: 4,
+            minWidth: 220,
+            maxWidth: 320,
+            userSelect: "none",
+          }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span>Radius (slider): {radius}px</span>
+            <input
+              type="range"
+              min={20}
+              max={200}
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              style={{ width: 180 }}
+            />
+          </label>
+          <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
+          {debugState ? (
+            <>
+              <div>event: <b>{debugState.event}</b></div>
+              <div>touches: <b>{debugState.touchCount}</b></div>
+              <div>primaryId: <b>{debugState.primaryId ?? "null"}</b></div>
+              <div>pinchRefDist: <b>{debugState.pinchRefDistance !== null ? debugState.pinchRefDistance.toFixed(1) : "null"}</b></div>
+              <div>pinchRefRadius: <b>{debugState.pinchRefRadius !== null ? debugState.pinchRefRadius.toFixed(1) : "null"}</b></div>
+              <div>currentRadius: <b>{debugState.currentRadius.toFixed(1)}</b></div>
+            </>
+          ) : (
+            <div style={{ color: "#999" }}>no touch events yet</div>
+          )}
+          <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
+          <details>
+            <summary style={{ cursor: "pointer" }}>
+              Selected: {selectedIds.length} points
+            </summary>
+            <div style={{ marginTop: 4, wordBreak: "break-all", color: "#555" }}>
+              {selectedIds.join(", ") || "none"}
+            </div>
+          </details>
         </div>
       </>
     );

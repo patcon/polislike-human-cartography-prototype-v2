@@ -19,7 +19,9 @@ const MIN_CIRCLE_RADIUS = 0.5; // prevent sub-pixel circles that vanish on mobil
 type D3MapProps = {
   /** Dataset points in the format [[i, [x, y]], ...] */
   data: [string, [number, number]][];
-  mode?: "move" | "paint";
+  mode?: "move" | "paint" | "spotlight";
+  /** Radius in SVG pixels for the spotlight selection circle (spotlight mode only) */
+  spotlightRadius?: number;
   /** Color indices parallel to data: null = default color, number = palette index (groups/votes) or 0-1 values (metrics) */
   pointColors?: (number | null)[];
   /** Color palette to use for rendering points */
@@ -65,6 +67,8 @@ type D3MapProps = {
   displayMask?: boolean[];
   /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
   unpaintedColor?: string;
+  /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
+  onSpotlightDebug?: (state: { event: string; touchCount: number; primaryId: number | null; pinchRefDistance: number | null; pinchRefRadius: number | null; currentRadius: number }) => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -96,6 +100,8 @@ export const D3Map: React.FC<D3MapProps> = ({
   liveData,
   displayMask,
   unpaintedColor = UNPAINTED_COLOR,
+  spotlightRadius = 60,
+  onSpotlightDebug,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -593,6 +599,8 @@ export const D3Map: React.FC<D3MapProps> = ({
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 15])
       .filter((event) => {
+        // Spotlight mode owns all pointer interactions — block pan/zoom entirely
+        if (modeRef.current === "spotlight") return false;
         /**
          * Here's what we do for every zoom event:
          * - all wheel events = YES, in any mode
@@ -823,6 +831,226 @@ export const D3Map: React.FC<D3MapProps> = ({
       lassoStateRef.current.cleanup = null;
     }
   }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
+
+  // --- Spotlight mode ---
+  React.useEffect(() => {
+    if (!svgRef.current || !containerRef.current) return;
+    if (mode !== "spotlight") return;
+
+    const svg = d3.select(svgRef.current);
+    const container = containerRef.current;
+    const svgNode = svgRef.current;
+
+    // Prevent native touch scroll/pan while spotlight is active
+    svgNode.style.touchAction = "none";
+
+    const ring = svg.append("circle")
+      .attr("class", "spotlight-ring")
+      .attr("fill", "rgba(255, 220, 0, 0.08)")
+      .attr("stroke", "#FFCC00")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "6 3")
+      .attr("cx", -9999)
+      .attr("cy", -9999)
+      .attr("r", spotlightRadius)
+      .style("pointer-events", "none");
+
+    let currentRadius = spotlightRadius;
+    let currentCx = -9999;
+    let currentCy = -9999;
+    // Touch Events give us event.touches (all active touches) on every event,
+    // so we don't need a manual map — no iOS pointer-ownership-transfer issues.
+    let primaryTouchId: number | null = null;
+    let pinchRefDistance: number | null = null;
+    let pinchRefRadius: number | null = null;
+
+    function debug(eventName: string, touchCount: number) {
+      onSpotlightDebug?.({ event: eventName, touchCount, primaryId: primaryTouchId, pinchRefDistance, pinchRefRadius, currentRadius });
+    }
+
+    function touchToSVG(touch: Touch): [number, number] {
+      const rect = svgNode.getBoundingClientRect();
+      return [touch.clientX - rect.left, touch.clientY - rect.top];
+    }
+
+    function findTouch(list: TouchList, id: number | null): Touch | null {
+      if (id === null) return null;
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].identifier === id) return list[i];
+      }
+      return null;
+    }
+
+    function updateSelection(cx: number, cy: number, radius: number) {
+      currentCx = cx;
+      currentCy = cy;
+      ring.attr("cx", cx).attr("cy", cy).attr("r", radius);
+      const transform = d3.zoomTransform(container.node()!);
+      const selected = (container.selectAll("circle").data() as any[]).filter((d: any) => {
+        if (displayMask && !displayMask[d.originalIndex]) return false;
+        const sx = transform.applyX((container as any).xScale(d.x));
+        const sy = transform.applyY((container as any).yScale(d.y));
+        return Math.sqrt((sx - cx) ** 2 + (sy - cy) ** 2) <= radius;
+      });
+      onSelectionChange?.(selected.map((d: any) => d.i));
+    }
+
+    // --- Touch Events (handles multi-touch reliably via event.touches) ---
+    function handleTouchStart(event: TouchEvent) {
+      event.preventDefault();
+      const n = event.touches.length;
+
+      if (n === 1) {
+        primaryTouchId = event.touches[0].identifier;
+        pinchRefDistance = null;
+        pinchRefRadius = null;
+        const [px, py] = touchToSVG(event.touches[0]);
+        updateSelection(px, py, currentRadius);
+        debug("touch:start:1", n);
+      } else if (n === 2) {
+        // Second finger just landed — lock in the scale reference
+        const primary = findTouch(event.touches, primaryTouchId) ?? event.touches[0];
+        primaryTouchId = primary.identifier;
+        const secondary = [...event.touches].find(t => t.identifier !== primaryTouchId)!;
+        const [p1x, p1y] = touchToSVG(primary);
+        const [p2x, p2y] = touchToSVG(secondary);
+        const dx = p1x - p2x;
+        const dy = p1y - p2y;
+        pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        pinchRefRadius = currentRadius;
+        debug("touch:start:2", n);
+      }
+    }
+
+    function handleTouchMove(event: TouchEvent) {
+      event.preventDefault();
+      const n = event.touches.length;
+
+      if (n === 1) {
+        primaryTouchId = event.touches[0].identifier;
+        const [px, py] = touchToSVG(event.touches[0]);
+        updateSelection(px, py, currentRadius);
+        debug("touch:move:1", n);
+      } else if (n >= 2) {
+        const primary = findTouch(event.touches, primaryTouchId) ?? event.touches[0];
+        const secondary = [...event.touches].find(t => t.identifier !== primary.identifier);
+        if (!secondary) return;
+
+        // Lazy capture only if reference is genuinely missing (not from a spurious reset)
+        if (pinchRefDistance === null || pinchRefRadius === null) {
+          const [p1x, p1y] = touchToSVG(primary);
+          const [p2x, p2y] = touchToSVG(secondary);
+          const dx = p1x - p2x;
+          const dy = p1y - p2y;
+          pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+          pinchRefRadius = currentRadius;
+          // Skip radius update on this frame — ref just captured, ratio would be 1
+          debug("touch:move:2:ref", n);
+          return;
+        }
+
+        const [p1x, p1y] = touchToSVG(primary);
+        const [p2x, p2y] = touchToSVG(secondary);
+        const dx = p1x - p2x;
+        const dy = p1y - p2y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        currentRadius = Math.max(10, Math.min(500, pinchRefRadius * (dist / pinchRefDistance)));
+        updateSelection(p1x, p1y, currentRadius);
+        debug("touch:move:2", n);
+      }
+    }
+
+    function handleTouchEnd(event: TouchEvent) {
+      const n = event.touches.length;
+      if (n === 0) {
+        ring.attr("cx", -9999).attr("cy", -9999);
+        currentCx = -9999;
+        currentCy = -9999;
+        primaryTouchId = null;
+        pinchRefDistance = null;
+        pinchRefRadius = null;
+        onSelectionChange?.([]);
+        debug("touch:end:0", n);
+      } else if (n === 1) {
+        // Second finger lifted — reset pinch baseline, keep tracking first finger
+        pinchRefDistance = null;
+        pinchRefRadius = null;
+        primaryTouchId = event.touches[0].identifier;
+        const [px, py] = touchToSVG(event.touches[0]);
+        updateSelection(px, py, currentRadius);
+        debug("touch:end:1", n);
+      }
+    }
+
+    function handleTouchCancel(event: TouchEvent) {
+      // touchcancel fires spuriously on iOS (system gestures, notifications, etc.)
+      // Only reset state if all touches are genuinely gone; preserve pinch reference otherwise
+      debug(`touch:cancel:${event.touches.length}`, event.touches.length);
+      if (event.touches.length === 0) {
+        ring.attr("cx", -9999).attr("cy", -9999);
+        currentCx = -9999;
+        currentCy = -9999;
+        primaryTouchId = null;
+        pinchRefDistance = null;
+        pinchRefRadius = null;
+        onSelectionChange?.([]);
+      }
+    }
+
+    // --- Mouse (Pointer Events, mouse only) ---
+    function handlePointerEnter(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      const [px, py] = d3.pointer(event, svgNode);
+      updateSelection(px, py, currentRadius);
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      const [px, py] = d3.pointer(event, svgNode);
+      updateSelection(px, py, currentRadius);
+    }
+
+    function handlePointerLeave(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return;
+      ring.attr("cx", -9999).attr("cy", -9999);
+      currentCx = -9999;
+      currentCy = -9999;
+      onSelectionChange?.([]);
+    }
+
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault();
+      const factor = event.deltaMode === 0 ? 0.002 : 0.06;
+      currentRadius = Math.max(10, Math.min(500, currentRadius * (1 - event.deltaY * factor)));
+      if (currentCx !== -9999) {
+        updateSelection(currentCx, currentCy, currentRadius);
+      } else {
+        ring.attr("r", currentRadius);
+      }
+    }
+
+    svgNode.addEventListener("touchstart", handleTouchStart, { passive: false });
+    svgNode.addEventListener("touchmove", handleTouchMove, { passive: false });
+    svgNode.addEventListener("touchend", handleTouchEnd);
+    svgNode.addEventListener("touchcancel", handleTouchCancel);
+    svgNode.addEventListener("pointerenter", handlePointerEnter);
+    svgNode.addEventListener("pointermove", handlePointerMove);
+    svgNode.addEventListener("pointerleave", handlePointerLeave);
+    svgNode.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      ring.remove();
+      svgNode.style.touchAction = "";
+      svgNode.removeEventListener("touchstart", handleTouchStart);
+      svgNode.removeEventListener("touchmove", handleTouchMove);
+      svgNode.removeEventListener("touchend", handleTouchEnd);
+      svgNode.removeEventListener("touchcancel", handleTouchCancel);
+      svgNode.removeEventListener("pointerenter", handlePointerEnter);
+      svgNode.removeEventListener("pointermove", handlePointerMove);
+      svgNode.removeEventListener("pointerleave", handlePointerLeave);
+      svgNode.removeEventListener("wheel", handleWheel);
+    };
+  }, [mode, spotlightRadius, onSelectionChange, onSpotlightDebug, displayMask]);
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {
