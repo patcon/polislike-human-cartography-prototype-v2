@@ -142,6 +142,7 @@ export const SpotlightModeSelection: Story = {
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
     const [radius, setRadius] = React.useState(60);
+    const [persist, setPersist] = React.useState(false);
     type DebugEntry = {
       event: string;
       touchCount: number;
@@ -188,6 +189,7 @@ export const SpotlightModeSelection: Story = {
           data={dataset}
           mode="spotlight"
           spotlightRadius={radius}
+          spotlightPersist={persist}
           onSelectionChange={(ids: (string | number)[]) => setSelectedIds(ids as number[])}
           onSpotlightDebug={handleDebug}
         />
@@ -219,6 +221,14 @@ export const SpotlightModeSelection: Story = {
               onChange={(e) => setRadius(Number(e.target.value))}
               style={{ width: 180 }}
             />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={persist}
+              onChange={(e) => setPersist(e.target.checked)}
+            />
+            Persist circle between touches
           </label>
           <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
           {debugState ? (

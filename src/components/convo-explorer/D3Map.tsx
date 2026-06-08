@@ -67,6 +67,8 @@ type D3MapProps = {
   displayMask?: boolean[];
   /** Color for unpainted points in groups mode. Defaults to UNPAINTED_COLOR (black). */
   unpaintedColor?: string;
+  /** When true, the spotlight circle stays in place after all fingers lift; the next touch moves it again (spotlight mode only) */
+  spotlightPersist?: boolean;
   /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
   onSpotlightDebug?: (state: { event: string; touchCount: number; primaryId: number | null; pinchRefDistance: number | null; pinchRefRadius: number | null; currentRadius: number }) => void;
 };
@@ -101,6 +103,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   displayMask,
   unpaintedColor = UNPAINTED_COLOR,
   spotlightRadius = 60,
+  spotlightPersist = false,
   onSpotlightDebug,
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
@@ -116,6 +119,7 @@ export const D3Map: React.FC<D3MapProps> = ({
     primaryTouchId: null as number | null,
     pinchRefDistance: null as number | null,
     pinchRefRadius: null as number | null,
+    persist: spotlightPersist,
   });
   // Keep callback refs so spotlight effect doesn't re-run when they change identity
   const onSelectionChangeRef = React.useRef(onSelectionChange);
@@ -124,8 +128,9 @@ export const D3Map: React.FC<D3MapProps> = ({
   React.useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   React.useEffect(() => { onSpotlightDebugRef.current = onSpotlightDebug; }, [onSpotlightDebug]);
   React.useEffect(() => { displayMaskRef.current = displayMask; }, [displayMask]);
-  // Sync slider value into state ref without re-running the spotlight effect
+  // Sync prop values into state ref without re-running the spotlight effect
   React.useEffect(() => { spotlightStateRef.current.currentRadius = spotlightRadius; }, [spotlightRadius]);
+  React.useEffect(() => { spotlightStateRef.current.persist = spotlightPersist; }, [spotlightPersist]);
   const lassoStateRef = React.useRef<{
     path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
     coords: [number, number][];
@@ -963,13 +968,15 @@ export const D3Map: React.FC<D3MapProps> = ({
     function handleTouchEnd(event: TouchEvent) {
       const n = event.touches.length;
       if (n === 0) {
-        ring.attr("cx", -9999).attr("cy", -9999);
-        s.currentCx = -9999;
-        s.currentCy = -9999;
         s.primaryTouchId = null;
         s.pinchRefDistance = null;
         s.pinchRefRadius = null;
-        onSelectionChangeRef.current?.([]);
+        if (!s.persist) {
+          ring.attr("cx", -9999).attr("cy", -9999);
+          s.currentCx = -9999;
+          s.currentCy = -9999;
+          onSelectionChangeRef.current?.([]);
+        }
         debug("touch:end:0", n);
       } else if (n === 1) {
         s.pinchRefDistance = null;
@@ -985,13 +992,15 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
       debug(`touch:cancel:${event.touches.length}`, event.touches.length);
       if (event.touches.length === 0) {
-        ring.attr("cx", -9999).attr("cy", -9999);
-        s.currentCx = -9999;
-        s.currentCy = -9999;
         s.primaryTouchId = null;
         s.pinchRefDistance = null;
         s.pinchRefRadius = null;
-        onSelectionChangeRef.current?.([]);
+        if (!s.persist) {
+          ring.attr("cx", -9999).attr("cy", -9999);
+          s.currentCx = -9999;
+          s.currentCy = -9999;
+          onSelectionChangeRef.current?.([]);
+        }
       }
     }
 
