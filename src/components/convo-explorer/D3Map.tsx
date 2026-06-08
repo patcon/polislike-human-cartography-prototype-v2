@@ -107,6 +107,25 @@ export const D3Map: React.FC<D3MapProps> = ({
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
+
+  // Spotlight: mutable touch state lives in a ref so it survives effect re-runs
+  const spotlightStateRef = React.useRef({
+    currentRadius: spotlightRadius,
+    currentCx: -9999,
+    currentCy: -9999,
+    primaryTouchId: null as number | null,
+    pinchRefDistance: null as number | null,
+    pinchRefRadius: null as number | null,
+  });
+  // Keep callback refs so spotlight effect doesn't re-run when they change identity
+  const onSelectionChangeRef = React.useRef(onSelectionChange);
+  const onSpotlightDebugRef = React.useRef(onSpotlightDebug);
+  const displayMaskRef = React.useRef(displayMask);
+  React.useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
+  React.useEffect(() => { onSpotlightDebugRef.current = onSpotlightDebug; }, [onSpotlightDebug]);
+  React.useEffect(() => { displayMaskRef.current = displayMask; }, [displayMask]);
+  // Sync slider value into state ref without re-running the spotlight effect
+  React.useEffect(() => { spotlightStateRef.current.currentRadius = spotlightRadius; }, [spotlightRadius]);
   const lassoStateRef = React.useRef<{
     path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
     coords: [number, number][];
@@ -852,20 +871,15 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("stroke-dasharray", "6 3")
       .attr("cx", -9999)
       .attr("cy", -9999)
-      .attr("r", spotlightRadius)
+      .attr("r", spotlightStateRef.current.currentRadius)
       .style("pointer-events", "none");
 
-    let currentRadius = spotlightRadius;
-    let currentCx = -9999;
-    let currentCy = -9999;
-    // Touch Events give us event.touches (all active touches) on every event,
-    // so we don't need a manual map — no iOS pointer-ownership-transfer issues.
-    let primaryTouchId: number | null = null;
-    let pinchRefDistance: number | null = null;
-    let pinchRefRadius: number | null = null;
+    // All mutable touch state lives in spotlightStateRef so it survives effect re-runs.
+    // Callbacks are accessed via refs so they never appear in deps and never trigger re-runs.
+    const s = spotlightStateRef.current;
 
     function debug(eventName: string, touchCount: number) {
-      onSpotlightDebug?.({ event: eventName, touchCount, primaryId: primaryTouchId, pinchRefDistance, pinchRefRadius, currentRadius });
+      onSpotlightDebugRef.current?.({ event: eventName, touchCount, primaryId: s.primaryTouchId, pinchRefDistance: s.pinchRefDistance, pinchRefRadius: s.pinchRefRadius, currentRadius: s.currentRadius });
     }
 
     function touchToSVG(touch: Touch): [number, number] {
@@ -882,17 +896,17 @@ export const D3Map: React.FC<D3MapProps> = ({
     }
 
     function updateSelection(cx: number, cy: number, radius: number) {
-      currentCx = cx;
-      currentCy = cy;
+      s.currentCx = cx;
+      s.currentCy = cy;
       ring.attr("cx", cx).attr("cy", cy).attr("r", radius);
       const transform = d3.zoomTransform(container.node()!);
       const selected = (container.selectAll("circle").data() as any[]).filter((d: any) => {
-        if (displayMask && !displayMask[d.originalIndex]) return false;
+        if (displayMaskRef.current && !displayMaskRef.current[d.originalIndex]) return false;
         const sx = transform.applyX((container as any).xScale(d.x));
         const sy = transform.applyY((container as any).yScale(d.y));
         return Math.sqrt((sx - cx) ** 2 + (sy - cy) ** 2) <= radius;
       });
-      onSelectionChange?.(selected.map((d: any) => d.i));
+      onSelectionChangeRef.current?.(selected.map((d: any) => d.i));
     }
 
     // --- Touch Events (handles multi-touch reliably via event.touches) ---
@@ -901,23 +915,22 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
 
       if (n === 1) {
-        primaryTouchId = event.touches[0].identifier;
-        pinchRefDistance = null;
-        pinchRefRadius = null;
+        s.primaryTouchId = event.touches[0].identifier;
+        s.pinchRefDistance = null;
+        s.pinchRefRadius = null;
         const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, currentRadius);
+        updateSelection(px, py, s.currentRadius);
         debug("touch:start:1", n);
       } else if (n === 2) {
-        // Second finger just landed — lock in the scale reference
-        const primary = findTouch(event.touches, primaryTouchId) ?? event.touches[0];
-        primaryTouchId = primary.identifier;
-        const secondary = [...event.touches].find(t => t.identifier !== primaryTouchId)!;
+        const primary = findTouch(event.touches, s.primaryTouchId) ?? event.touches[0];
+        s.primaryTouchId = primary.identifier;
+        const secondary = [...event.touches].find(t => t.identifier !== s.primaryTouchId)!;
         const [p1x, p1y] = touchToSVG(primary);
         const [p2x, p2y] = touchToSVG(secondary);
         const dx = p1x - p2x;
         const dy = p1y - p2y;
-        pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-        pinchRefRadius = currentRadius;
+        s.pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        s.pinchRefRadius = s.currentRadius;
         debug("touch:start:2", n);
       }
     }
@@ -927,24 +940,22 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
 
       if (n === 1) {
-        primaryTouchId = event.touches[0].identifier;
+        s.primaryTouchId = event.touches[0].identifier;
         const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, currentRadius);
+        updateSelection(px, py, s.currentRadius);
         debug("touch:move:1", n);
       } else if (n >= 2) {
-        const primary = findTouch(event.touches, primaryTouchId) ?? event.touches[0];
+        const primary = findTouch(event.touches, s.primaryTouchId) ?? event.touches[0];
         const secondary = [...event.touches].find(t => t.identifier !== primary.identifier);
         if (!secondary) return;
 
-        // Lazy capture only if reference is genuinely missing (not from a spurious reset)
-        if (pinchRefDistance === null || pinchRefRadius === null) {
+        if (s.pinchRefDistance === null || s.pinchRefRadius === null) {
           const [p1x, p1y] = touchToSVG(primary);
           const [p2x, p2y] = touchToSVG(secondary);
           const dx = p1x - p2x;
           const dy = p1y - p2y;
-          pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-          pinchRefRadius = currentRadius;
-          // Skip radius update on this frame — ref just captured, ratio would be 1
+          s.pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+          s.pinchRefRadius = s.currentRadius;
           debug("touch:move:2:ref", n);
           return;
         }
@@ -954,8 +965,8 @@ export const D3Map: React.FC<D3MapProps> = ({
         const dx = p1x - p2x;
         const dy = p1y - p2y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        currentRadius = Math.max(10, Math.min(500, pinchRefRadius * (dist / pinchRefDistance)));
-        updateSelection(p1x, p1y, currentRadius);
+        s.currentRadius = Math.max(10, Math.min(500, s.pinchRefRadius * (dist / s.pinchRefDistance)));
+        updateSelection(p1x, p1y, s.currentRadius);
         debug("touch:move:2", n);
       }
     }
@@ -964,36 +975,34 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
       if (n === 0) {
         ring.attr("cx", -9999).attr("cy", -9999);
-        currentCx = -9999;
-        currentCy = -9999;
-        primaryTouchId = null;
-        pinchRefDistance = null;
-        pinchRefRadius = null;
-        onSelectionChange?.([]);
+        s.currentCx = -9999;
+        s.currentCy = -9999;
+        s.primaryTouchId = null;
+        s.pinchRefDistance = null;
+        s.pinchRefRadius = null;
+        onSelectionChangeRef.current?.([]);
         debug("touch:end:0", n);
       } else if (n === 1) {
-        // Second finger lifted — reset pinch baseline, keep tracking first finger
-        pinchRefDistance = null;
-        pinchRefRadius = null;
-        primaryTouchId = event.touches[0].identifier;
+        s.pinchRefDistance = null;
+        s.pinchRefRadius = null;
+        s.primaryTouchId = event.touches[0].identifier;
         const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, currentRadius);
+        updateSelection(px, py, s.currentRadius);
         debug("touch:end:1", n);
       }
     }
 
     function handleTouchCancel(event: TouchEvent) {
-      // touchcancel fires spuriously on iOS (system gestures, notifications, etc.)
-      // Only reset state if all touches are genuinely gone; preserve pinch reference otherwise
+      // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
       debug(`touch:cancel:${event.touches.length}`, event.touches.length);
       if (event.touches.length === 0) {
         ring.attr("cx", -9999).attr("cy", -9999);
-        currentCx = -9999;
-        currentCy = -9999;
-        primaryTouchId = null;
-        pinchRefDistance = null;
-        pinchRefRadius = null;
-        onSelectionChange?.([]);
+        s.currentCx = -9999;
+        s.currentCy = -9999;
+        s.primaryTouchId = null;
+        s.pinchRefDistance = null;
+        s.pinchRefRadius = null;
+        onSelectionChangeRef.current?.([]);
       }
     }
 
@@ -1001,31 +1010,31 @@ export const D3Map: React.FC<D3MapProps> = ({
     function handlePointerEnter(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
       const [px, py] = d3.pointer(event, svgNode);
-      updateSelection(px, py, currentRadius);
+      updateSelection(px, py, s.currentRadius);
     }
 
     function handlePointerMove(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
       const [px, py] = d3.pointer(event, svgNode);
-      updateSelection(px, py, currentRadius);
+      updateSelection(px, py, s.currentRadius);
     }
 
     function handlePointerLeave(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
       ring.attr("cx", -9999).attr("cy", -9999);
-      currentCx = -9999;
-      currentCy = -9999;
-      onSelectionChange?.([]);
+      s.currentCx = -9999;
+      s.currentCy = -9999;
+      onSelectionChangeRef.current?.([]);
     }
 
     function handleWheel(event: WheelEvent) {
       event.preventDefault();
       const factor = event.deltaMode === 0 ? 0.002 : 0.06;
-      currentRadius = Math.max(10, Math.min(500, currentRadius * (1 - event.deltaY * factor)));
-      if (currentCx !== -9999) {
-        updateSelection(currentCx, currentCy, currentRadius);
+      s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * (1 - event.deltaY * factor)));
+      if (s.currentCx !== -9999) {
+        updateSelection(s.currentCx, s.currentCy, s.currentRadius);
       } else {
-        ring.attr("r", currentRadius);
+        ring.attr("r", s.currentRadius);
       }
     }
 
@@ -1050,7 +1059,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       svgNode.removeEventListener("pointerleave", handlePointerLeave);
       svgNode.removeEventListener("wheel", handleWheel);
     };
-  }, [mode, spotlightRadius, onSelectionChange, onSpotlightDebug, displayMask]);
+  }, [mode]); // callbacks + display state accessed via refs — no re-run needed when they change
 
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {

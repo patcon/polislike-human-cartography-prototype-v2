@@ -142,20 +142,40 @@ export const SpotlightModeSelection: Story = {
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
     const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
     const [radius, setRadius] = React.useState(60);
-    const [debugState, setDebugState] = React.useState<{
+    type DebugEntry = {
       event: string;
       touchCount: number;
       primaryId: number | null;
       pinchRefDistance: number | null;
       pinchRefRadius: number | null;
       currentRadius: number;
-    } | null>(null);
+    };
+    const [debugState, setDebugState] = React.useState<DebugEntry | null>(null);
+    const [debugLog, setDebugLog] = React.useState<string[]>([]);
+    const [copied, setCopied] = React.useState(false);
+
+    const handleDebug = React.useCallback((state: DebugEntry) => {
+      setDebugState(state);
+      const line = `${state.event} | touches:${state.touchCount} primaryId:${state.primaryId ?? "null"} refDist:${state.pinchRefDistance !== null ? state.pinchRefDistance.toFixed(1) : "null"} refR:${state.pinchRefRadius !== null ? state.pinchRefRadius.toFixed(1) : "null"} r:${state.currentRadius.toFixed(1)}`;
+      setDebugLog(prev => [...prev.slice(-199), line]);
+    }, []);
 
     React.useEffect(() => {
       if (pipelines.length > 0) {
         console.log('Available pipelines:', pipelines);
       }
     }, [pipelines]);
+
+    function fallbackCopy(text: string) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;top:-9999px;left:-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
 
     if (loading || pipelinesLoading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
@@ -169,7 +189,7 @@ export const SpotlightModeSelection: Story = {
           mode="spotlight"
           spotlightRadius={radius}
           onSelectionChange={(ids: (string | number)[]) => setSelectedIds(ids as number[])}
-          onSpotlightDebug={setDebugState}
+          onSpotlightDebug={handleDebug}
         />
         <div
           style={{
@@ -213,6 +233,46 @@ export const SpotlightModeSelection: Story = {
           ) : (
             <div style={{ color: "#999" }}>no touch events yet</div>
           )}
+          <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+            <span>Event log ({debugLog.length})</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => {
+                  const text = debugLog.join("\n");
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+                  } else {
+                    fallbackCopy(text);
+                  }
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                }}
+                style={{ fontSize: 10, padding: "1px 6px", cursor: "pointer" }}
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+              <button
+                onClick={() => setDebugLog([])}
+                style={{ fontSize: 10, padding: "1px 6px", cursor: "pointer" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div style={{
+            maxHeight: 120,
+            overflowY: "auto",
+            fontSize: 10,
+            color: "#444",
+            lineHeight: 1.4,
+            wordBreak: "break-all",
+          }}>
+            {debugLog.length === 0
+              ? <span style={{ color: "#999" }}>—</span>
+              : [...debugLog].reverse().map((line, i) => <div key={i}>{line}</div>)
+            }
+          </div>
           <hr style={{ margin: "2px 0", border: "none", borderTop: "1px solid #ccc" }} />
           <details>
             <summary style={{ cursor: "pointer" }}>
