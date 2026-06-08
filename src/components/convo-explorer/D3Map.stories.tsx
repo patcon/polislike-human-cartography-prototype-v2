@@ -146,10 +146,11 @@ export const SpotlightModeSelection: Story = {
     type DebugEntry = {
       event: string;
       touchCount: number;
-      primaryId: number | null;
-      pinchRefDistance: number | null;
-      pinchRefRadius: number | null;
       currentRadius: number;
+      cx: number;
+      cy: number;
+      grabOffsetX: number;
+      grabOffsetY: number;
     };
     const [debugState, setDebugState] = React.useState<DebugEntry | null>(null);
     const [debugLog, setDebugLog] = React.useState<string[]>([]);
@@ -157,7 +158,7 @@ export const SpotlightModeSelection: Story = {
 
     const handleDebug = React.useCallback((state: DebugEntry) => {
       setDebugState(state);
-      const line = `${state.event} | touches:${state.touchCount} primaryId:${state.primaryId ?? "null"} refDist:${state.pinchRefDistance !== null ? state.pinchRefDistance.toFixed(1) : "null"} refR:${state.pinchRefRadius !== null ? state.pinchRefRadius.toFixed(1) : "null"} r:${state.currentRadius.toFixed(1)}`;
+      const line = `${state.event} | touches:${state.touchCount} r:${state.currentRadius.toFixed(1)} cx:${state.cx.toFixed(1)} cy:${state.cy.toFixed(1)} grabX:${state.grabOffsetX.toFixed(1)} grabY:${state.grabOffsetY.toFixed(1)}`;
       setDebugLog(prev => [...prev.slice(-199), line]);
     }, []);
 
@@ -235,10 +236,9 @@ export const SpotlightModeSelection: Story = {
             <>
               <div>event: <b>{debugState.event}</b></div>
               <div>touches: <b>{debugState.touchCount}</b></div>
-              <div>primaryId: <b>{debugState.primaryId ?? "null"}</b></div>
-              <div>pinchRefDist: <b>{debugState.pinchRefDistance !== null ? debugState.pinchRefDistance.toFixed(1) : "null"}</b></div>
-              <div>pinchRefRadius: <b>{debugState.pinchRefRadius !== null ? debugState.pinchRefRadius.toFixed(1) : "null"}</b></div>
-              <div>currentRadius: <b>{debugState.currentRadius.toFixed(1)}</b></div>
+              <div>radius: <b>{debugState.currentRadius.toFixed(1)}</b></div>
+              <div>cx/cy: <b>{debugState.cx.toFixed(1)}, {debugState.cy.toFixed(1)}</b></div>
+              <div>grabOffset: <b>{debugState.grabOffsetX.toFixed(1)}, {debugState.grabOffsetY.toFixed(1)}</b></div>
             </>
           ) : (
             <div style={{ color: "#999" }}>no touch events yet</div>

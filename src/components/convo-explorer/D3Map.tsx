@@ -70,7 +70,7 @@ type D3MapProps = {
   /** When true, the spotlight circle stays in place after all fingers lift; the next touch moves it again (spotlight mode only) */
   spotlightPersist?: boolean;
   /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
-  onSpotlightDebug?: (state: { event: string; touchCount: number; primaryId: number | null; pinchRefDistance: number | null; pinchRefRadius: number | null; currentRadius: number }) => void;
+  onSpotlightDebug?: (state: { event: string; touchCount: number; currentRadius: number; cx: number; cy: number; grabOffsetX: number; grabOffsetY: number }) => void;
 };
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
@@ -116,10 +116,12 @@ export const D3Map: React.FC<D3MapProps> = ({
     currentRadius: spotlightRadius,
     currentCx: -9999,
     currentCy: -9999,
-    primaryTouchId: null as number | null,
-    pinchRefDistance: null as number | null,
-    pinchRefRadius: null as number | null,
     persist: spotlightPersist,
+    // single-touch grab: offset from circle center to touch landing point
+    grabOffsetX: 0,
+    grabOffsetY: 0,
+    // two-touch transform: previous SVG positions keyed by touch identifier
+    touchPrevPositions: new Map<number, [number, number]>(),
   });
   // Keep callback refs so spotlight effect doesn't re-run when they change identity
   const onSelectionChangeRef = React.useRef(onSelectionChange);
@@ -884,20 +886,12 @@ export const D3Map: React.FC<D3MapProps> = ({
     const s = spotlightStateRef.current;
 
     function debug(eventName: string, touchCount: number) {
-      onSpotlightDebugRef.current?.({ event: eventName, touchCount, primaryId: s.primaryTouchId, pinchRefDistance: s.pinchRefDistance, pinchRefRadius: s.pinchRefRadius, currentRadius: s.currentRadius });
+      onSpotlightDebugRef.current?.({ event: eventName, touchCount, currentRadius: s.currentRadius, cx: s.currentCx, cy: s.currentCy, grabOffsetX: s.grabOffsetX, grabOffsetY: s.grabOffsetY });
     }
 
     function touchToSVG(touch: Touch): [number, number] {
       const rect = svgNode.getBoundingClientRect();
       return [touch.clientX - rect.left, touch.clientY - rect.top];
-    }
-
-    function findTouch(list: TouchList, id: number | null): Touch | null {
-      if (id === null) return null;
-      for (let i = 0; i < list.length; i++) {
-        if (list[i].identifier === id) return list[i];
-      }
-      return null;
     }
 
     function updateSelection(cx: number, cy: number, radius: number) {
@@ -914,30 +908,53 @@ export const D3Map: React.FC<D3MapProps> = ({
       onSelectionChangeRef.current?.(selected.map((d: any) => d.i));
     }
 
+    function resetAllTouches() {
+      s.touchPrevPositions.clear();
+      if (!s.persist) {
+        ring.attr("cx", -9999).attr("cy", -9999);
+        s.currentCx = -9999;
+        s.currentCy = -9999;
+        onSelectionChangeRef.current?.([]);
+      }
+    }
+
+    function captureAllTouches(touches: TouchList) {
+      s.touchPrevPositions.clear();
+      for (let i = 0; i < touches.length; i++) {
+        s.touchPrevPositions.set(touches[i].identifier, touchToSVG(touches[i]));
+      }
+    }
+
+    function setupGrabOffset(touch: Touch) {
+      const [tx, ty] = touchToSVG(touch);
+      s.grabOffsetX = s.currentCx === -9999 ? 0 : s.currentCx - tx;
+      s.grabOffsetY = s.currentCy === -9999 ? 0 : s.currentCy - ty;
+    }
+
     // --- Touch Events (handles multi-touch reliably via event.touches) ---
     function handleTouchStart(event: TouchEvent) {
       event.preventDefault();
       const n = event.touches.length;
+      captureAllTouches(event.touches);
 
       if (n === 1) {
-        s.primaryTouchId = event.touches[0].identifier;
-        s.pinchRefDistance = null;
-        s.pinchRefRadius = null;
-        const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, s.currentRadius);
-        debug("touch:start:1", n);
-      } else if (n === 2) {
-        const primary = findTouch(event.touches, s.primaryTouchId) ?? event.touches[0];
-        s.primaryTouchId = primary.identifier;
-        const secondary = [...event.touches].find(t => t.identifier !== s.primaryTouchId)!;
-        const [p1x, p1y] = touchToSVG(primary);
-        const [p2x, p2y] = touchToSVG(secondary);
-        const dx = p1x - p2x;
-        const dy = p1y - p2y;
-        s.pinchRefDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-        s.pinchRefRadius = s.currentRadius;
-        debug("touch:start:2", n);
+        const [tx, ty] = touchToSVG(event.touches[0]);
+        if (s.currentCx === -9999) {
+          // First placement — center circle on the touch point
+          updateSelection(tx, ty, s.currentRadius);
+          s.grabOffsetX = 0;
+          s.grabOffsetY = 0;
+        } else {
+          s.grabOffsetX = s.currentCx - tx;
+          s.grabOffsetY = s.currentCy - ty;
+        }
+      } else if (n === 2 && s.currentCx === -9999) {
+        // Two fingers on an unpositioned circle — place center at midpoint
+        const [ax, ay] = touchToSVG(event.touches[0]);
+        const [bx, by] = touchToSVG(event.touches[1]);
+        updateSelection((ax + bx) / 2, (ay + by) / 2, s.currentRadius);
       }
+      debug(`touch:start:${n}`, n);
     }
 
     function handleTouchMove(event: TouchEvent) {
@@ -945,22 +962,55 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
 
       if (n === 1) {
-        s.primaryTouchId = event.touches[0].identifier;
-        const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, s.currentRadius);
+        const touch = event.touches[0];
+        const [tx, ty] = touchToSVG(touch);
+        updateSelection(tx + s.grabOffsetX, ty + s.grabOffsetY, s.currentRadius);
+        s.touchPrevPositions.set(touch.identifier, [tx, ty]);
         debug("touch:move:1", n);
       } else if (n >= 2) {
-        const primary = findTouch(event.touches, s.primaryTouchId) ?? event.touches[0];
-        const secondary = [...event.touches].find(t => t.identifier !== primary.identifier);
-        if (!secondary || s.pinchRefDistance === null || s.pinchRefRadius === null) return;
+        const tA = event.touches[0];
+        const tB = event.touches[1];
+        const currA = touchToSVG(tA);
+        const currB = touchToSVG(tB);
+        const prevA = s.touchPrevPositions.get(tA.identifier);
+        const prevB = s.touchPrevPositions.get(tB.identifier);
 
-        const [p1x, p1y] = touchToSVG(primary);
-        const [p2x, p2y] = touchToSVG(secondary);
-        const dx = p1x - p2x;
-        const dy = p1y - p2y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        s.currentRadius = Math.max(10, Math.min(500, s.pinchRefRadius * (dist / s.pinchRefDistance)));
-        updateSelection(p1x, p1y, s.currentRadius);
+        if (!prevA || !prevB) {
+          // Shouldn't normally happen — capture and wait for next frame
+          s.touchPrevPositions.set(tA.identifier, currA);
+          s.touchPrevPositions.set(tB.identifier, currB);
+          return;
+        }
+
+        const prevDist = Math.hypot(prevA[0] - prevB[0], prevA[1] - prevB[1]);
+        const currDist = Math.hypot(currA[0] - currB[0], currA[1] - currB[1]);
+        if (prevDist < 1) {
+          s.touchPrevPositions.set(tA.identifier, currA);
+          s.touchPrevPositions.set(tB.identifier, currB);
+          return;
+        }
+
+        const scale = currDist / prevDist;
+        const prevMidX = (prevA[0] + prevB[0]) / 2;
+        const prevMidY = (prevA[1] + prevB[1]) / 2;
+        const currMidX = (currA[0] + currB[0]) / 2;
+        const currMidY = (currA[1] + currB[1]) / 2;
+        const rotation = Math.atan2(currB[1] - currA[1], currB[0] - currA[0])
+                       - Math.atan2(prevB[1] - prevA[1], prevB[0] - prevA[0]);
+
+        // Apply similarity transform (scale + rotation + translation) to circle center
+        const dx = s.currentCx - prevMidX;
+        const dy = s.currentCy - prevMidY;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const newCx = currMidX + scale * (dx * cos - dy * sin);
+        const newCy = currMidY + scale * (dx * sin + dy * cos);
+
+        s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
+        updateSelection(newCx, newCy, s.currentRadius);
+
+        s.touchPrevPositions.set(tA.identifier, currA);
+        s.touchPrevPositions.set(tB.identifier, currB);
         debug("touch:move:2", n);
       }
     }
@@ -968,23 +1018,12 @@ export const D3Map: React.FC<D3MapProps> = ({
     function handleTouchEnd(event: TouchEvent) {
       const n = event.touches.length;
       if (n === 0) {
-        s.primaryTouchId = null;
-        s.pinchRefDistance = null;
-        s.pinchRefRadius = null;
-        if (!s.persist) {
-          ring.attr("cx", -9999).attr("cy", -9999);
-          s.currentCx = -9999;
-          s.currentCy = -9999;
-          onSelectionChangeRef.current?.([]);
-        }
+        resetAllTouches();
         debug("touch:end:0", n);
-      } else if (n === 1) {
-        s.pinchRefDistance = null;
-        s.pinchRefRadius = null;
-        s.primaryTouchId = event.touches[0].identifier;
-        const [px, py] = touchToSVG(event.touches[0]);
-        updateSelection(px, py, s.currentRadius);
-        debug("touch:end:1", n);
+      } else {
+        captureAllTouches(event.touches);
+        if (n === 1) setupGrabOffset(event.touches[0]);
+        debug(`touch:end:${n}`, n);
       }
     }
 
@@ -992,15 +1031,10 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
       debug(`touch:cancel:${event.touches.length}`, event.touches.length);
       if (event.touches.length === 0) {
-        s.primaryTouchId = null;
-        s.pinchRefDistance = null;
-        s.pinchRefRadius = null;
-        if (!s.persist) {
-          ring.attr("cx", -9999).attr("cy", -9999);
-          s.currentCx = -9999;
-          s.currentCy = -9999;
-          onSelectionChangeRef.current?.([]);
-        }
+        resetAllTouches();
+      } else {
+        captureAllTouches(event.touches);
+        if (event.touches.length === 1) setupGrabOffset(event.touches[0]);
       }
     }
 
