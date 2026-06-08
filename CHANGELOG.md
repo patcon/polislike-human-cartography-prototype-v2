@@ -8,7 +8,6 @@
 
 ### Added
 
-- `SpotlightRepresentativeStatements` story: D3Map in spotlight mode continuously calculates top representative statements for the selected participants (debounced 400 ms) and displays up to 3 via `FloatingModalV2Stack`.
 - `FloatingModalV2` component with `agree` (green), `disagree` (red), `pass` (yellow), and `unstyled` variants — accent color applied to border and statement ID; X button remains optional.
 - `FloatingModalV2Stack` for vertically stacking `FloatingModalV2` modals with animated horizontal alignment: agree items slide right, disagree items slide left, pass/unstyled items stay centered.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
@@ -35,6 +34,8 @@
 - Spotlight mode for D3Map: a circle-follows-cursor selection tool where hovering selects all points within the circle radius; on touch, single-finger tracks the ring and two-finger pinch resizes it. Exposed via `mode="spotlight"` and `spotlightRadius` props; explored in the new `SpotlightModeSelection` Storybook story.
 - `spotlightPersist` prop for spotlight mode: when enabled, the circle and its selection stay frozen after all fingers lift; the next touch resumes from the last position. Story panel includes a matching checkbox toggle.
 - Spotlight touch mechanic reworked as a similarity transform: single touch grabs at the contact point (preserving offset from circle center), two touches apply an incremental scale + rotation + translation each frame so the circle behaves like a sticker layer rather than anchoring to the first finger. No special "primary touch" — both fingers are treated symmetrically.
+- `SpotlightRepresentativeStatements` story: D3Map in spotlight mode continuously calculates top representative statements for the selected participants (debounced 400 ms) and displays up to 3 via `FloatingModalV2Stack`.
+- Spotlight mode (desktop): clicking the canvas locks the circle in place; clicking again unlocks it. The ring switches from dashed to solid while locked and the cursor changes to a crosshair.
 
 ### Changed
 

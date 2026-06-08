@@ -126,6 +126,8 @@ export const D3Map: React.FC<D3MapProps> = ({
     grabOffsetY: 0,
     // two-touch transform: previous SVG positions keyed by touch identifier
     touchPrevPositions: new Map<number, [number, number]>(),
+    // desktop click-to-lock: when true, pointer move/leave are ignored
+    mouseLocked: false,
   });
   // Keep callback refs so spotlight effect doesn't re-run when they change identity
   const onSelectionChangeRef = React.useRef(onSelectionChange);
@@ -1055,22 +1057,42 @@ export const D3Map: React.FC<D3MapProps> = ({
     // --- Mouse (Pointer Events, mouse only) ---
     function handlePointerEnter(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
+      if (s.mouseLocked) return;
       const [px, py] = d3.pointer(event, svgNode);
       updateSelection(px, py, s.currentRadius);
     }
 
     function handlePointerMove(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
+      if (s.mouseLocked) return;
       const [px, py] = d3.pointer(event, svgNode);
       updateSelection(px, py, s.currentRadius);
     }
 
     function handlePointerLeave(event: PointerEvent) {
       if (event.pointerType !== "mouse") return;
+      if (s.mouseLocked) return;
       ring.attr("cx", -9999).attr("cy", -9999);
       s.currentCx = -9999;
       s.currentCy = -9999;
       onSelectionChangeRef.current?.([]);
+    }
+
+    function handleClick(event: MouseEvent) {
+      s.mouseLocked = !s.mouseLocked;
+      if (s.mouseLocked) {
+        // Lock: place circle at current pointer position and freeze it there
+        const [px, py] = d3.pointer(event, svgNode);
+        updateSelection(px, py, s.currentRadius);
+        ring.attr("stroke-dasharray", null).attr("stroke-width", 2.5);
+        svgNode.style.cursor = "crosshair";
+      } else {
+        // Unlock: resume following the pointer from where it is now
+        ring.attr("stroke-dasharray", "6 3").attr("stroke-width", 2);
+        svgNode.style.cursor = "";
+        const [px, py] = d3.pointer(event, svgNode);
+        updateSelection(px, py, s.currentRadius);
+      }
     }
 
     function handleWheel(event: WheelEvent) {
@@ -1093,11 +1115,13 @@ export const D3Map: React.FC<D3MapProps> = ({
     svgNode.addEventListener("pointerenter", handlePointerEnter);
     svgNode.addEventListener("pointermove", handlePointerMove);
     svgNode.addEventListener("pointerleave", handlePointerLeave);
+    svgNode.addEventListener("click", handleClick);
     svgNode.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => {
       ring.remove();
       svgNode.style.touchAction = "";
+      svgNode.style.cursor = "";
       svgNode.removeEventListener("touchstart", handleTouchStart);
       svgNode.removeEventListener("touchmove", handleTouchMove);
       svgNode.removeEventListener("touchend", handleTouchEnd);
@@ -1105,6 +1129,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       svgNode.removeEventListener("pointerenter", handlePointerEnter);
       svgNode.removeEventListener("pointermove", handlePointerMove);
       svgNode.removeEventListener("pointerleave", handlePointerLeave);
+      svgNode.removeEventListener("click", handleClick);
       svgNode.removeEventListener("wheel", handleWheel);
     };
   }, [mode]); // callbacks + display state accessed via refs — no re-run needed when they change
