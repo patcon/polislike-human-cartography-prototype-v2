@@ -36,6 +36,29 @@ const getTranslateX = (variant: FloatingModalV2Variant = "unstyled"): string => 
   return "0";
 };
 
+function applyItemsUpdate(prev: DisplayItem[], next: StackItem[]): DisplayItem[] {
+  const nextMap = new Map(next.map(i => [i.id, i]));
+  const result: DisplayItem[] = [];
+
+  next.forEach(item => {
+    const prevItem = prev.find(p => p.id === item.id);
+    result.push({
+      ...item,
+      status: prevItem
+        ? (prevItem.status === "exiting" ? "visible" : prevItem.status)
+        : "entering",
+    });
+  });
+
+  prev.forEach(item => {
+    if (!nextMap.has(item.id)) {
+      result.push({ ...item, status: "exiting" });
+    }
+  });
+
+  return result;
+}
+
 export const FloatingModalV2Stack = ({ items, isVisible = true }: FloatingModalV2StackProps) => {
   const [displayItems, setDisplayItems] = useState<DisplayItem[]>(
     () => items.map(item => ({ ...item, status: "visible" as const }))
@@ -45,33 +68,39 @@ export const FloatingModalV2Stack = ({ items, isVisible = true }: FloatingModalV
   const outerRefs = useRef<Map<string | number, HTMLDivElement>>(new Map());
   // Last known offsetTop for each item (layout position, unaffected by CSS transform)
   const lastTops = useRef<Map<string | number, number>>(new Map());
+  // Holds the latest incoming items to apply once the current exit phase completes
+  const pendingItemsRef = useRef<StackItem[] | null>(null);
 
-  // Sync displayItems with incoming items prop
+  // Sync displayItems with incoming items prop.
+  // When an update involves both removals and additions, split it into two phases:
+  //   Phase 1 — exit only: mark removed items as exiting, don't add new ones yet.
+  //   Phase 2 — enter only: once exits finish, apply the full target state.
+  // This prevents incoming items from being pushed up by outgoing items that still
+  // occupy layout space, which would cause a visible jump when exits complete.
   useEffect(() => {
     setDisplayItems(prev => {
-      const nextMap = new Map(items.map(i => [i.id, i]));
+      // If exits are already in progress, just update the pending target.
+      if (prev.some(i => i.status === "exiting")) {
+        pendingItemsRef.current = items;
+        return prev;
+      }
 
-      const result: DisplayItem[] = [];
+      const nextIds = new Set(items.map(i => i.id));
+      const hasRemovals = prev.some(i => !nextIds.has(i.id));
+      const hasAdditions = items.some(i => !prev.find(p => p.id === i.id));
 
-      // Add items in new order, carrying over animation status
-      items.forEach(item => {
-        const prevItem = prev.find(p => p.id === item.id);
-        result.push({
+      if (hasRemovals && hasAdditions) {
+        // Phase 1: exit removed items only; queue the full target for phase 2.
+        pendingItemsRef.current = items;
+        return prev.map(item => ({
           ...item,
-          status: prevItem
-            ? (prevItem.status === "exiting" ? "visible" : prevItem.status)
-            : "entering",
-        });
-      });
+          status: nextIds.has(item.id) ? item.status : ("exiting" as const),
+        }));
+      }
 
-      // Append items being removed (keep them visible in DOM so they can fade out)
-      prev.forEach(item => {
-        if (!nextMap.has(item.id)) {
-          result.push({ ...item, status: "exiting" });
-        }
-      });
-
-      return result;
+      // Pure addition or pure removal — apply in one step.
+      pendingItemsRef.current = null;
+      return applyItemsUpdate(prev, items);
     });
   }, [items]);
 
@@ -87,11 +116,19 @@ export const FloatingModalV2Stack = ({ items, isVisible = true }: FloatingModalV
     return () => cancelAnimationFrame(raf);
   }, [displayItems]);
 
-  // Remove exiting items from state after the CSS transition finishes
+  // Remove exiting items after the CSS transition finishes, then apply any pending update
   useEffect(() => {
     if (!displayItems.some(i => i.status === "exiting")) return;
     const timer = setTimeout(() => {
-      setDisplayItems(prev => prev.filter(i => i.status !== "exiting"));
+      setDisplayItems(prev => {
+        const filtered = prev.filter(i => i.status !== "exiting");
+        if (pendingItemsRef.current !== null) {
+          const pending = pendingItemsRef.current;
+          pendingItemsRef.current = null;
+          return applyItemsUpdate(filtered, pending);
+        }
+        return filtered;
+      });
     }, TRANSITION_MS + 50);
     return () => clearTimeout(timer);
   }, [displayItems]);
