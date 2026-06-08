@@ -776,7 +776,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
                  effectiveLayerMode === "metrics" ? pointMetrics : pointGroups)}
             palette={mode === "spotlight"
               ? (activeSpotlightStatementId
-                  ? [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
+                  ? [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass]
                   : PALETTE_COLORS)
               : (effectiveLayerMode === "votes" ?
                   (highlightPassVotes ?
