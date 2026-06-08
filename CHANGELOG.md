@@ -38,6 +38,7 @@
 - Spotlight mode (desktop): clicking the canvas locks the circle in place; clicking again unlocks it. The ring switches from dashed to solid while locked and the cursor changes to a crosshair.
 - `FloatingModalV2` renders `cursor-pointer` when an `onClick` prop is provided; `StackItem` type in `FloatingModalV2Stack` now includes an optional `onClick`. `SpotlightRepresentativeStatements` story: clicking a statement card overlays per-participant vote colors on the map; clicking again clears the overlay.
 - `SpotlightRepresentativeStatements` story now uses `VOTE_COLORS_HIGHLIGHT_PASS` palette so pass votes render as yellow instead of near-invisible light gray.
+- `SpotlightMode` story under `Components/App`: a full App instance with the spotlight tool enabled. Add `enableSpotlight` prop to `App` (default `false`) to activate the `<Spotlight />` toolbar button and wire up spotlight selection → rep-statement calculation → `FloatingModalV2Stack` display. The button is visible but disabled in the production app.
 
 ### Changed
 

@@ -13,8 +13,8 @@ import type { FinalizedCommentStats, ConsensusStatement } from "@/lib/stats";
 import type { MetricConfig } from "./MetricsLayerConfig";
 
 type MapOverlayProps = {
-  action?: "move-map" | "paint-groups";
-  onActionChange?: (value: "move-map" | "paint-groups") => void;
+  action?: "move-map" | "paint-groups" | "spotlight";
+  onActionChange?: (value: "move-map" | "paint-groups" | "spotlight") => void;
   colorIndex?: number; // 👈 new
   onColorIndexChange?: (index: number) => void; // 👈 new
   statements?: Statement[];
@@ -57,6 +57,8 @@ type MapOverlayProps = {
 
   /** Whether WebAssembly is available (false when Lockdown Mode is active) */
   wasmSupported?: boolean;
+  /** Enable the spotlight toolbar button (disabled/non-interactive by default) */
+  enableSpotlight?: boolean;
 };
 
 export function MapOverlay({
@@ -102,9 +104,10 @@ export function MapOverlay({
   pipelineId,
 
   wasmSupported = true,
+  enableSpotlight = false,
 }: MapOverlayProps) {
   // if no props passed, create local state
-  const [internalAction, setInternalAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
+  const [internalAction, setInternalAction] = React.useState<"move-map" | "paint-groups" | "spotlight">(INITIAL_ACTION);
   const action = controlledAction ?? internalAction;
   const handleActionChange = onActionChange ?? setInternalAction;
 
@@ -200,7 +203,7 @@ export function MapOverlay({
         <ToggleToolBar value={toggles} onValueChange={handleTogglesChange} />
 
         <div className="flex items-center gap-2">
-          <ActionToolBar value={action} onValueChange={handleActionChange as (value: string) => void} />
+          <ActionToolBar value={action} onValueChange={handleActionChange as (value: string) => void} enableSpotlight={enableSpotlight} />
           <PalettePopover
             activeIndex={colorIndex}
             onSelectIndex={handleColorIndexChange}

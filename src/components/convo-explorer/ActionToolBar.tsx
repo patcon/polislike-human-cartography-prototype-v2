@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Hand, Paintbrush } from "lucide-react";
+import { Hand, Paintbrush, Spotlight } from "lucide-react";
 
 type ActionToolBarProps = {
   value: string; // always selected (controlled)
   onValueChange: (value: string) => void;
+  enableSpotlight?: boolean;
 };
 
-export function ActionToolBar({ value, onValueChange }: ActionToolBarProps) {
+export function ActionToolBar({ value, onValueChange, enableSpotlight = false }: ActionToolBarProps) {
   // 1) Guard against Radix emitting empty string for "no selection"
   const handleValueChange = (next?: string) => {
     if (!next) return; // ignore '', null, undefined
@@ -42,8 +43,19 @@ export function ActionToolBar({ value, onValueChange }: ActionToolBarProps) {
       value={value}
       onValueChange={handleValueChange}
       className="flex bg-white"
-      aria-label="Action toolbar: move map, paint groups"
+      aria-label="Action toolbar: spotlight, move map, paint groups"
     >
+      <ToggleGroupItem
+        value="spotlight"
+        aria-label="Spotlight participants"
+        disabled={!enableSpotlight}
+        onPointerDown={makePointerDownHandler("spotlight")}
+        onKeyDown={makeKeyDownHandler("spotlight")}
+        className="data-[state=on]:bg-sky-600 data-[state=on]:text-white"
+      >
+        <Spotlight className="h-5 w-5" />
+      </ToggleGroupItem>
+
       <ToggleGroupItem
         value="paint-groups"
         aria-label="Paint groups"

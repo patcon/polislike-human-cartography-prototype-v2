@@ -22,6 +22,8 @@ import { RecomputeProjectionDialog } from "./RecomputeProjectionDialog";
 import { useRepresentativeStatements } from "@/hooks/useRepresentativeStatements";
 import { useRecomputeDialog } from "@/hooks/useRecomputeDialog";
 import { useMetricsLayer } from "@/hooks/useMetricsLayer";
+import { FloatingModalV2Stack } from "./FloatingModalV2Stack";
+import { calculateRepresentativeStatements, createStatementTextMap, type FinalizedCommentStats } from "@/lib/representative-statements";
 
 // Helper function for ID matching - can be optimized later for performance
 function findDatasetIndex(dataset: [string, [number, number]][], targetId: number | string): number {
@@ -55,15 +57,26 @@ type AppProps = {
   pipelineFilter?: string;
   preloadedData?: PreloadedData;
   onLoadFile?: () => void;
+  /** Enable the spotlight toolbar button (story-only; disabled in production by default) */
+  enableSpotlight?: boolean;
 };
 
-export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData, onLoadFile }) => {
+export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData, onLoadFile, enableSpotlight = false }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
   const [statements, setStatements] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const [, setSelectedIds] = React.useState<number[]>([]);
-  const [action, setAction] = React.useState<"move-map" | "paint-groups">(INITIAL_ACTION);
+  const [action, setAction] = React.useState<"move-map" | "paint-groups" | "spotlight">(INITIAL_ACTION);
+
+  // Spotlight mode state
+  const [spotlightStackItems, setSpotlightStackItems] = React.useState<
+    { id: string | number; statement: { statement_id: number; txt: string }; variant: "agree" | "disagree"; onClick: () => void }[]
+  >([]);
+  const [activeSpotlightStatementId, setActiveSpotlightStatementId] = React.useState<string | null>(null);
+  const [spotlightPointVotes, setSpotlightPointVotes] = React.useState<(number | null)[]>([]);
+  const spotlightDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spotlightLatestIdsRef = React.useRef<(string | number)[]>([]);
 
   // current palette index chosen in the overlay - default to 1 (orange)
   const [colorIndex, setColorIndex] = React.useState(1);
@@ -104,11 +117,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
   // Debug mode state
   const debugMode = useDebugMode();
 
-  // Shift key temporary mode switching
-  const { effectiveMode } = useShiftKeyTempMode({
-    currentMode: action,
-    onModeChange: setAction
+  // Shift key temporary mode switching (spotlight is not affected by shift-key temp switching)
+  const shiftKeyMode = action === "spotlight" ? "move-map" : action as "move-map" | "paint-groups";
+  const { effectiveMode: _shiftEffectiveMode } = useShiftKeyTempMode({
+    currentMode: shiftKeyMode,
+    onModeChange: setAction as (mode: "move-map" | "paint-groups") => void
   });
+  const effectiveMode = action === "spotlight" ? "spotlight" : _shiftEffectiveMode;
 
   // Layer mode cycling for painting in non-group modes
   const { effectiveLayerMode, cycleOpacity, startCycle, stopCycle } = useLayerModeCycling({
@@ -433,7 +448,64 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
     }
   }, [layerMode, statementId, dataset, kedroBaseUrl]);
 
-  const mode: "move" | "paint" = effectiveMode === "paint-groups" ? "paint" : "move";
+  const mode: "move" | "paint" | "spotlight" = effectiveMode === "paint-groups" ? "paint" : effectiveMode === "spotlight" ? "spotlight" : "move";
+
+  // Spotlight statement click: toggle vote overlay for the selected statement
+  const handleSpotlightStatementClick = React.useCallback(async (statementId: string) => {
+    if (!dataset.length) return;
+    if (activeSpotlightStatementId === statementId) {
+      setActiveSpotlightStatementId(null);
+      setSpotlightPointVotes([]);
+      return;
+    }
+    setActiveSpotlightStatementId(statementId);
+    const participantIds = dataset.map(([id]) => id);
+    const votes = await getVotesForParticipants(statementId, participantIds, kedroBaseUrl, currentPipelineIdRef.current);
+    setSpotlightPointVotes(
+      dataset.map(([participantId]) => {
+        switch (votes.get(participantId) ?? null) {
+          case 1:  return 0;
+          case -1: return 1;
+          case 0:  return 2;
+          default: return null;
+        }
+      })
+    );
+  }, [dataset, activeSpotlightStatementId, kedroBaseUrl]);
+
+  // Spotlight selection handler: debounce and calculate rep statements for the hovered region
+  const handleSpotlightSelectionChange = React.useCallback((ids: (string | number)[]) => {
+    spotlightLatestIdsRef.current = ids;
+    if (spotlightDebounceRef.current) clearTimeout(spotlightDebounceRef.current);
+    spotlightDebounceRef.current = setTimeout(async () => {
+      const selectedIds = spotlightLatestIdsRef.current;
+      if (!dataset.length || selectedIds.length < 2) {
+        setSpotlightStackItems([]);
+        return;
+      }
+      try {
+        const participants = dataset.map(([id]) => id);
+        const selectedSet = new Set(selectedIds.map(String));
+        const labelArray = participants.map((id) => (selectedSet.has(id) ? "0" : "1"));
+        const commentTextMap = createStatementTextMap(statements);
+        const result = await calculateRepresentativeStatements(labelArray, participants, commentTextMap, { maxStatementsCount: 10 });
+        const top3: FinalizedCommentStats[] = result.repComments["0"]?.slice(0, 3) ?? [];
+        setSpotlightStackItems(
+          top3.map((stat) => ({
+            id: stat.tid,
+            statement: { statement_id: Number(stat.tid), txt: String(commentTextMap[stat.tid] ?? "") },
+            variant: (stat.repful_for === "agree" ? "agree" : "disagree") as "agree" | "disagree",
+            onClick: () => handleSpotlightStatementClick(String(stat.tid)),
+          }))
+        );
+        setActiveSpotlightStatementId(null);
+        setSpotlightPointVotes([]);
+      } catch (err) {
+        console.error("Spotlight rep statements error:", err);
+        setSpotlightStackItems([]);
+      }
+    }, 400);
+  }, [dataset, statements, handleSpotlightStatementClick]);
 
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
@@ -695,18 +767,25 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           <D3Map
             data={dataset}
             liveData={druidLiveDataset}
-            mode={mode}
-            pointColors={effectiveLayerMode === "votes" ? pointVotes :
-                        effectiveLayerMode === "metrics" ? pointMetrics : pointGroups}
-            palette={effectiveLayerMode === "votes" ?
-              (highlightPassVotes ?
-                [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass] :
-                [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
-              ) :
-              PALETTE_COLORS}
-            layerMode={effectiveLayerMode}
+            mode={mode === "spotlight" ? "spotlight" : mode}
+            spotlightPersist={mode === "spotlight" ? true : undefined}
+            onSelectionChange={mode === "spotlight" ? handleSpotlightSelectionChange : handleSelectionChange}
+            pointColors={mode === "spotlight"
+              ? (activeSpotlightStatementId ? spotlightPointVotes : pointGroups)
+              : (effectiveLayerMode === "votes" ? pointVotes :
+                 effectiveLayerMode === "metrics" ? pointMetrics : pointGroups)}
+            palette={mode === "spotlight"
+              ? (activeSpotlightStatementId
+                  ? [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
+                  : PALETTE_COLORS)
+              : (effectiveLayerMode === "votes" ?
+                  (highlightPassVotes ?
+                    [VOTE_COLORS_HIGHLIGHT_PASS.agree, VOTE_COLORS_HIGHLIGHT_PASS.disagree, VOTE_COLORS_HIGHLIGHT_PASS.pass] :
+                    [VOTE_COLORS.agree, VOTE_COLORS.disagree, VOTE_COLORS.pass]
+                  ) :
+                  PALETTE_COLORS)}
+            layerMode={mode === "spotlight" ? "groups" : effectiveLayerMode}
             metricsType={metricsType}
-            onSelectionChange={handleSelectionChange}
             onQuickSelect={handleQuickSelect}
             onLassoStart={handleLassoStart}
             onLassoEnd={handleLassoEnd}
@@ -795,6 +874,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           kedroBaseUrl={kedroBaseUrl}
           pipelineId={currentPipelineId}
           wasmSupported={wasmSupported}
+          enableSpotlight={enableSpotlight}
         />
       </div>
 
@@ -819,6 +899,11 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
           />
         </div>
       </div>
+
+      {/* FloatingModalV2Stack - shows rep statements in spotlight mode */}
+      {action === "spotlight" && (
+        <FloatingModalV2Stack items={spotlightStackItems} isVisible={spotlightStackItems.length > 0} />
+      )}
 
       {/* FloatingModal - shows current statement in votes mode */}
       {layerMode === "votes" && (
