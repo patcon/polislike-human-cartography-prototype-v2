@@ -8,6 +8,8 @@
 
 ### Added
 
+- `FloatingModalV2` component with `agree` (green), `disagree` (red), `pass` (yellow), and `unstyled` variants — accent color applied to border and statement ID; X button remains optional.
+- `FloatingModalV2Stack` for vertically stacking `FloatingModalV2` modals with animated horizontal alignment: agree items slide right, disagree items slide left, pass/unstyled items stay centered.
 - `useDruidWorker` hook and its worker script moved into the `reddwarf-ts` package (`reddwarf-ts/react` entry point); the app now re-exports from there.
 - Reduction animates live on the map: the recompute dialog closes when Run is clicked, and intermediate point positions are streamed from the worker every 10 iterations and displayed directly on the map. A progress pill at the bottom of the map shows "Building KNN graph…" then a 0–100 % progress bar during iteration. The final result is registered as a named projection as before.
 - Annoy KNN backend now exposes its parameters (`numTrees`, `maxPointsPerLeaf`, `seed`) in the recompute dialog, matching the HNSW pattern. Switching backends shows that backend's params immediately; values are forwarded as `knn_params` to PaCMAP and LocalMAP. HNSW params expanded to include `m` and `seed`.
@@ -32,6 +34,10 @@
 - Spotlight mode for D3Map: a circle-follows-cursor selection tool where hovering selects all points within the circle radius; on touch, single-finger tracks the ring and two-finger pinch resizes it. Exposed via `mode="spotlight"` and `spotlightRadius` props; explored in the new `SpotlightModeSelection` Storybook story.
 - `spotlightPersist` prop for spotlight mode: when enabled, the circle and its selection stay frozen after all fingers lift; the next touch resumes from the last position. Story panel includes a matching checkbox toggle.
 - Spotlight touch mechanic reworked as a similarity transform: single touch grabs at the contact point (preserving offset from circle center), two touches apply an incremental scale + rotation + translation each frame so the circle behaves like a sticker layer rather than anchoring to the first finger. No special "primary touch" — both fingers are treated symmetrically.
+- `SpotlightRepresentativeStatements` story: D3Map in spotlight mode continuously calculates top representative statements for the selected participants (debounced 400 ms) and displays up to 3 via `FloatingModalV2Stack`.
+- Spotlight mode (desktop): clicking the canvas locks the circle in place; clicking again unlocks it. The ring switches from dashed to solid while locked and the cursor changes to a crosshair.
+- `FloatingModalV2` renders `cursor-pointer` when an `onClick` prop is provided; `StackItem` type in `FloatingModalV2Stack` now includes an optional `onClick`. `SpotlightRepresentativeStatements` story: clicking a statement card overlays per-participant vote colors on the map; clicking again clears the overlay.
+- `SpotlightRepresentativeStatements` story now uses `VOTE_COLORS_HIGHLIGHT_PASS` palette so pass votes render as yellow instead of near-invisible light gray.
 
 ### Changed
 
