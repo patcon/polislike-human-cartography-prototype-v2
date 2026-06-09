@@ -1033,10 +1033,10 @@ export const D3Map: React.FC<D3MapProps> = ({
           zoomRef.current.transform(d3.select(svgNode), newT);
           s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
           if (s.currentCx !== -9999) {
-            updateSelection(scale * (s.currentCx - prevMidX) + currMidX, scale * (s.currentCy - prevMidY) + currMidY, s.currentRadius);
-          } else {
-            ring.attr("r", s.currentRadius);
+            s.currentCx = scale * (s.currentCx - prevMidX) + currMidX;
+            s.currentCy = scale * (s.currentCy - prevMidY) + currMidY;
           }
+          ring.attr("cx", s.currentCx).attr("cy", s.currentCy).attr("r", s.currentRadius);
           radiusFromGestureRef.current = true;
           onSpotlightRadiusChangeRef.current?.(s.currentRadius);
           s.touchPrevPositions.set(tA.identifier, currA);
@@ -1160,12 +1160,10 @@ export const D3Map: React.FC<D3MapProps> = ({
         // center by the same focal-point transform the container just received.
         s.currentRadius = s.currentRadius * scaleFactor;
         if (s.currentCx !== -9999) {
-          const newCx = px + scaleFactor * (s.currentCx - px);
-          const newCy = py + scaleFactor * (s.currentCy - py);
-          updateSelection(newCx, newCy, s.currentRadius);
-        } else {
-          ring.attr("r", s.currentRadius);
+          s.currentCx = px + scaleFactor * (s.currentCx - px);
+          s.currentCy = py + scaleFactor * (s.currentCy - py);
         }
+        ring.attr("cx", s.currentCx).attr("cy", s.currentCy).attr("r", s.currentRadius);
         radiusFromGestureRef.current = true;
         onSpotlightRadiusChangeRef.current?.(s.currentRadius);
         return;
