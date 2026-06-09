@@ -5,14 +5,11 @@ import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
 import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getAnnotationCategoricalColor } from "@/lib/color-schemes";
-import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
 import { useSpotlightMode } from "@/hooks/useSpotlightMode";
+import { usePipelineManager } from "@/hooks/usePipelineManager";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
 import { FileDown, Import, Info } from "lucide-react";
-
-type ProjectionData = [string, [number, number]][];
-
 
 const FEATURE_SCALE_RADIUS_ON_ZOOM = true;
 const MIN_CIRCLE_RADIUS = 0.5; // prevent sub-pixel circles that vanish on mobile
@@ -76,8 +73,6 @@ type D3MapProps = {
   /** Debug callback fired on every spotlight touch/pointer event with internal state (spotlight mode only) */
   onSpotlightDebug?: (state: { event: string; touchCount: number; currentRadius: number; cx: number; cy: number; grabOffsetX: number; grabOffsetY: number }) => void;
 };
-
-const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
 
 type MapPoint = { i: string; x: number; y: number; originalIndex: number };
 // D3 selections don't support custom properties natively — we attach xScale/yScale
@@ -155,72 +150,29 @@ export const D3Map: React.FC<D3MapProps> = ({
   }>({ path: null, coords: [], cleanup: null });
   React.useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  // Mode helpers - Kedro is default unless kedroBaseUrl isn't set
-  const isStaticMode = !kedroBaseUrl;
-  const isKedroMode = !isStaticMode;
-
-  // Animation state
-  const [isAnimating, setIsAnimating] = React.useState(false);
-
-  // Unified pipeline data state - works for both Kedro and static projections
-  const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
-  const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
-  const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
-
-  // Static projections as pipeline options
-  const staticPipelines = React.useMemo(() => [
-    { id: 'localmap', name: 'LocalMAP' },
-    { id: 'pacmap', name: 'PaCMAP' },
-    { id: 'umap', name: 'UMAP' }
-  ], []);
-
-  // Kedro pipeline options - use internal pipeline fetching if availablePipelines not provided
-  const shouldFetchKedroOptions = isKedroMode && testAnimation && !availablePipelines?.length;
-  const { pipelines: fetchedKedroOptions } = usePipelineOptions(
-    shouldFetchKedroOptions ? kedroBaseUrl : undefined,
-    pipelineFilter || 'bestkmeans'
-  );
-  const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
-
-  // Preloaded pipeline options derived from preloadedPipelineData keys,
-  // plus any projections recomputed in-browser
-  const preloadedPipelineOptions = React.useMemo(() => {
-    if (!preloadedPipelineData) return [];
-    const keys = [
-      ...Object.keys(preloadedPipelineData),
-      ...Object.keys(extraPipelineData ?? {}),
-    ];
-    return keys.map(id => ({ id, name: id }));
-  }, [preloadedPipelineData, extraPipelineData]);
-
-  // Current pipeline options based on mode
-  const currentPipelineOptions = preloadedPipelineData ? preloadedPipelineOptions : isKedroMode ? kedroOptions : staticPipelines;
-
-  // Auto-cycling state
-  const [isAutoCycling, setIsAutoCycling] = React.useState(false);
+  const {
+    pipelineData,
+    selectedPipeline,
+    previousPipeline,
+    currentPipelineOptions,
+    isAnimating,
+    isAutoCycling,
+    onAnimationComplete,
+    handlePipelineChange,
+    handleTogglePipeline,
+    handleAutoCycleToggle,
+  } = usePipelineManager({
+    testAnimation,
+    kedroBaseUrl,
+    pipelineFilter,
+    availablePipelines,
+    preloadedPipelineData,
+    extraPipelineData,
+    onPipelineChange,
+  });
 
   // State to trigger re-calculation of radius on resize
   const [resizeCounter, forceUpdate] = React.useReducer(x => x + 1, 0);
-
-  // Initialize selectedPipeline when pipeline options become available
-  React.useEffect(() => {
-    if (currentPipelineOptions.length > 0 && !selectedPipeline) {
-      if (preloadedPipelineData) {
-        // For preloaded data, use preferred order: localmap > umap > pacmap > first key
-        const preferredOrder = ['localmap', 'umap', 'pacmap'];
-        const preferred = preferredOrder.find(id => id in preloadedPipelineData);
-        setSelectedPipeline(preferred || currentPipelineOptions[0].id);
-      } else if (isKedroMode) {
-        // Prioritize preferred Kedro pipeline if available, otherwise use first
-        const preferredPipeline = currentPipelineOptions.find(p => p.id === PREFERRED_KEDRO_PIPELINE);
-        const defaultPipeline = preferredPipeline || currentPipelineOptions[0];
-        setSelectedPipeline(defaultPipeline.id);
-      } else if (testAnimation) {
-        // For static projections, default to localmap
-        setSelectedPipeline('localmap');
-      }
-    }
-  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation, preloadedPipelineData]);
 
   // Handle window resize to update radius (with throttling)
   React.useEffect(() => {
@@ -230,7 +182,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         forceUpdate(); // Trigger re-calculation of BASE_RADIUS
-      }, 100); // Throttle to avoid excessive updates
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
@@ -239,82 +191,6 @@ export const D3Map: React.FC<D3MapProps> = ({
       clearTimeout(timeoutId);
     };
   }, []);
-
-  // Load projection data only if testAnimation is enabled
-  React.useEffect(() => {
-    if (!testAnimation) return;
-
-    // If preloaded pipeline data is provided, use it directly
-    // (merged with any projections recomputed in-browser)
-    if (preloadedPipelineData) {
-      setPipelineData({ ...preloadedPipelineData, ...extraPipelineData });
-      return;
-    }
-
-    const loadProjections = async () => {
-      try {
-        if (isKedroMode && kedroOptions.length > 0) {
-          // Load pipeline data from Kedro API
-          const { fetchAndProcessKedroData } = await import('../../lib/kedro-api');
-          const dataMap: Record<string, ProjectionData | null> = {};
-
-          for (const pipeline of kedroOptions) {
-            try {
-              const data = await fetchAndProcessKedroData(kedroBaseUrl!, pipeline.id);
-              dataMap[pipeline.id] = data;
-            } catch (error) {
-              console.error(`Failed to load pipeline ${pipeline.id}:`, error);
-              dataMap[pipeline.id] = null;
-            }
-          }
-
-          setPipelineData(dataMap);
-        } else if (isStaticMode) {
-          // Load static projection files
-          const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
-            fetch('/projections.json'),
-            fetch('/projections.mean-pacmap.json'),
-            fetch('/projections.mean-umap.json')
-          ]);
-
-          const [localmapData, pacmapData, umapData] = await Promise.all([
-            localmapResponse.json(),
-            pacmapResponse.json(),
-            umapResponse.json()
-          ]);
-
-          // Sort all projection data by participant ID to ensure consistent ordering
-          const sortByParticipantId = (data: [string, [number, number]][]) =>
-            data.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-
-          setPipelineData({
-            localmap: sortByParticipantId([...localmapData]),
-            pacmap: sortByParticipantId([...pacmapData]),
-            umap: sortByParticipantId([...umapData]),
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load projection data:', error);
-      }
-    };
-
-    loadProjections();
-  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData, extraPipelineData]);
-
-  // Auto-select a freshly recomputed projection when it first appears
-  const prevExtraKeysRef = React.useRef<string[]>([]);
-  React.useEffect(() => {
-    const keys = Object.keys(extraPipelineData ?? {});
-    const added = keys.find(k => !prevExtraKeysRef.current.includes(k));
-    prevExtraKeysRef.current = keys;
-    if (added) {
-      setSelectedPipeline(prev => {
-        setPreviousPipeline(prev);
-        return added;
-      });
-      onPipelineChange?.(added);
-    }
-  }, [extraPipelineData, onPipelineChange]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {
@@ -534,11 +410,11 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
-        setIsAnimating(false);
+        onAnimationComplete();
         if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       }).catch(() => {
         // Handle case where transition is interrupted
-        setIsAnimating(false);
+        onAnimationComplete();
         if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       });
     } else {
@@ -585,55 +461,6 @@ export const D3Map: React.FC<D3MapProps> = ({
     containerRef.current.selectAll("circle")
       .attr("r", Math.max(BASE_RADIUS / transformK, MIN_CIRCLE_RADIUS));
   }, [BASE_RADIUS]);
-
-  // Handle pipeline change with animation (works for both Kedro and static)
-  const handlePipelineChange = React.useCallback((newPipeline: string) => {
-    if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
-
-    setIsAnimating(true);
-    setPreviousPipeline(selectedPipeline);
-    setSelectedPipeline(newPipeline);
-
-    // Notify parent component about pipeline change
-    onPipelineChange?.(newPipeline);
-  }, [testAnimation, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
-
-  // Handle toggle between current and previous pipeline
-  const handleTogglePipeline = React.useCallback(() => {
-    if (!testAnimation || !previousPipeline || !pipelineData[previousPipeline] || isAnimating) return;
-    setIsAnimating(true);
-    const temp = selectedPipeline;
-    setSelectedPipeline(previousPipeline);
-    setPreviousPipeline(temp);
-
-    // Notify parent component about pipeline change
-    onPipelineChange?.(previousPipeline);
-  }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
-
-  // Auto-cycling logic - trigger next cycle when animation completes
-  React.useEffect(() => {
-    if (isAutoCycling && previousPipeline && !isAnimating) {
-      // Start the next cycle immediately when animation completes
-      const timeoutId = setTimeout(() => {
-        handleTogglePipeline();
-      }, 0);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isAutoCycling, previousPipeline, isAnimating, handleTogglePipeline]);
-
-  // Handle auto-cycle toggle
-  const handleAutoCycleToggle = React.useCallback(() => {
-    if (isAutoCycling) {
-      // Stop auto-cycling - let current cycle complete
-      setIsAutoCycling(false);
-    } else {
-      // Start auto-cycling if we have a previous pipeline
-      if (previousPipeline && pipelineData[previousPipeline]) {
-        setIsAutoCycling(true);
-      }
-    }
-  }, [isAutoCycling, previousPipeline, pipelineData]);
 
   // --- Zoom behavior (pan/zoom only) ---
   React.useEffect(() => {
