@@ -7,6 +7,7 @@
 - Extracted three custom hooks from `convo-explorer/App.tsx` to reduce its size from ~1230 to ~830 lines: `useRepresentativeStatements` (rep-statements state + async calculation), `useRecomputeDialog` (in-browser reduction dialog + DruidJS state), and `useMetricsLayer` (metrics layer state, loading, and obs-column cycling). Each hook is covered by a new unit test suite using `renderHook`.
 - Extracted `useSpotlightMode` hook from `D3Map.tsx` (~345 lines), moving all spotlight touch/pointer/wheel event handling, mutable touch state, and callback-ref sync effects into `src/hooks/useSpotlightMode.ts`. `D3Map` now calls the hook with a single line.
 - Extracted `usePipelineManager` hook from `D3Map.tsx` (~160 lines), consolidating pipeline data loading, option derivation, selection initialization, animation state, and auto-cycling into `src/hooks/usePipelineManager.ts`. Returns a clean interface; `D3Map` signals animation completion via `onAnimationComplete()`.
+- Extracted `useLassoMode` hook from `D3Map.tsx` (~119 lines), moving lasso drag logic, state refs, and `pointInPolygon` into `src/hooks/useLassoMode.ts`. The hook returns a `lassoCleanupRef` that the zoom effect reads on multi-touch start.
 
 ### Added
 

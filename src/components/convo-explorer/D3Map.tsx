@@ -7,6 +7,7 @@ import type { ObsColumnType } from "@/lib/color-schemes";
 import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getAnnotationCategoricalColor } from "@/lib/color-schemes";
 import { useSpotlightMode } from "@/hooks/useSpotlightMode";
 import { usePipelineManager } from "@/hooks/usePipelineManager";
+import { useLassoMode } from "@/hooks/useLassoMode";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
 import { FileDown, Import, Info } from "lucide-react";
@@ -138,16 +139,11 @@ export const D3Map: React.FC<D3MapProps> = ({
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-  const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
   const zoomRef = React.useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
   useSpotlightMode({ mode, svgRef, containerRef, zoomRef, displayMask, onSelectionChange, spotlightRadius, spotlightPersist, onSpotlightRadiusChange, onSpotlightDebug });
-  const lassoStateRef = React.useRef<{
-    path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
-    coords: [number, number][];
-    cleanup: (() => void) | null;
-  }>({ path: null, coords: [], cleanup: null });
+  const { lassoCleanupRef } = useLassoMode({ mode, svgRef, containerRef, displayMask, onSelectionChange, onLassoStart, onLassoEnd });
   React.useEffect(() => { modeRef.current = mode; }, [mode]);
 
   const {
@@ -475,9 +471,9 @@ export const D3Map: React.FC<D3MapProps> = ({
         // Clean up lasso when zoom starts (especially for multi-touch)
         if (event.sourceEvent && event.sourceEvent.type.startsWith("touch")) {
           const touches = event.sourceEvent.touches?.length ?? 0;
-          if (touches >= 2 && lassoStateRef.current.cleanup) {
+          if (touches >= 2 && lassoCleanupRef.current) {
             console.log('🔍 Zoom start detected with multi-touch, cleaning up lasso');
-            lassoStateRef.current.cleanup();
+            lassoCleanupRef.current();
           }
         }
       })
@@ -564,128 +560,6 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
   }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect, displayMask]);
 
-  // --- Lasso painting ---
-  React.useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
-    const svg = d3.select(svgRef.current);
-    const container = containerRef.current;
-
-    // 🟢 Clean up any previous lasso drag when mode changes
-    svg.on('.drag', null);
-
-    if (lassoRectRef.current) {
-      d3.select(lassoRectRef.current).remove();
-      lassoRectRef.current = null;
-    }
-
-    if (mode === "paint") {
-      function cleanupLasso(callEndCallback = false) {
-        console.log('🎨 Lasso CLEANUP, callEndCallback:', callEndCallback);
-        if (lassoStateRef.current.path) {
-          lassoStateRef.current.path.remove();
-          lassoStateRef.current.path = null;
-        }
-        lassoStateRef.current.coords = [];
-
-        // Only call onLassoEnd when explicitly requested (normal end, not cleanup)
-        if (callEndCallback) {
-          onLassoEnd?.();
-        }
-      }
-
-      // Store cleanup function in ref so zoom can access it
-      lassoStateRef.current.cleanup = cleanupLasso;
-
-      function lassoStart(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>) {
-        console.log('🎨 Lasso START:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso(true); // End cycling on multi-touch
-          return;
-        }
-
-        lassoStateRef.current.coords = [];
-        if (lassoStateRef.current.path) lassoStateRef.current.path.remove();
-        lassoStateRef.current.path = svg.append("path")
-          .attr("fill", "rgba(0,0,0,0.1)")
-          .attr("stroke", "#666")
-          .attr("stroke-width", 1.5)
-          .attr("stroke-dasharray", "4 2")
-          .style("pointer-events", "none");
-      }
-
-      function lassoDrag(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>) {
-        console.log('🎨 Lasso DRAG:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso(true); // End cycling on multi-touch
-          return;
-        }
-
-        // Trigger layer mode cycling when we get the first drag event (lasso is actually happening)
-        if (lassoStateRef.current.coords.length === 0) {
-          onLassoStart?.();
-        }
-
-        lassoStateRef.current.coords.push([event.x, event.y]);
-        if (lassoStateRef.current.path) {
-          lassoStateRef.current.path.attr("d", d3.line()(lassoStateRef.current.coords));
-        }
-      }
-
-      function lassoEnd() {
-        console.log('🎨 Lasso END, coords:', lassoStateRef.current.coords.length);
-
-        if (!lassoStateRef.current.coords.length) {
-          cleanupLasso(true); // End cycling and cleanup
-          return;
-        }
-        const transform = d3.zoomTransform(container.node()!);
-        const circles = container.selectAll("circle");
-        const selected = (circles.data() as MapPoint[]).filter((d) => {
-          if (displayMask && !displayMask[d.originalIndex]) return false;
-          const ext = container as unknown as D3ContainerExt;
-          const sx = transform.applyX(ext.xScale(d.x));
-          const sy = transform.applyY(ext.yScale(d.y));
-          return pointInPolygon([sx, sy], lassoStateRef.current.coords);
-        });
-        if (onSelectionChange) onSelectionChange(selected.map((d) => d.i));
-
-        cleanupLasso(true); // End cycling and cleanup
-      }
-
-      svg.call(
-        d3.drag<SVGSVGElement, unknown>()
-          .filter((event) => (event.sourceEvent?.touches?.length ?? 0) <= 1)
-          .on("start", lassoStart)
-          .on("drag", lassoDrag)
-          .on("end", lassoEnd)
-      );
-
-      // To avoid type warning in case lassoRectRef is null
-      if (!lassoRectRef.current) return;
-
-      d3.select(lassoRectRef.current).call(
-        // @ts-expect-error - Complex D3 drag behavior type issue, ignoring for now
-        d3.drag<SVGRectElement, unknown>()
-          .filter((event) => (event.sourceEvent?.touches?.length ?? 0) <= 1)
-          .on("start", lassoStart)
-          .on("drag", lassoDrag)
-          .on("end", lassoEnd)
-      )
-      .on("touchstart.zoom", null)
-      .on("touchmove.zoom", null)
-      .on("touchend.zoom", null);
-
-      // Cleanup function when mode changes
-      return () => {
-        cleanupLasso(true); // End cycling when mode changes
-        lassoStateRef.current.cleanup = null;
-      };
-    } else {
-      // Clear cleanup function when not in paint mode
-      lassoStateRef.current.cleanup = null;
-    }
-  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
-
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -699,16 +573,6 @@ export const D3Map: React.FC<D3MapProps> = ({
         ? (d: MapPoint) => getPointOpacity(d.originalIndex)
         : 1);
   }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask, unpaintedColor]);
-
-  function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
-    let inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      const [xi, yi] = vs[i], [xj, yj] = vs[j];
-      const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
 
   return (
     <div className="relative w-screen h-screen">
