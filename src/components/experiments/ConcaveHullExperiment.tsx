@@ -13,9 +13,7 @@ import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
 
-type DisplaySettings = {
-  // Remove width/height props since we'll use full screen
-};
+type DisplaySettings = Record<string, never>;
 
 export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
   // Use custom hooks for shared functionality

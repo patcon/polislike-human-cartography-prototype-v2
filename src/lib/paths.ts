@@ -11,7 +11,7 @@ function getBasePath(): string {
   const isStorybook = typeof window !== 'undefined' &&
     (window.location.pathname.includes('/iframe.html') ||
      window.location.pathname.includes('/?path=') ||
-     // @ts-ignore - Storybook sets this global
+     // @ts-expect-error - Storybook sets this global
      window.__STORYBOOK_ADDONS_MANAGER__ !== undefined);
 
   // Check if we're in Chromatic environment

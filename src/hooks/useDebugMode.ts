@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 // Global debug mode state
 let globalDebugMode = false;
-let debugModeListeners: Set<(enabled: boolean) => void> = new Set();
+const debugModeListeners: Set<(enabled: boolean) => void> = new Set();
 
 // Expose debug mode control to browser console
 declare global {

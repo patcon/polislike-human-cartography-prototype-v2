@@ -456,7 +456,7 @@ export function calculateRepresentativeComments(
     for (const [groupId, groupMatrix] of Object.entries(groupVotes)) {
       let agrees = 0,
         disagrees = 0,
-        passes = 0,
+        _passes = 0,
         seen = 0;
 
       for (const voteRow of Object.values(groupMatrix)) {
@@ -465,7 +465,7 @@ export function calculateRepresentativeComments(
           seen++;
           if (vote === 1) agrees++;
           else if (vote === -1) disagrees++;
-          else passes++;
+          else _passes++;
         }
       }
 
