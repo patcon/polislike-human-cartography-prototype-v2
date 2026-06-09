@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Square, Columns2, Columns3, SlidersHorizontal } from "lucide-react";
-import { Grid2x2Plus, Shrink, Group } from "lucide-react";
+import { Grid2x2Plus, Shrink, Group, type LucideIcon } from "lucide-react";
 import type { Selections } from "./ConfigSheetContent";
 
-const sectionIcons: Record<string, React.FC<any>> = {
+const sectionIcons: Record<string, LucideIcon> = {
   imputer: Grid2x2Plus,
   reducer: Shrink,
   clusterer: Group,

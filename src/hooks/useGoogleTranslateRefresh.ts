@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type DependencyList } from 'react';
 import { refreshGoogleTranslate } from '@/lib/google-translate-utils';
 
 /**
@@ -8,7 +8,7 @@ import { refreshGoogleTranslate } from '@/lib/google-translate-utils';
  * @param delay - Delay in ms before triggering re-scan (default: 100)
  */
 export function useGoogleTranslateRefresh(
-  dependencies: any[],
+  dependencies: DependencyList,
   selector?: string,
   delay?: number
 ) {

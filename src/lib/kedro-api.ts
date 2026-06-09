@@ -11,7 +11,7 @@ interface KedroNode {
   modular_pipelines: string[] | null;
   layer: string;
   dataset_type: string;
-  stats: any;
+  stats: Record<string, unknown>;
 }
 
 interface KedroApiResponse {
@@ -27,7 +27,7 @@ interface PlotlyTrace {
   x: PlotlyTypedArray;
   y: PlotlyTypedArray;
   hovertext: PlotlyTypedArray;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface KedroNodeDataResponse {
@@ -426,11 +426,11 @@ export async function getAvailablePipelineIds(kedroBaseUrl: string, pipelineFilt
       const apiResponse = await response.json();
 
       // Find all scatter plot nodes and extract pipeline IDs
-      const scatterPlotNodes = apiResponse.nodes.filter((node: any) =>
+      const scatterPlotNodes = (apiResponse as KedroApiResponse).nodes.filter((node) =>
         node.name.endsWith('__scatter_plot')
       );
 
-      const pipelineIds = scatterPlotNodes.map((node: any) => {
+      const pipelineIds = scatterPlotNodes.map((node) => {
         const pipelineId = node.name.replace('__scatter_plot', '');
         return {
           id: pipelineId,
@@ -458,15 +458,16 @@ export async function getAvailablePipelineIds(kedroBaseUrl: string, pipelineFilt
 
       const data = await response.json();
       // Filter out polis_classic as it has a different structure
-      let filteredPipelines = (data.pipelines || []).filter((pipeline: any) => pipeline.id !== 'polis_classic');
+      type PipelineEntry = { id: string; name: string };
+      let filteredPipelines = ((data.pipelines || []) as PipelineEntry[]).filter((pipeline) => pipeline.id !== 'polis_classic');
 
       // Apply additional filter if provided
       if (pipelineFilter) {
-        filteredPipelines = filteredPipelines.filter((pipeline: any) => pipeline.id.includes(pipelineFilter));
+        filteredPipelines = filteredPipelines.filter((pipeline) => pipeline.id.includes(pipelineFilter));
         console.log(`🔍 Applied filter "${pipelineFilter}": ${filteredPipelines.length} pipelines`);
       }
 
-      console.log('✅ Found pipelines in v1 format:', filteredPipelines.map((p: any) => p.id));
+      console.log('✅ Found pipelines in v1 format:', filteredPipelines.map((p) => p.id));
       return filteredPipelines;
     }
   } catch (error) {
@@ -479,7 +480,7 @@ export async function getAvailablePipelineIds(kedroBaseUrl: string, pipelineFilt
  * Load statements JSON data with optional Kedro API support
  * Falls back to local file if Kedro parameters are not provided
  */
-export async function loadStatementsData(kedroBaseUrl?: string, pipelineId?: string): Promise<any> {
+export async function loadStatementsData(kedroBaseUrl?: string, pipelineId?: string): Promise<Record<string, unknown>[]> {
   try {
     if (kedroBaseUrl) {
       // Use Kedro API to get the statements JSON file path

@@ -4,10 +4,12 @@ import { D3Map } from './D3Map';
 
 // jsdom doesn't ship a Touch constructor; polyfill the properties the spotlight
 // handlers actually access: identifier, clientX, clientY, target.
-if (typeof (global as any).Touch === 'undefined') {
-  (global as any).Touch = class Touch {
+type TouchInit = { identifier: number; target: EventTarget; clientX: number; clientY: number };
+const globalAny = global as unknown as Record<string, unknown>;
+if (typeof globalAny['Touch'] === 'undefined') {
+  globalAny['Touch'] = class Touch {
     identifier: number; target: EventTarget; clientX: number; clientY: number;
-    constructor(init: any) { Object.assign(this, init); }
+    constructor(init: TouchInit) { Object.assign(this, init); }
   };
 }
 
@@ -17,14 +19,15 @@ if (typeof (global as any).Touch === 'undefined') {
 //   - zoomIdentity supports .translate().scale() chaining
 vi.mock('d3', () => {
   const createMockSelection = () => {
-    const sel: any = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sel: Record<string, any> = {
       attr: vi.fn().mockReturnThis(),
       append: vi.fn().mockReturnThis(),
       call: vi.fn().mockReturnThis(),
       remove: vi.fn(),
       // data() with no args → [] (read path used in updateSelection's .filter())
       // data(array, key?) with args → selection (write path used in D3 data join)
-      data: vi.fn((...args: any[]) => args.length > 0 ? sel : []),
+      data: vi.fn((...args: unknown[]) => args.length > 0 ? sel : []),
       enter: vi.fn(() => sel),
       exit: vi.fn(() => sel),
       select: vi.fn(() => sel),

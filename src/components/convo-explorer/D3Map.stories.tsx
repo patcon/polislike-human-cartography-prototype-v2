@@ -362,7 +362,7 @@ export const QuickSelectDemo: Story = {
 export const KedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const decodedArgs = decodeStorybookArgs(args as any);
+    const decodedArgs = decodeStorybookArgs(args as Record<string, unknown>);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
@@ -401,7 +401,7 @@ KedroMode.storyName = "Kedro Mode";
 export const LocalKedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const decodedArgs = decodeStorybookArgs(args as any);
+    const decodedArgs = decodeStorybookArgs(args as Record<string, unknown>);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);

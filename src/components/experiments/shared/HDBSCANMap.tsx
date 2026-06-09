@@ -237,7 +237,7 @@ export const HDBSCANMap: React.FC<MapVisualizationProps> = ({
         // Update circle sizes and stroke widths for both selected and unselected
         container.selectAll(".unselected-point")
           .attr("r", 4 / transform.k)
-          .attr("stroke-width", function(d: any) {
+          .attr("stroke-width", function(d: { id: string }) {
             const pointIndex = points.findIndex(p => p.id === d.id);
             const threshold = nearestThreshold(currentLambda);
             const labels = labelsByThreshold[threshold];

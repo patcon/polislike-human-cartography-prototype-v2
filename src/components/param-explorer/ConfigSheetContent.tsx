@@ -13,9 +13,10 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
-import { Grid2x2Plus, Shrink, Group, HelpCircle } from "lucide-react";
+import { Grid2x2Plus, Shrink, Group, HelpCircle, type LucideIcon } from "lucide-react";
 import config from "./config.json";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getInitialSelections() {
   const initial: Selections = {};
 
@@ -40,7 +41,7 @@ export function getInitialSelections() {
 
 export interface Selections {
   [section: string]: {
-    [algo: string]: { [param: string]: any };
+    [algo: string]: { [param: string]: unknown };
   };
 }
 
@@ -132,7 +133,7 @@ interface SectionItem {
 interface SectionProps {
   label: string;
   items: SectionItem[];
-  icon: React.FC<any>;
+  icon: LucideIcon;
   sectionKey: string;
   selections: Selections;
   setSelections: React.Dispatch<React.SetStateAction<Selections>>;

@@ -78,6 +78,14 @@ type D3MapProps = {
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
 
+type MapPoint = { i: string; x: number; y: number; originalIndex: number };
+// D3 selections don't support custom properties natively — we attach xScale/yScale
+// to the container element so zoom and lasso handlers can read them without closure deps.
+type D3ContainerExt = d3.Selection<SVGGElement, unknown, null, undefined> & {
+  xScale: d3.ScaleLinear<number, number>;
+  yScale: d3.ScaleLinear<number, number>;
+};
+
 function isTap(dx: number, dy: number, durationMs: number, maxDist = 10, maxMs = 500) {
   return Math.hypot(dx, dy) < maxDist && durationMs < maxMs;
 }
@@ -518,17 +526,17 @@ export const D3Map: React.FC<D3MapProps> = ({
     if (!containerRef.current) return;
     const container = containerRef.current;
 
-    (container as any).xScale = xScale;
-    (container as any).yScale = yScale;
+    (container as unknown as D3ContainerExt).xScale = xScale;
+    (container as unknown as D3ContainerExt).yScale = yScale;
 
     // Force complete re-render when colorsToFront changes or when pointColors change while sorted
     // Use a unique selector that includes a hash of the pointColors to force re-render when vote data changes
     const pointColorsHash = pointColors.slice(0, 100).join(','); // Sample first 100 for performance
     const circleSelector = colorsToFront ? `circle.sorted-${pointColorsHash.length}` : "circle.original";
     const circles = container.selectAll<SVGCircleElement, typeof points[0]>(circleSelector)
-      .data(points, (d: any) => d.i);
+      .data(points, (d: MapPoint) => d.i);
 
-    let transformK: any = null
+    let transformK: number
     if (FEATURE_SCALE_RADIUS_ON_ZOOM) {
       const transform = d3.zoomTransform(svgRef.current!);
       transformK = transform.k;
@@ -794,7 +802,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       // Store cleanup function in ref so zoom can access it
       lassoStateRef.current.cleanup = cleanupLasso;
 
-      function lassoStart(event: any) {
+      function lassoStart(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>) {
         console.log('🎨 Lasso START:', event.sourceEvent?.type);
         if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
           cleanupLasso(true); // End cycling on multi-touch
@@ -811,7 +819,7 @@ export const D3Map: React.FC<D3MapProps> = ({
           .style("pointer-events", "none");
       }
 
-      function lassoDrag(event: any) {
+      function lassoDrag(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>) {
         console.log('🎨 Lasso DRAG:', event.sourceEvent?.type);
         if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
           cleanupLasso(true); // End cycling on multi-touch
@@ -838,13 +846,14 @@ export const D3Map: React.FC<D3MapProps> = ({
         }
         const transform = d3.zoomTransform(container.node()!);
         const circles = container.selectAll("circle");
-        const selected = circles.data().filter((d: any) => {
+        const selected = (circles.data() as MapPoint[]).filter((d) => {
           if (displayMask && !displayMask[d.originalIndex]) return false;
-          const sx = transform.applyX((container as any).xScale(d.x));
-          const sy = transform.applyY((container as any).yScale(d.y));
+          const ext = container as unknown as D3ContainerExt;
+          const sx = transform.applyX(ext.xScale(d.x));
+          const sy = transform.applyY(ext.yScale(d.y));
           return pointInPolygon([sx, sy], lassoStateRef.current.coords);
         });
-        if (onSelectionChange) onSelectionChange(selected.map((d: any) => d.i));
+        if (onSelectionChange) onSelectionChange(selected.map((d) => d.i));
 
         cleanupLasso(true); // End cycling and cleanup
       }
@@ -924,13 +933,14 @@ export const D3Map: React.FC<D3MapProps> = ({
       s.currentCy = cy;
       ring.attr("cx", cx).attr("cy", cy).attr("r", radius);
       const transform = d3.zoomTransform(container.node()!);
-      const selected = (container.selectAll("circle").data() as any[]).filter((d: any) => {
+      const ext = container as unknown as D3ContainerExt;
+      const selected = (container.selectAll("circle").data() as MapPoint[]).filter((d) => {
         if (displayMaskRef.current && !displayMaskRef.current[d.originalIndex]) return false;
-        const sx = transform.applyX((container as any).xScale(d.x));
-        const sy = transform.applyY((container as any).yScale(d.y));
+        const sx = transform.applyX(ext.xScale(d.x));
+        const sy = transform.applyY(ext.yScale(d.y));
         return Math.sqrt((sx - cx) ** 2 + (sy - cy) ** 2) <= radius;
       });
-      onSelectionChangeRef.current?.(selected.map((d: any) => d.i));
+      onSelectionChangeRef.current?.(selected.map((d) => d.i));
     }
 
     function resetAllTouches() {
@@ -1234,12 +1244,12 @@ export const D3Map: React.FC<D3MapProps> = ({
     if (!containerRef.current) return;
     // Update colors for all circles regardless of class
     containerRef.current.selectAll("circle")
-      .attr("fill", (d: any) => {
+      .attr("fill", (d: MapPoint) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
       .attr("opacity", displayMask
-        ? (d: any) => getPointOpacity(d.originalIndex)
+        ? (d: MapPoint) => getPointOpacity(d.originalIndex)
         : 1);
   }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask, unpaintedColor]);
 

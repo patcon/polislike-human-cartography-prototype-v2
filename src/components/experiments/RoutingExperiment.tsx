@@ -1276,7 +1276,7 @@ export const RoutingExperiment: React.FC<DisplaySettings> = ({
 
         // Update circle/path/edge sizes to maintain visual consistency during zoom
         container.selectAll("circle")
-          .attr("r", (d: any) => {
+          .attr("r", (d: { id: string }) => {
             const baseRadius = (() => {
               if (sourcePoint && d.id === sourcePoint.id) return 8;
               if (destinationPoint && d.id === destinationPoint.id) return 8;

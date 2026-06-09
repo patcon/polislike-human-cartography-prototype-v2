@@ -54,7 +54,7 @@ describe('useRepresentativeStatements', () => {
 
     let resolveCalc!: (v: unknown) => void;
     vi.mocked(repStatementsLib.calculateRepresentativeStatements).mockReturnValue(
-      new Promise(resolve => { resolveCalc = resolve; }) as any
+      new Promise(resolve => { resolveCalc = resolve; }) as Promise<unknown>
     );
 
     const { result } = renderHook(() => useRepresentativeStatements(defaultProps));
@@ -77,7 +77,7 @@ describe('useRepresentativeStatements', () => {
     vi.mocked(repStatementsLib.calculateRepresentativeStatements).mockResolvedValue({
       repComments: { 'group-1': [], 'group-2': [] },
       consensusStatements: { agree: [], disagree: [] },
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof repStatementsLib.calculateRepresentativeStatements>>);
 
     const { result } = renderHook(() => useRepresentativeStatements(defaultProps));
 
@@ -112,7 +112,7 @@ describe('useRepresentativeStatements', () => {
     vi.mocked(repStatementsLib.calculateRepresentativeStatements).mockResolvedValue({
       repComments: { 'group-1': [] },
       consensusStatements: { agree: [], disagree: [] },
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof repStatementsLib.calculateRepresentativeStatements>>);
 
     const { result } = renderHook(() => useRepresentativeStatements(defaultProps));
 

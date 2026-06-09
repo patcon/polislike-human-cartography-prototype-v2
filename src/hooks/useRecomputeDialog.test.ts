@@ -19,7 +19,7 @@ const makeDruidState = (overrides: Partial<DruidWorkerState> = {}): DruidWorkerS
 });
 
 const defaultProps = {
-  preloadedData: undefined as any,
+  preloadedData: undefined,
   dataset: [['p1', [0, 0]], ['p2', [1, 1]]] as [string, [number, number]][],
   currentPipelineIdRef: { current: 'default' } as React.MutableRefObject<string>,
 };
