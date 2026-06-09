@@ -114,6 +114,7 @@ export const D3Map: React.FC<D3MapProps> = ({
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
+  const zoomRef = React.useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
   // Spotlight: mutable touch state lives in a ref so it survives effect re-runs
   const spotlightStateRef = React.useRef({
@@ -675,6 +676,7 @@ export const D3Map: React.FC<D3MapProps> = ({
         if (OUTLINE_RADIUS > 0) svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
 
+    zoomRef.current = zoom;
     svg.call(zoom);
     svg.call(zoom.transform, d3.zoomIdentity);
   }, []);
@@ -1097,6 +1099,25 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     function handleWheel(event: WheelEvent) {
       event.preventDefault();
+      if (s.mouseLocked && zoomRef.current) {
+        const factor = event.deltaMode === 0 ? 0.002 : 0.06;
+        const scaleFactor = Math.pow(2, -event.deltaY * factor);
+        const [px, py] = d3.pointer(event, svgNode);
+        zoomRef.current.scaleBy(d3.select(svgNode), scaleFactor, [px, py]);
+        // Keep the ring covering the same data region: scale radius and translate
+        // center by the same focal-point transform the container just received.
+        s.currentRadius = s.currentRadius * scaleFactor;
+        if (s.currentCx !== -9999) {
+          const newCx = px + scaleFactor * (s.currentCx - px);
+          const newCy = py + scaleFactor * (s.currentCy - py);
+          updateSelection(newCx, newCy, s.currentRadius);
+        } else {
+          ring.attr("r", s.currentRadius);
+        }
+        radiusFromGestureRef.current = true;
+        onSpotlightRadiusChangeRef.current?.(s.currentRadius);
+        return;
+      }
       const factor = event.deltaMode === 0 ? 0.002 : 0.06;
       s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * (1 - event.deltaY * factor)));
       if (s.currentCx !== -9999) {

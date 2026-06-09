@@ -49,3 +49,5 @@
 - Renamed `analyzePaintedClusters` → `analyzeLabeledGroups` in the package (neutral terminology; the app adapter preserves backward compat internally).
 
 ### Fixed
+
+- Spotlight mode (desktop): scroll wheel now zooms the map when the circle is locked, matching the behavior of paint and move tools. Previously the wheel always resized the spotlight circle regardless of lock state.
