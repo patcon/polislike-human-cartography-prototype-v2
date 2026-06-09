@@ -78,6 +78,10 @@ type D3MapProps = {
 
 const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
 
+function isTap(dx: number, dy: number, durationMs: number, maxDist = 10, maxMs = 500) {
+  return Math.hypot(dx, dy) < maxDist && durationMs < maxMs;
+}
+
 export const D3Map: React.FC<D3MapProps> = ({
   data,
   mode = "move",
@@ -706,11 +710,9 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       const dx = event.clientX - startPos[0];
       const dy = event.clientY - startPos[1];
-      const distance = Math.sqrt(dx * dx + dy * dy);
       const duration = Date.now() - startTime;
 
-      // Consider it a click/tap if movement is small and duration is short
-      const isClick = distance < 10 && duration < 500;
+      const isClick = isTap(dx, dy, duration);
 
       if (isClick) {
         console.log('🎯 Click/tap detected - mode:', mode);
@@ -1095,9 +1097,8 @@ export const D3Map: React.FC<D3MapProps> = ({
       if (n === 0) {
         if (s.tapStartPos && event.changedTouches.length === 1) {
           const [ex, ey] = touchToSVG(event.changedTouches[0]);
-          const tapDist = Math.hypot(ex - s.tapStartPos[0], ey - s.tapStartPos[1]);
           const tapDuration = Date.now() - s.tapStartTime;
-          if (tapDist < 10 && tapDuration < 500) {
+          if (isTap(ex - s.tapStartPos[0], ey - s.tapStartPos[1], tapDuration)) {
             s.mouseLocked = !s.mouseLocked;
             if (s.mouseLocked) {
               ring.attr("stroke-dasharray", null).attr("stroke-width", 2.5);
