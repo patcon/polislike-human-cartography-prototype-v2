@@ -71,7 +71,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
   // Spotlight mode state
   const [spotlightStackItems, setSpotlightStackItems] = React.useState<
-    { id: string | number; statement: { statement_id: number; txt: string }; variant: "agree" | "disagree"; onClick: () => void }[]
+    { id: string | number; statement: { statement_id: number; txt: string }; variant: "agree" | "disagree" }[]
   >([]);
   const [activeSpotlightStatementId, setActiveSpotlightStatementId] = React.useState<string | null>(null);
   const [spotlightPointVotes, setSpotlightPointVotes] = React.useState<(number | null)[]>([]);
@@ -495,7 +495,6 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
             id: stat.tid,
             statement: { statement_id: Number(stat.tid), txt: String(commentTextMap[stat.tid] ?? "") },
             variant: (stat.repful_for === "agree" ? "agree" : "disagree") as "agree" | "disagree",
-            onClick: () => handleSpotlightStatementClick(String(stat.tid)),
           }))
         );
         setActiveSpotlightStatementId(null);
@@ -505,7 +504,7 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
         setSpotlightStackItems([]);
       }
     }, 400);
-  }, [dataset, statements, handleSpotlightStatementClick]);
+  }, [dataset, statements]);
 
   // Vote stats calculation removed from App level - now handled in StatementExplorerDrawer
   // This avoids calculating stats for all statements when only group tab statements need them
@@ -902,7 +901,13 @@ export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, i
 
       {/* FloatingModalV2Stack - shows rep statements in spotlight mode */}
       {action === "spotlight" && (
-        <FloatingModalV2Stack items={spotlightStackItems} isVisible={spotlightStackItems.length > 0} />
+        <FloatingModalV2Stack
+          items={spotlightStackItems.map(item => ({
+            ...item,
+            onClick: () => handleSpotlightStatementClick(String(item.id)),
+          }))}
+          isVisible={spotlightStackItems.length > 0}
+        />
       )}
 
       {/* FloatingModal - shows current statement in votes mode */}
