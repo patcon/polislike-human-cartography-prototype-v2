@@ -41,16 +41,16 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     SEGMENT_CLUSTERED
   );
 
-  // Handle loading error
-  if (error) {
-    return <LoadingDisplay message={`Error loading data: ${error}`} />;
-  }
-
   // Create map callbacks
   const mapCallbacks: MapCallbacks = React.useMemo(() => ({
     onPointClick: handlePointClick,
     onBackgroundClick: handleBackgroundClick
   }), [handlePointClick, handleBackgroundClick]);
+
+  // Handle loading error
+  if (error) {
+    return <LoadingDisplay message={`Error loading data: ${error}`} />;
+  }
 
   if (isLoading) {
     return <LoadingDisplay message="Loading HDBSCAN data..." />;

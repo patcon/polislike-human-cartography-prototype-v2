@@ -57,11 +57,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     renderOrder: 'above'
   });
 
-  // Handle loading error
-  if (error) {
-    return <LoadingDisplay message={`Error loading data: ${error}`} />;
-  }
-
   // Create map callbacks
   const mapCallbacks: MapCallbacks = React.useMemo(() => ({
     onPointClick: handlePointClick,
@@ -80,6 +75,11 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
       renderConcaveHulls(context, hullConfig);
     }
   }, [hullConfig]);
+
+  // Handle loading error
+  if (error) {
+    return <LoadingDisplay message={`Error loading data: ${error}`} />;
+  }
 
   if (isLoading) {
     return <LoadingDisplay message="Loading HDBSCAN data..." />;
