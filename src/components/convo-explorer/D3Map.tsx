@@ -989,9 +989,28 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
 
       if (n === 1) {
-        if (s.mouseLocked) return;
         const touch = event.touches[0];
         const [tx, ty] = touchToSVG(touch);
+        if (s.mouseLocked) {
+          const prev = s.touchPrevPositions.get(touch.identifier);
+          if (prev && zoomRef.current) {
+            const dx = tx - prev[0];
+            const dy = ty - prev[1];
+            // translateBy multiplies by k internally, so use transform to shift T.x/T.y
+            // directly by SVG pixel delta — keeping ring and map in sync at any zoom level.
+            const T = d3.zoomTransform(svgNode);
+            zoomRef.current.transform(d3.select(svgNode),
+              d3.zoomIdentity.translate(T.x + dx, T.y + dy).scale(T.k));
+            if (s.currentCx !== -9999) {
+              s.currentCx += dx;
+              s.currentCy += dy;
+              ring.attr("cx", s.currentCx).attr("cy", s.currentCy);
+            }
+          }
+          s.touchPrevPositions.set(touch.identifier, [tx, ty]);
+          debug("touch:move:1:locked", n);
+          return;
+        }
         updateSelection(tx + s.grabOffsetX, ty + s.grabOffsetY, s.currentRadius);
         s.touchPrevPositions.set(touch.identifier, [tx, ty]);
         debug("touch:move:1", n);
