@@ -82,6 +82,24 @@ function isTap(dx: number, dy: number, durationMs: number, maxDist = 10, maxMs =
   return Math.hypot(dx, dy) < maxDist && durationMs < maxMs;
 }
 
+/**
+ * Decides whether D3 zoom should handle a given event.
+ * Spotlight mode registers its own wheel/touch listeners and handles everything itself,
+ * so D3 zoom must yield. For other modes: wheel always zooms, pinch always zooms,
+ * single-touch only pans in move mode.
+ */
+function zoomEventFilter(event: Event, mode: string): boolean {
+  if (mode === "spotlight") return false;
+  if (event.type === "wheel") return true;
+  if (event.type.startsWith("touch")) {
+    const touches = (event as TouchEvent).touches?.length ?? 0;
+    if (touches >= 2) return true;
+    if (touches === 1 && mode === "move") return true;
+    return false;
+  }
+  return mode === "move";
+}
+
 export const D3Map: React.FC<D3MapProps> = ({
   data,
   mode = "move",
@@ -650,25 +668,7 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 15])
-      .filter((event) => {
-        // Spotlight mode owns all pointer interactions — block pan/zoom entirely
-        if (modeRef.current === "spotlight") return false;
-        /**
-         * Here's what we do for every zoom event:
-         * - all wheel events = YES, in any mode
-         * - all multi-touch pinch events = YES, in any mode
-         * - single-touch event = YES, in move mode
-         * - otherwise, NO, ignore event, because we're painting.
-         */
-        if (event.type === "wheel") return true;
-        if (event.type.startsWith("touch")) {
-          const touches = event.touches?.length ?? 0;
-          if (touches >= 2) return true; // pinch zoom
-          if (touches === 1 && modeRef.current === "move") return true; // single-finger pan
-          return false;
-        }
-        return modeRef.current === "move";
-      })
+      .filter((event) => zoomEventFilter(event, modeRef.current))
       .on("start", (event) => {
         // Clean up lasso when zoom starts (especially for multi-touch)
         if (event.sourceEvent && event.sourceEvent.type.startsWith("touch")) {
