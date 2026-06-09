@@ -1,6 +1,6 @@
 // StatementExplorerDrawer.stories.tsx
 import { useState, useEffect } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { StatementExplorerDrawer } from "./StatementExplorerDrawer";
 import { loadStatementsData } from "../../lib/kedro-api";
 

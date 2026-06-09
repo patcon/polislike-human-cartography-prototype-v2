@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { BringToFrontSolid } from "./BringToFrontSolid";
 
 type Story = StoryObj<typeof BringToFrontSolid>;

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { Button } from "@/components/ui/button";
 

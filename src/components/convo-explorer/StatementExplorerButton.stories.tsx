@@ -1,6 +1,6 @@
 "use client";
 
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { StatementExplorerButton } from "./StatementExplorerButton";
 import type { StatementExplorerButtonProps } from "./StatementExplorerButton";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ParticipantCountBar } from "./ParticipantCountBar";
 import { UNPAINTED_VALUE } from "@/constants";
 

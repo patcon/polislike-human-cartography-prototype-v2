@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PalettePanel } from "./PalettePanel";
 import { ClearColorsDialog } from "./ClearColorsDialog";
 import { PALETTE_COLORS } from "@/constants";

@@ -1,7 +1,7 @@
 // SelectLayerButton.stories.tsx
 "use client";
 
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SelectLayerButton } from "./SelectLayerButton";
 
 const meta = {

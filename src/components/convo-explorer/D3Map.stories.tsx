@@ -1,5 +1,5 @@
 import React from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { D3Map } from "./D3Map";
 import { useStorybookDataLoader } from "../../../.storybook/hooks/useStorybookDataLoader";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";

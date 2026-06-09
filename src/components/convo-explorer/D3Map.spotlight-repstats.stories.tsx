@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { D3Map } from "./D3Map";
 import { FloatingModalV2Stack } from "./FloatingModalV2Stack";
 import { useStorybookDataLoader } from "../../../.storybook/hooks/useStorybookDataLoader";

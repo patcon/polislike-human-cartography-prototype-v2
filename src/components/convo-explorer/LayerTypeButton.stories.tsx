@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LayerTypeButton } from "./LayerTypeButton";
 import { Vote, Group } from "lucide-react";
 

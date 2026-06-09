@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { GroupVoteComparisonWidget } from "./GroupVoteComparisonWidget";
 import { VOTE_COLORS, VOTE_COLORS_HIGHLIGHT_PASS } from "@/constants";
 

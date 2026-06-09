@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { MissingVotesToggleButton } from './MissingVotesToggleButton';
 import { useState } from 'react';
 

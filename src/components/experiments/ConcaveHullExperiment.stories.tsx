@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConcaveHullExperiment } from './ConcaveHullExperiment';
 
 const meta: Meta<typeof ConcaveHullExperiment> = {
