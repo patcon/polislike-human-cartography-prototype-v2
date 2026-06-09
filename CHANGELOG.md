@@ -51,3 +51,4 @@
 ### Fixed
 
 - Spotlight mode (desktop): scroll wheel now zooms the map when the circle is locked, matching the behavior of paint and move tools. Previously the wheel always resized the spotlight circle regardless of lock state.
+- Spotlight mode (mobile): a quick tap now toggles the circle lock, mirroring the desktop click-to-lock mechanic. While locked, single-touch does not move the circle and two-finger pinch+pan zooms the map (keeping the ring over the same data region), instead of resizing the circle.

@@ -127,8 +127,11 @@ export const D3Map: React.FC<D3MapProps> = ({
     grabOffsetY: 0,
     // two-touch transform: previous SVG positions keyed by touch identifier
     touchPrevPositions: new Map<number, [number, number]>(),
-    // desktop click-to-lock: when true, pointer move/leave are ignored
+    // desktop click-to-lock / mobile tap-to-lock: when true, pointer move/leave are ignored
     mouseLocked: false,
+    // tap detection: track single-touch start so touchend can detect a quick tap
+    tapStartTime: 0,
+    tapStartPos: null as [number, number] | null,
   });
   // Keep callback refs so spotlight effect doesn't re-run when they change identity
   const onSelectionChangeRef = React.useRef(onSelectionChange);
@@ -955,20 +958,28 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       if (n === 1) {
         const [tx, ty] = touchToSVG(event.touches[0]);
-        if (s.currentCx === -9999) {
-          // First placement — center circle on the touch point
-          updateSelection(tx, ty, s.currentRadius);
-          s.grabOffsetX = 0;
-          s.grabOffsetY = 0;
-        } else {
-          s.grabOffsetX = s.currentCx - tx;
-          s.grabOffsetY = s.currentCy - ty;
+        s.tapStartTime = Date.now();
+        s.tapStartPos = [tx, ty];
+        if (!s.mouseLocked) {
+          if (s.currentCx === -9999) {
+            // First placement — center circle on the touch point
+            updateSelection(tx, ty, s.currentRadius);
+            s.grabOffsetX = 0;
+            s.grabOffsetY = 0;
+          } else {
+            s.grabOffsetX = s.currentCx - tx;
+            s.grabOffsetY = s.currentCy - ty;
+          }
         }
-      } else if (n === 2 && s.currentCx === -9999) {
-        // Two fingers on an unpositioned circle — place center at midpoint
-        const [ax, ay] = touchToSVG(event.touches[0]);
-        const [bx, by] = touchToSVG(event.touches[1]);
-        updateSelection((ax + bx) / 2, (ay + by) / 2, s.currentRadius);
+      } else {
+        // Multi-touch: cancel any pending tap
+        s.tapStartPos = null;
+        if (n === 2 && s.currentCx === -9999 && !s.mouseLocked) {
+          // Two fingers on an unpositioned circle — place center at midpoint
+          const [ax, ay] = touchToSVG(event.touches[0]);
+          const [bx, by] = touchToSVG(event.touches[1]);
+          updateSelection((ax + bx) / 2, (ay + by) / 2, s.currentRadius);
+        }
       }
       debug(`touch:start:${n}`, n);
     }
@@ -978,6 +989,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       const n = event.touches.length;
 
       if (n === 1) {
+        if (s.mouseLocked) return;
         const touch = event.touches[0];
         const [tx, ty] = touchToSVG(touch);
         updateSelection(tx + s.grabOffsetX, ty + s.grabOffsetY, s.currentRadius);
@@ -1011,6 +1023,28 @@ export const D3Map: React.FC<D3MapProps> = ({
         const prevMidY = (prevA[1] + prevB[1]) / 2;
         const currMidX = (currA[0] + currB[0]) / 2;
         const currMidY = (currA[1] + currB[1]) / 2;
+
+        if (s.mouseLocked && zoomRef.current) {
+          // Locked: pinch+pan zooms the map; keep ring over same data region
+          const T = d3.zoomTransform(svgNode);
+          const newT = d3.zoomIdentity
+            .translate(scale * T.x + (currMidX - scale * prevMidX), scale * T.y + (currMidY - scale * prevMidY))
+            .scale(scale * T.k);
+          zoomRef.current.transform(d3.select(svgNode), newT);
+          s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
+          if (s.currentCx !== -9999) {
+            updateSelection(scale * (s.currentCx - prevMidX) + currMidX, scale * (s.currentCy - prevMidY) + currMidY, s.currentRadius);
+          } else {
+            ring.attr("r", s.currentRadius);
+          }
+          radiusFromGestureRef.current = true;
+          onSpotlightRadiusChangeRef.current?.(s.currentRadius);
+          s.touchPrevPositions.set(tA.identifier, currA);
+          s.touchPrevPositions.set(tB.identifier, currB);
+          debug("touch:move:2:locked", n);
+          return;
+        }
+
         const rotation = Math.atan2(currB[1] - currA[1], currB[0] - currA[0])
                        - Math.atan2(prevB[1] - prevA[1], prevB[0] - prevA[0]);
 
@@ -1036,11 +1070,28 @@ export const D3Map: React.FC<D3MapProps> = ({
     function handleTouchEnd(event: TouchEvent) {
       const n = event.touches.length;
       if (n === 0) {
-        resetAllTouches();
+        if (s.tapStartPos && event.changedTouches.length === 1) {
+          const [ex, ey] = touchToSVG(event.changedTouches[0]);
+          const tapDist = Math.hypot(ex - s.tapStartPos[0], ey - s.tapStartPos[1]);
+          const tapDuration = Date.now() - s.tapStartTime;
+          if (tapDist < 10 && tapDuration < 500) {
+            s.mouseLocked = !s.mouseLocked;
+            if (s.mouseLocked) {
+              ring.attr("stroke-dasharray", null).attr("stroke-width", 2.5);
+              if (s.currentCx === -9999) updateSelection(ex, ey, s.currentRadius);
+            } else {
+              ring.attr("stroke-dasharray", "6 3").attr("stroke-width", 2);
+            }
+          }
+        }
+        s.tapStartPos = null;
+        s.tapStartTime = 0;
+        if (!s.mouseLocked) resetAllTouches();
         debug("touch:end:0", n);
       } else {
+        s.tapStartPos = null;
         captureAllTouches(event.touches);
-        if (n === 1) setupGrabOffset(event.touches[0]);
+        if (n === 1 && !s.mouseLocked) setupGrabOffset(event.touches[0]);
         debug(`touch:end:${n}`, n);
       }
     }
@@ -1048,11 +1099,12 @@ export const D3Map: React.FC<D3MapProps> = ({
     function handleTouchCancel(event: TouchEvent) {
       // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
       debug(`touch:cancel:${event.touches.length}`, event.touches.length);
+      s.tapStartPos = null;
       if (event.touches.length === 0) {
-        resetAllTouches();
+        if (!s.mouseLocked) resetAllTouches();
       } else {
         captureAllTouches(event.touches);
-        if (event.touches.length === 1) setupGrabOffset(event.touches[0]);
+        if (event.touches.length === 1 && !s.mouseLocked) setupGrabOffset(event.touches[0]);
       }
     }
 
