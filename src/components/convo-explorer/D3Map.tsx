@@ -340,6 +340,10 @@ export const D3Map: React.FC<D3MapProps> = ({
     return radiusMultiplier * devicePixelRatio;
   }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
 
+  // Ref so the zoom handler always reads the current radius without re-registering
+  const baseRadiusRef = React.useRef(BASE_RADIUS);
+  React.useEffect(() => { baseRadiusRef.current = BASE_RADIUS; }, [BASE_RADIUS]);
+
   // --- Color scale for continuous metrics mode ---
   const continuousColorScale = React.useMemo(() => createContinuousScale(), []);
 
@@ -674,7 +678,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
         const k = FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1;
-        container.selectAll("circle").attr("r", Math.max(BASE_RADIUS / k, MIN_CIRCLE_RADIUS));
+        container.selectAll("circle").attr("r", Math.max(baseRadiusRef.current / k, MIN_CIRCLE_RADIUS));
         // Scale outline radius with zoom so it stays proportional to circle size
         if (OUTLINE_RADIUS > 0) svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
