@@ -13,9 +13,7 @@ import type { ConcaveHullConfig } from './shared/ConcaveHullConfigModal';
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
 
-type DisplaySettings = {
-  // Remove width/height props since we'll use full screen
-};
+type DisplaySettings = Record<string, never>;
 
 export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
   // Use custom hooks for shared functionality
@@ -59,11 +57,6 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
     renderOrder: 'above'
   });
 
-  // Handle loading error
-  if (error) {
-    return <LoadingDisplay message={`Error loading data: ${error}`} />;
-  }
-
   // Create map callbacks
   const mapCallbacks: MapCallbacks = React.useMemo(() => ({
     onPointClick: handlePointClick,
@@ -82,6 +75,11 @@ export const ConcaveHullExperiment: React.FC<DisplaySettings> = () => {
       renderConcaveHulls(context, hullConfig);
     }
   }, [hullConfig]);
+
+  // Handle loading error
+  if (error) {
+    return <LoadingDisplay message={`Error loading data: ${error}`} />;
+  }
 
   if (isLoading) {
     return <LoadingDisplay message="Loading HDBSCAN data..." />;

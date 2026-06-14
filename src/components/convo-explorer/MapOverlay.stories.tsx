@@ -1,5 +1,5 @@
 "use client";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MapOverlay } from "./MapOverlay";
 
 const meta = {

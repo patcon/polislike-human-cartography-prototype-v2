@@ -1,5 +1,5 @@
 // D3Map.metrics.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { D3Map } from "./D3Map";
 
 const meta: Meta<typeof D3Map> = {

@@ -32,6 +32,7 @@ export function useLayerModeCycling({
 
   const cycleTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const cycleCleanupRef = useRef<(() => void) | null>(null);
 
   // Update effective layer mode when current layer mode changes (only when not cycling)
   useEffect(() => {
@@ -108,7 +109,7 @@ export function useLayerModeCycling({
     };
 
     // Store cleanup in ref so stopCycle can access it
-    (cycleTimeoutRef as any).cleanup = cleanup;
+    cycleCleanupRef.current = cleanup;
 
     // Start the continuous cycle
     performContinuousCycle();
@@ -116,9 +117,9 @@ export function useLayerModeCycling({
 
   const stopCycle = useCallback(() => {
     // Always call cleanup function if it exists, regardless of isCycling state
-    if ((cycleTimeoutRef as any).cleanup) {
-      (cycleTimeoutRef as any).cleanup();
-      (cycleTimeoutRef as any).cleanup = null;
+    if (cycleCleanupRef.current) {
+      cycleCleanupRef.current();
+      cycleCleanupRef.current = null;
     }
 
     // Always clear timeouts, regardless of isCycling state

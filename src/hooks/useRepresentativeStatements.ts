@@ -7,7 +7,7 @@ import {
 import type { FinalizedCommentStats, ConsensusStatement } from '@/lib/stats';
 
 export interface UseRepresentativeStatementsProps {
-  statements: any[];
+  statements: Record<string, unknown>[];
   dataset: [string, [number, number]][];
   pointGroups: number[];
   currentPipelineId: string;

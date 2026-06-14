@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { App } from './App';
 import type { PreloadedData } from './App';
 import { loadH5adFile } from '../../lib/h5ad-loader';

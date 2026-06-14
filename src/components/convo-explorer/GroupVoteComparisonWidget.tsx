@@ -31,10 +31,6 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
   voteOrder = "UDPA", // Default: Unseen, Disagree, Pass, Agree (top to bottom)
   highlightGroupIndex,
 }) => {
-  if (!groupVotes || groupVotes.length === 0) {
-    return null;
-  }
-
   const renderGroupData = React.useCallback((groupData: GroupVoteData) => {
     const { groupIndex, n_agree, n_disagree, n_pass, n_trials, totalGroupSize } = groupData;
 
@@ -130,6 +126,10 @@ export const GroupVoteComparisonWidget: React.FC<GroupVoteComparisonWidgetProps>
       )
     };
   }, [includeMissingVotes, height, width, voteColors, voteOrder, highlightGroupIndex]);
+
+  if (!groupVotes || groupVotes.length === 0) {
+    return null;
+  }
 
   const renderedGroups = groupVotes.map(renderGroupData);
 

@@ -24,7 +24,7 @@ function parseCSV(csvText: string): Conversation[] {
     // Simple comma-separated parsing - split by comma and map to headers
     const values = line.split(',').map(value => value.trim().replace(/\r/g, ''));
 
-    const conversation: any = {};
+    const conversation: Record<string, string> = {};
     headers.forEach((header, index) => {
       // Use the value at the corresponding index, or empty string if not present
       conversation[header] = values[index] || '';

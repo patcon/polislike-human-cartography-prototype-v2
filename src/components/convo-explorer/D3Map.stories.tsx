@@ -1,5 +1,5 @@
 import React from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { D3Map } from "./D3Map";
 import { useStorybookDataLoader } from "../../../.storybook/hooks/useStorybookDataLoader";
 import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
@@ -362,7 +362,7 @@ export const QuickSelectDemo: Story = {
 export const KedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const decodedArgs = decodeStorybookArgs(args as any);
+    const decodedArgs = decodeStorybookArgs(args as Record<string, unknown>);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);
@@ -401,7 +401,7 @@ KedroMode.storyName = "Kedro Mode";
 export const LocalKedroMode: Story = {
   render: (args) => {
     // Extract kedroBaseUrl and pipelineId from args and remove them before passing to D3Map
-    const decodedArgs = decodeStorybookArgs(args as any);
+    const decodedArgs = decodeStorybookArgs(args as Record<string, unknown>);
     const { kedroBaseUrl, pipelineId, ...d3MapArgs } = decodedArgs;
     const { pipelines, loading: pipelinesLoading } = usePipelineOptions(kedroBaseUrl, 'bestkmeans');
     const { dataset, loading, error } = useStorybookDataLoader(kedroBaseUrl, pipelineId);

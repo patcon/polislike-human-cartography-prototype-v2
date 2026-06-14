@@ -10,9 +10,7 @@ import type { MapCallbacks } from './shared/types';
 // Configuration constant for segmented cluster view
 const SEGMENT_CLUSTERED = true;
 
-type DisplaySettings = {
-  // Remove width/height props since we'll use full screen
-};
+type DisplaySettings = Record<string, never>;
 
 export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
   // Use custom hooks for shared functionality
@@ -43,16 +41,16 @@ export const MagicPaintExperiment: React.FC<DisplaySettings> = () => {
     SEGMENT_CLUSTERED
   );
 
-  // Handle loading error
-  if (error) {
-    return <LoadingDisplay message={`Error loading data: ${error}`} />;
-  }
-
   // Create map callbacks
   const mapCallbacks: MapCallbacks = React.useMemo(() => ({
     onPointClick: handlePointClick,
     onBackgroundClick: handleBackgroundClick
   }), [handlePointClick, handleBackgroundClick]);
+
+  // Handle loading error
+  if (error) {
+    return <LoadingDisplay message={`Error loading data: ${error}`} />;
+  }
 
   if (isLoading) {
     return <LoadingDisplay message="Loading HDBSCAN data..." />;

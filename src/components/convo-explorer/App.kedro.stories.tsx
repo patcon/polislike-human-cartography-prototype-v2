@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { App } from './App';
 import { decodeStorybookArgs, encodeStorybookParam } from '../../../.storybook/preview';
 

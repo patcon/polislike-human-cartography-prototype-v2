@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FloatingModalV2 } from "./FloatingModalV2";
 import { FloatingModalV2Stack } from "./FloatingModalV2Stack";
 

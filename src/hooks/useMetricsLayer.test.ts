@@ -21,7 +21,7 @@ const defaultProps = {
   layerMode: 'groups' as const,
   dataset,
   statements: [{ statement_id: '1', txt: 'Hello', moderated: 0 }],
-  preloadedData: undefined as any,
+  preloadedData: undefined,
   kedroBaseUrl: undefined as string | undefined,
   currentPipelineIdRef: { current: 'default' } as React.MutableRefObject<string>,
 };

@@ -64,7 +64,7 @@ export function decodeStorybookParam(value: string): string {
  *
  * To add new encoded parameters, add the key name to the encodedKeys array.
  */
-export function decodeStorybookArgs(args: Record<string, any>): Record<string, any> {
+export function decodeStorybookArgs(args: Record<string, unknown>): Record<string, unknown> {
   const decoded = { ...args };
 
   // List of arg keys that might contain encoded values

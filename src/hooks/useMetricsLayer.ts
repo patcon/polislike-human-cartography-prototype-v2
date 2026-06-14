@@ -11,7 +11,7 @@ import type { PreloadedData } from '@/components/convo-explorer/App';
 export interface UseMetricsLayerProps {
   layerMode: 'groups' | 'votes' | 'metrics';
   dataset: [string, [number, number]][];
-  statements: any[];
+  statements: Record<string, unknown>[];
   preloadedData?: PreloadedData;
   kedroBaseUrl?: string;
   currentPipelineIdRef: React.MutableRefObject<string>;

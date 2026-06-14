@@ -5,13 +5,12 @@ import * as d3 from "d3";
 import { PALETTE_COLORS, UNPAINTED_COLOR, UNPAINTED_VALUE, OUTLINE_RADIUS, OUTLINE_OPACITY, OUTLINE_SUSPEND_DURING_ANIMATION } from "@/constants";
 import type { ObsColumnType } from "@/lib/color-schemes";
 import { BOOLEAN_COLORS, NULL_COLOR, createContinuousScale, getAnnotationCategoricalColor } from "@/lib/color-schemes";
-import { usePipelineOptions } from "../../../.storybook/hooks/usePipelineOptions";
+import { useSpotlightMode } from "@/hooks/useSpotlightMode";
+import { usePipelineManager } from "@/hooks/usePipelineManager";
+import { useLassoMode } from "@/hooks/useLassoMode";
 import { MapProjectionSelector } from "./MapProjectionSelector";
 import { Button } from "../ui/button";
 import { FileDown, Import, Info } from "lucide-react";
-
-type ProjectionData = [string, [number, number]][];
-
 
 const FEATURE_SCALE_RADIUS_ON_ZOOM = true;
 const MIN_CIRCLE_RADIUS = 0.5; // prevent sub-pixel circles that vanish on mobile
@@ -76,7 +75,35 @@ type D3MapProps = {
   onSpotlightDebug?: (state: { event: string; touchCount: number; currentRadius: number; cx: number; cy: number; grabOffsetX: number; grabOffsetY: number }) => void;
 };
 
-const PREFERRED_KEDRO_PIPELINE = 'mean_localmap_bestkmeans';
+type MapPoint = { i: string; x: number; y: number; originalIndex: number };
+// D3 selections don't support custom properties natively — we attach xScale/yScale
+// to the container element so zoom and lasso handlers can read them without closure deps.
+type D3ContainerExt = d3.Selection<SVGGElement, unknown, null, undefined> & {
+  xScale: d3.ScaleLinear<number, number>;
+  yScale: d3.ScaleLinear<number, number>;
+};
+
+function isTap(dx: number, dy: number, durationMs: number, maxDist = 10, maxMs = 500) {
+  return Math.hypot(dx, dy) < maxDist && durationMs < maxMs;
+}
+
+/**
+ * Decides whether D3 zoom should handle a given event.
+ * Spotlight mode registers its own wheel/touch listeners and handles everything itself,
+ * so D3 zoom must yield. For other modes: wheel always zooms, pinch always zooms,
+ * single-touch only pans in move mode.
+ */
+function zoomEventFilter(event: Event, mode: string): boolean {
+  if (mode === "spotlight") return false;
+  if (event.type === "wheel") return true;
+  if (event.type.startsWith("touch")) {
+    const touches = (event as TouchEvent).touches?.length ?? 0;
+    if (touches >= 2) return true;
+    if (touches === 1 && mode === "move") return true;
+    return false;
+  }
+  return mode === "move";
+}
 
 export const D3Map: React.FC<D3MapProps> = ({
   data,
@@ -112,114 +139,36 @@ export const D3Map: React.FC<D3MapProps> = ({
 }) => {
   const svgRef = React.useRef<SVGSVGElement>(null);
   const containerRef = React.useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-  const lassoRectRef = React.useRef<SVGRectElement | null>(null);
   const modeRef = React.useRef(mode);
+  const zoomRef = React.useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
-  // Spotlight: mutable touch state lives in a ref so it survives effect re-runs
-  const spotlightStateRef = React.useRef({
-    currentRadius: spotlightRadius,
-    currentCx: -9999,
-    currentCy: -9999,
-    persist: spotlightPersist,
-    // single-touch grab: offset from circle center to touch landing point
-    grabOffsetX: 0,
-    grabOffsetY: 0,
-    // two-touch transform: previous SVG positions keyed by touch identifier
-    touchPrevPositions: new Map<number, [number, number]>(),
-    // desktop click-to-lock: when true, pointer move/leave are ignored
-    mouseLocked: false,
-  });
-  // Keep callback refs so spotlight effect doesn't re-run when they change identity
-  const onSelectionChangeRef = React.useRef(onSelectionChange);
-  const onSpotlightDebugRef = React.useRef(onSpotlightDebug);
-  const onSpotlightRadiusChangeRef = React.useRef(onSpotlightRadiusChange);
-  const displayMaskRef = React.useRef(displayMask);
-  React.useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
-  React.useEffect(() => { onSpotlightDebugRef.current = onSpotlightDebug; }, [onSpotlightDebug]);
-  React.useEffect(() => { onSpotlightRadiusChangeRef.current = onSpotlightRadiusChange; }, [onSpotlightRadiusChange]);
-  React.useEffect(() => { displayMaskRef.current = displayMask; }, [displayMask]);
-  // Tracks whether the most recent spotlightRadius change was reported outward by a gesture.
-  // If so, the sync effect must not write back — doing so would overwrite a newer gesture value.
-  const radiusFromGestureRef = React.useRef(false);
-  // Sync prop values into state ref without re-running the spotlight effect
-  React.useEffect(() => {
-    if (radiusFromGestureRef.current) { radiusFromGestureRef.current = false; return; }
-    spotlightStateRef.current.currentRadius = spotlightRadius;
-  }, [spotlightRadius]);
-  React.useEffect(() => { spotlightStateRef.current.persist = spotlightPersist; }, [spotlightPersist]);
-  const lassoStateRef = React.useRef<{
-    path: d3.Selection<SVGPathElement, unknown, null, undefined> | null;
-    coords: [number, number][];
-    cleanup: (() => void) | null;
-  }>({ path: null, coords: [], cleanup: null });
+  useSpotlightMode({ mode, svgRef, containerRef, zoomRef, displayMask, onSelectionChange, spotlightRadius, spotlightPersist, onSpotlightRadiusChange, onSpotlightDebug });
+  const { lassoCleanupRef } = useLassoMode({ mode, svgRef, containerRef, displayMask, onSelectionChange, onLassoStart, onLassoEnd });
   React.useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  // Mode helpers - Kedro is default unless kedroBaseUrl isn't set
-  const isStaticMode = !kedroBaseUrl;
-  const isKedroMode = !isStaticMode;
-
-  // Animation state
-  const [isAnimating, setIsAnimating] = React.useState(false);
-
-  // Unified pipeline data state - works for both Kedro and static projections
-  const [pipelineData, setPipelineData] = React.useState<Record<string, ProjectionData | null>>({});
-  const [selectedPipeline, setSelectedPipeline] = React.useState<string>('');
-  const [previousPipeline, setPreviousPipeline] = React.useState<string>('');
-
-  // Static projections as pipeline options
-  const staticPipelines = React.useMemo(() => [
-    { id: 'localmap', name: 'LocalMAP' },
-    { id: 'pacmap', name: 'PaCMAP' },
-    { id: 'umap', name: 'UMAP' }
-  ], []);
-
-  // Kedro pipeline options - use internal pipeline fetching if availablePipelines not provided
-  const shouldFetchKedroOptions = isKedroMode && testAnimation && !availablePipelines?.length;
-  const { pipelines: fetchedKedroOptions } = usePipelineOptions(
-    shouldFetchKedroOptions ? kedroBaseUrl : undefined,
-    pipelineFilter || 'bestkmeans'
-  );
-  const kedroOptions = availablePipelines?.length ? availablePipelines : fetchedKedroOptions;
-
-  // Preloaded pipeline options derived from preloadedPipelineData keys,
-  // plus any projections recomputed in-browser
-  const preloadedPipelineOptions = React.useMemo(() => {
-    if (!preloadedPipelineData) return [];
-    const keys = [
-      ...Object.keys(preloadedPipelineData),
-      ...Object.keys(extraPipelineData ?? {}),
-    ];
-    return keys.map(id => ({ id, name: id }));
-  }, [preloadedPipelineData, extraPipelineData]);
-
-  // Current pipeline options based on mode
-  const currentPipelineOptions = preloadedPipelineData ? preloadedPipelineOptions : isKedroMode ? kedroOptions : staticPipelines;
-
-  // Auto-cycling state
-  const [isAutoCycling, setIsAutoCycling] = React.useState(false);
+  const {
+    pipelineData,
+    selectedPipeline,
+    previousPipeline,
+    currentPipelineOptions,
+    isAnimating,
+    isAutoCycling,
+    onAnimationComplete,
+    handlePipelineChange,
+    handleTogglePipeline,
+    handleAutoCycleToggle,
+  } = usePipelineManager({
+    testAnimation,
+    kedroBaseUrl,
+    pipelineFilter,
+    availablePipelines,
+    preloadedPipelineData,
+    extraPipelineData,
+    onPipelineChange,
+  });
 
   // State to trigger re-calculation of radius on resize
   const [resizeCounter, forceUpdate] = React.useReducer(x => x + 1, 0);
-
-  // Initialize selectedPipeline when pipeline options become available
-  React.useEffect(() => {
-    if (currentPipelineOptions.length > 0 && !selectedPipeline) {
-      if (preloadedPipelineData) {
-        // For preloaded data, use preferred order: localmap > umap > pacmap > first key
-        const preferredOrder = ['localmap', 'umap', 'pacmap'];
-        const preferred = preferredOrder.find(id => id in preloadedPipelineData);
-        setSelectedPipeline(preferred || currentPipelineOptions[0].id);
-      } else if (isKedroMode) {
-        // Prioritize preferred Kedro pipeline if available, otherwise use first
-        const preferredPipeline = currentPipelineOptions.find(p => p.id === PREFERRED_KEDRO_PIPELINE);
-        const defaultPipeline = preferredPipeline || currentPipelineOptions[0];
-        setSelectedPipeline(defaultPipeline.id);
-      } else if (testAnimation) {
-        // For static projections, default to localmap
-        setSelectedPipeline('localmap');
-      }
-    }
-  }, [currentPipelineOptions, selectedPipeline, isKedroMode, testAnimation, preloadedPipelineData]);
 
   // Handle window resize to update radius (with throttling)
   React.useEffect(() => {
@@ -229,7 +178,7 @@ export const D3Map: React.FC<D3MapProps> = ({
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         forceUpdate(); // Trigger re-calculation of BASE_RADIUS
-      }, 100); // Throttle to avoid excessive updates
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
@@ -238,82 +187,6 @@ export const D3Map: React.FC<D3MapProps> = ({
       clearTimeout(timeoutId);
     };
   }, []);
-
-  // Load projection data only if testAnimation is enabled
-  React.useEffect(() => {
-    if (!testAnimation) return;
-
-    // If preloaded pipeline data is provided, use it directly
-    // (merged with any projections recomputed in-browser)
-    if (preloadedPipelineData) {
-      setPipelineData({ ...preloadedPipelineData, ...extraPipelineData });
-      return;
-    }
-
-    const loadProjections = async () => {
-      try {
-        if (isKedroMode && kedroOptions.length > 0) {
-          // Load pipeline data from Kedro API
-          const { fetchAndProcessKedroData } = await import('../../lib/kedro-api');
-          const dataMap: Record<string, ProjectionData | null> = {};
-
-          for (const pipeline of kedroOptions) {
-            try {
-              const data = await fetchAndProcessKedroData(kedroBaseUrl!, pipeline.id);
-              dataMap[pipeline.id] = data;
-            } catch (error) {
-              console.error(`Failed to load pipeline ${pipeline.id}:`, error);
-              dataMap[pipeline.id] = null;
-            }
-          }
-
-          setPipelineData(dataMap);
-        } else if (isStaticMode) {
-          // Load static projection files
-          const [localmapResponse, pacmapResponse, umapResponse] = await Promise.all([
-            fetch('/projections.json'),
-            fetch('/projections.mean-pacmap.json'),
-            fetch('/projections.mean-umap.json')
-          ]);
-
-          const [localmapData, pacmapData, umapData] = await Promise.all([
-            localmapResponse.json(),
-            pacmapResponse.json(),
-            umapResponse.json()
-          ]);
-
-          // Sort all projection data by participant ID to ensure consistent ordering
-          const sortByParticipantId = (data: [string, [number, number]][]) =>
-            data.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-
-          setPipelineData({
-            localmap: sortByParticipantId([...localmapData]),
-            pacmap: sortByParticipantId([...pacmapData]),
-            umap: sortByParticipantId([...umapData]),
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load projection data:', error);
-      }
-    };
-
-    loadProjections();
-  }, [testAnimation, isKedroMode, kedroOptions, preloadedPipelineData, extraPipelineData]);
-
-  // Auto-select a freshly recomputed projection when it first appears
-  const prevExtraKeysRef = React.useRef<string[]>([]);
-  React.useEffect(() => {
-    const keys = Object.keys(extraPipelineData ?? {});
-    const added = keys.find(k => !prevExtraKeysRef.current.includes(k));
-    prevExtraKeysRef.current = keys;
-    if (added) {
-      setSelectedPipeline(prev => {
-        setPreviousPipeline(prev);
-        return added;
-      });
-      onPipelineChange?.(added);
-    }
-  }, [extraPipelineData, onPipelineChange]);
 
   // Calculate responsive base radius directly in JavaScript
   const BASE_RADIUS = React.useMemo(() => {
@@ -335,6 +208,10 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     return radiusMultiplier * devicePixelRatio;
   }, [resizeCounter]); // Re-calculate when resizeCounter changes (on resize)
+
+  // Ref so the zoom handler always reads the current radius without re-registering
+  const baseRadiusRef = React.useRef(BASE_RADIUS);
+  React.useEffect(() => { baseRadiusRef.current = BASE_RADIUS; }, [BASE_RADIUS]);
 
   // --- Color scale for continuous metrics mode ---
   const continuousColorScale = React.useMemo(() => createContinuousScale(), []);
@@ -488,17 +365,17 @@ export const D3Map: React.FC<D3MapProps> = ({
     if (!containerRef.current) return;
     const container = containerRef.current;
 
-    (container as any).xScale = xScale;
-    (container as any).yScale = yScale;
+    (container as unknown as D3ContainerExt).xScale = xScale;
+    (container as unknown as D3ContainerExt).yScale = yScale;
 
     // Force complete re-render when colorsToFront changes or when pointColors change while sorted
     // Use a unique selector that includes a hash of the pointColors to force re-render when vote data changes
     const pointColorsHash = pointColors.slice(0, 100).join(','); // Sample first 100 for performance
     const circleSelector = colorsToFront ? `circle.sorted-${pointColorsHash.length}` : "circle.original";
     const circles = container.selectAll<SVGCircleElement, typeof points[0]>(circleSelector)
-      .data(points, (d: any) => d.i);
+      .data(points, (d: MapPoint) => d.i);
 
-    let transformK: any = null
+    let transformK: number
     if (FEATURE_SCALE_RADIUS_ON_ZOOM) {
       const transform = d3.zoomTransform(svgRef.current!);
       transformK = transform.k;
@@ -529,11 +406,11 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       // Use transition.end() promise to properly handle when all animations complete
       transition.end().then(() => {
-        setIsAnimating(false);
+        onAnimationComplete();
         if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       }).catch(() => {
         // Handle case where transition is interrupted
-        setIsAnimating(false);
+        onAnimationComplete();
         if (OUTLINE_RADIUS > 0 && OUTLINE_SUSPEND_DURING_ANIMATION) container.attr("filter", "url(#clusterOutline)");
       });
     } else {
@@ -581,55 +458,6 @@ export const D3Map: React.FC<D3MapProps> = ({
       .attr("r", Math.max(BASE_RADIUS / transformK, MIN_CIRCLE_RADIUS));
   }, [BASE_RADIUS]);
 
-  // Handle pipeline change with animation (works for both Kedro and static)
-  const handlePipelineChange = React.useCallback((newPipeline: string) => {
-    if (!testAnimation || !pipelineData[newPipeline] || isAnimating || newPipeline === selectedPipeline) return;
-
-    setIsAnimating(true);
-    setPreviousPipeline(selectedPipeline);
-    setSelectedPipeline(newPipeline);
-
-    // Notify parent component about pipeline change
-    onPipelineChange?.(newPipeline);
-  }, [testAnimation, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
-
-  // Handle toggle between current and previous pipeline
-  const handleTogglePipeline = React.useCallback(() => {
-    if (!testAnimation || !previousPipeline || !pipelineData[previousPipeline] || isAnimating) return;
-    setIsAnimating(true);
-    const temp = selectedPipeline;
-    setSelectedPipeline(previousPipeline);
-    setPreviousPipeline(temp);
-
-    // Notify parent component about pipeline change
-    onPipelineChange?.(previousPipeline);
-  }, [testAnimation, previousPipeline, pipelineData, isAnimating, selectedPipeline, onPipelineChange]);
-
-  // Auto-cycling logic - trigger next cycle when animation completes
-  React.useEffect(() => {
-    if (isAutoCycling && previousPipeline && !isAnimating) {
-      // Start the next cycle immediately when animation completes
-      const timeoutId = setTimeout(() => {
-        handleTogglePipeline();
-      }, 0);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isAutoCycling, previousPipeline, isAnimating, handleTogglePipeline]);
-
-  // Handle auto-cycle toggle
-  const handleAutoCycleToggle = React.useCallback(() => {
-    if (isAutoCycling) {
-      // Stop auto-cycling - let current cycle complete
-      setIsAutoCycling(false);
-    } else {
-      // Start auto-cycling if we have a previous pipeline
-      if (previousPipeline && pipelineData[previousPipeline]) {
-        setIsAutoCycling(true);
-      }
-    }
-  }, [isAutoCycling, previousPipeline, pipelineData]);
-
   // --- Zoom behavior (pan/zoom only) ---
   React.useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -638,43 +466,26 @@ export const D3Map: React.FC<D3MapProps> = ({
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 15])
-      .filter((event) => {
-        // Spotlight mode owns all pointer interactions — block pan/zoom entirely
-        if (modeRef.current === "spotlight") return false;
-        /**
-         * Here's what we do for every zoom event:
-         * - all wheel events = YES, in any mode
-         * - all multi-touch pinch events = YES, in any mode
-         * - single-touch event = YES, in move mode
-         * - otherwise, NO, ignore event, because we're painting.
-         */
-        if (event.type === "wheel") return true;
-        if (event.type.startsWith("touch")) {
-          const touches = event.touches?.length ?? 0;
-          if (touches >= 2) return true; // pinch zoom
-          if (touches === 1 && modeRef.current === "move") return true; // single-finger pan
-          return false;
-        }
-        return modeRef.current === "move";
-      })
+      .filter((event) => zoomEventFilter(event, modeRef.current))
       .on("start", (event) => {
         // Clean up lasso when zoom starts (especially for multi-touch)
         if (event.sourceEvent && event.sourceEvent.type.startsWith("touch")) {
           const touches = event.sourceEvent.touches?.length ?? 0;
-          if (touches >= 2 && lassoStateRef.current.cleanup) {
+          if (touches >= 2 && lassoCleanupRef.current) {
             console.log('🔍 Zoom start detected with multi-touch, cleaning up lasso');
-            lassoStateRef.current.cleanup();
+            lassoCleanupRef.current();
           }
         }
       })
       .on("zoom", (event) => {
         container.attr("transform", event.transform);
         const k = FEATURE_SCALE_RADIUS_ON_ZOOM ? event.transform.k : 1;
-        container.selectAll("circle").attr("r", Math.max(BASE_RADIUS / k, MIN_CIRCLE_RADIUS));
+        container.selectAll("circle").attr("r", Math.max(baseRadiusRef.current / k, MIN_CIRCLE_RADIUS));
         // Scale outline radius with zoom so it stays proportional to circle size
         if (OUTLINE_RADIUS > 0) svg.select("#clusterOutline feMorphology").attr("radius", OUTLINE_RADIUS / k);
       });
 
+    zoomRef.current = zoom;
     svg.call(zoom);
     svg.call(zoom.transform, d3.zoomIdentity);
   }, []);
@@ -697,11 +508,9 @@ export const D3Map: React.FC<D3MapProps> = ({
 
       const dx = event.clientX - startPos[0];
       const dy = event.clientY - startPos[1];
-      const distance = Math.sqrt(dx * dx + dy * dy);
       const duration = Date.now() - startTime;
 
-      // Consider it a click/tap if movement is small and duration is short
-      const isClick = distance < 10 && duration < 500;
+      const isClick = isTap(dx, dy, duration);
 
       if (isClick) {
         console.log('🎯 Click/tap detected - mode:', mode);
@@ -751,412 +560,19 @@ export const D3Map: React.FC<D3MapProps> = ({
     };
   }, [mode, xScale, yScale, quadtree, onSelectionChange, onQuickSelect, displayMask]);
 
-  // --- Lasso painting ---
-  React.useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
-    const svg = d3.select(svgRef.current);
-    const container = containerRef.current;
-
-    // 🟢 Clean up any previous lasso drag when mode changes
-    svg.on('.drag', null);
-
-    if (lassoRectRef.current) {
-      d3.select(lassoRectRef.current).remove();
-      lassoRectRef.current = null;
-    }
-
-    if (mode === "paint") {
-      function cleanupLasso(callEndCallback = false) {
-        console.log('🎨 Lasso CLEANUP, callEndCallback:', callEndCallback);
-        if (lassoStateRef.current.path) {
-          lassoStateRef.current.path.remove();
-          lassoStateRef.current.path = null;
-        }
-        lassoStateRef.current.coords = [];
-
-        // Only call onLassoEnd when explicitly requested (normal end, not cleanup)
-        if (callEndCallback) {
-          onLassoEnd?.();
-        }
-      }
-
-      // Store cleanup function in ref so zoom can access it
-      lassoStateRef.current.cleanup = cleanupLasso;
-
-      function lassoStart(event: any) {
-        console.log('🎨 Lasso START:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso(true); // End cycling on multi-touch
-          return;
-        }
-
-        lassoStateRef.current.coords = [];
-        if (lassoStateRef.current.path) lassoStateRef.current.path.remove();
-        lassoStateRef.current.path = svg.append("path")
-          .attr("fill", "rgba(0,0,0,0.1)")
-          .attr("stroke", "#666")
-          .attr("stroke-width", 1.5)
-          .attr("stroke-dasharray", "4 2")
-          .style("pointer-events", "none");
-      }
-
-      function lassoDrag(event: any) {
-        console.log('🎨 Lasso DRAG:', event.sourceEvent?.type);
-        if (event.sourceEvent && (event.sourceEvent.touches?.length ?? 1) > 1) {
-          cleanupLasso(true); // End cycling on multi-touch
-          return;
-        }
-
-        // Trigger layer mode cycling when we get the first drag event (lasso is actually happening)
-        if (lassoStateRef.current.coords.length === 0) {
-          onLassoStart?.();
-        }
-
-        lassoStateRef.current.coords.push([event.x, event.y]);
-        if (lassoStateRef.current.path) {
-          lassoStateRef.current.path.attr("d", d3.line()(lassoStateRef.current.coords));
-        }
-      }
-
-      function lassoEnd() {
-        console.log('🎨 Lasso END, coords:', lassoStateRef.current.coords.length);
-
-        if (!lassoStateRef.current.coords.length) {
-          cleanupLasso(true); // End cycling and cleanup
-          return;
-        }
-        const transform = d3.zoomTransform(container.node()!);
-        const circles = container.selectAll("circle");
-        const selected = circles.data().filter((d: any) => {
-          if (displayMask && !displayMask[d.originalIndex]) return false;
-          const sx = transform.applyX((container as any).xScale(d.x));
-          const sy = transform.applyY((container as any).yScale(d.y));
-          return pointInPolygon([sx, sy], lassoStateRef.current.coords);
-        });
-        if (onSelectionChange) onSelectionChange(selected.map((d: any) => d.i));
-
-        cleanupLasso(true); // End cycling and cleanup
-      }
-
-      svg.call(
-        d3.drag<SVGSVGElement, unknown>()
-          .filter((event) => (event.sourceEvent?.touches?.length ?? 0) <= 1)
-          .on("start", lassoStart)
-          .on("drag", lassoDrag)
-          .on("end", lassoEnd)
-      );
-
-      // To avoid type warning in case lassoRectRef is null
-      if (!lassoRectRef.current) return;
-
-      d3.select(lassoRectRef.current).call(
-        // @ts-expect-error - Complex D3 drag behavior type issue, ignoring for now
-        d3.drag<SVGRectElement, unknown>()
-          .filter((event) => (event.sourceEvent?.touches?.length ?? 0) <= 1)
-          .on("start", lassoStart)
-          .on("drag", lassoDrag)
-          .on("end", lassoEnd)
-      )
-      .on("touchstart.zoom", null)
-      .on("touchmove.zoom", null)
-      .on("touchend.zoom", null);
-
-      // Cleanup function when mode changes
-      return () => {
-        cleanupLasso(true); // End cycling when mode changes
-        lassoStateRef.current.cleanup = null;
-      };
-    } else {
-      // Clear cleanup function when not in paint mode
-      lassoStateRef.current.cleanup = null;
-    }
-  }, [mode, onSelectionChange, xScale, yScale, onLassoStart, onLassoEnd, displayMask]);
-
-  // --- Spotlight mode ---
-  React.useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
-    if (mode !== "spotlight") return;
-
-    const svg = d3.select(svgRef.current);
-    const container = containerRef.current;
-    const svgNode = svgRef.current;
-
-    // Prevent native touch scroll/pan while spotlight is active
-    svgNode.style.touchAction = "none";
-
-    const ring = svg.append("circle")
-      .attr("class", "spotlight-ring")
-      .attr("fill", "rgba(255, 220, 0, 0.08)")
-      .attr("stroke", "#FFCC00")
-      .attr("stroke-width", 2)
-      .attr("stroke-dasharray", "6 3")
-      .attr("cx", -9999)
-      .attr("cy", -9999)
-      .attr("r", spotlightStateRef.current.currentRadius)
-      .style("pointer-events", "none");
-
-    // All mutable touch state lives in spotlightStateRef so it survives effect re-runs.
-    // Callbacks are accessed via refs so they never appear in deps and never trigger re-runs.
-    const s = spotlightStateRef.current;
-
-    function debug(eventName: string, touchCount: number) {
-      onSpotlightDebugRef.current?.({ event: eventName, touchCount, currentRadius: s.currentRadius, cx: s.currentCx, cy: s.currentCy, grabOffsetX: s.grabOffsetX, grabOffsetY: s.grabOffsetY });
-    }
-
-    function touchToSVG(touch: Touch): [number, number] {
-      const rect = svgNode.getBoundingClientRect();
-      return [touch.clientX - rect.left, touch.clientY - rect.top];
-    }
-
-    function updateSelection(cx: number, cy: number, radius: number) {
-      s.currentCx = cx;
-      s.currentCy = cy;
-      ring.attr("cx", cx).attr("cy", cy).attr("r", radius);
-      const transform = d3.zoomTransform(container.node()!);
-      const selected = (container.selectAll("circle").data() as any[]).filter((d: any) => {
-        if (displayMaskRef.current && !displayMaskRef.current[d.originalIndex]) return false;
-        const sx = transform.applyX((container as any).xScale(d.x));
-        const sy = transform.applyY((container as any).yScale(d.y));
-        return Math.sqrt((sx - cx) ** 2 + (sy - cy) ** 2) <= radius;
-      });
-      onSelectionChangeRef.current?.(selected.map((d: any) => d.i));
-    }
-
-    function resetAllTouches() {
-      s.touchPrevPositions.clear();
-      if (!s.persist) {
-        ring.attr("cx", -9999).attr("cy", -9999);
-        s.currentCx = -9999;
-        s.currentCy = -9999;
-        onSelectionChangeRef.current?.([]);
-      }
-    }
-
-    function captureAllTouches(touches: TouchList) {
-      s.touchPrevPositions.clear();
-      for (let i = 0; i < touches.length; i++) {
-        s.touchPrevPositions.set(touches[i].identifier, touchToSVG(touches[i]));
-      }
-    }
-
-    function setupGrabOffset(touch: Touch) {
-      const [tx, ty] = touchToSVG(touch);
-      s.grabOffsetX = s.currentCx === -9999 ? 0 : s.currentCx - tx;
-      s.grabOffsetY = s.currentCy === -9999 ? 0 : s.currentCy - ty;
-    }
-
-    // --- Touch Events (handles multi-touch reliably via event.touches) ---
-    function handleTouchStart(event: TouchEvent) {
-      event.preventDefault();
-      const n = event.touches.length;
-      captureAllTouches(event.touches);
-
-      if (n === 1) {
-        const [tx, ty] = touchToSVG(event.touches[0]);
-        if (s.currentCx === -9999) {
-          // First placement — center circle on the touch point
-          updateSelection(tx, ty, s.currentRadius);
-          s.grabOffsetX = 0;
-          s.grabOffsetY = 0;
-        } else {
-          s.grabOffsetX = s.currentCx - tx;
-          s.grabOffsetY = s.currentCy - ty;
-        }
-      } else if (n === 2 && s.currentCx === -9999) {
-        // Two fingers on an unpositioned circle — place center at midpoint
-        const [ax, ay] = touchToSVG(event.touches[0]);
-        const [bx, by] = touchToSVG(event.touches[1]);
-        updateSelection((ax + bx) / 2, (ay + by) / 2, s.currentRadius);
-      }
-      debug(`touch:start:${n}`, n);
-    }
-
-    function handleTouchMove(event: TouchEvent) {
-      event.preventDefault();
-      const n = event.touches.length;
-
-      if (n === 1) {
-        const touch = event.touches[0];
-        const [tx, ty] = touchToSVG(touch);
-        updateSelection(tx + s.grabOffsetX, ty + s.grabOffsetY, s.currentRadius);
-        s.touchPrevPositions.set(touch.identifier, [tx, ty]);
-        debug("touch:move:1", n);
-      } else if (n >= 2) {
-        const tA = event.touches[0];
-        const tB = event.touches[1];
-        const currA = touchToSVG(tA);
-        const currB = touchToSVG(tB);
-        const prevA = s.touchPrevPositions.get(tA.identifier);
-        const prevB = s.touchPrevPositions.get(tB.identifier);
-
-        if (!prevA || !prevB) {
-          // Shouldn't normally happen — capture and wait for next frame
-          s.touchPrevPositions.set(tA.identifier, currA);
-          s.touchPrevPositions.set(tB.identifier, currB);
-          return;
-        }
-
-        const prevDist = Math.hypot(prevA[0] - prevB[0], prevA[1] - prevB[1]);
-        const currDist = Math.hypot(currA[0] - currB[0], currA[1] - currB[1]);
-        if (prevDist < 1) {
-          s.touchPrevPositions.set(tA.identifier, currA);
-          s.touchPrevPositions.set(tB.identifier, currB);
-          return;
-        }
-
-        const scale = currDist / prevDist;
-        const prevMidX = (prevA[0] + prevB[0]) / 2;
-        const prevMidY = (prevA[1] + prevB[1]) / 2;
-        const currMidX = (currA[0] + currB[0]) / 2;
-        const currMidY = (currA[1] + currB[1]) / 2;
-        const rotation = Math.atan2(currB[1] - currA[1], currB[0] - currA[0])
-                       - Math.atan2(prevB[1] - prevA[1], prevB[0] - prevA[0]);
-
-        // Apply similarity transform (scale + rotation + translation) to circle center
-        const dx = s.currentCx - prevMidX;
-        const dy = s.currentCy - prevMidY;
-        const cos = Math.cos(rotation);
-        const sin = Math.sin(rotation);
-        const newCx = currMidX + scale * (dx * cos - dy * sin);
-        const newCy = currMidY + scale * (dx * sin + dy * cos);
-
-        s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * scale));
-        updateSelection(newCx, newCy, s.currentRadius);
-        radiusFromGestureRef.current = true;
-        onSpotlightRadiusChangeRef.current?.(s.currentRadius);
-
-        s.touchPrevPositions.set(tA.identifier, currA);
-        s.touchPrevPositions.set(tB.identifier, currB);
-        debug("touch:move:2", n);
-      }
-    }
-
-    function handleTouchEnd(event: TouchEvent) {
-      const n = event.touches.length;
-      if (n === 0) {
-        resetAllTouches();
-        debug("touch:end:0", n);
-      } else {
-        captureAllTouches(event.touches);
-        if (n === 1) setupGrabOffset(event.touches[0]);
-        debug(`touch:end:${n}`, n);
-      }
-    }
-
-    function handleTouchCancel(event: TouchEvent) {
-      // Only reset if all touches are gone; spurious cancels mid-gesture should be ignored
-      debug(`touch:cancel:${event.touches.length}`, event.touches.length);
-      if (event.touches.length === 0) {
-        resetAllTouches();
-      } else {
-        captureAllTouches(event.touches);
-        if (event.touches.length === 1) setupGrabOffset(event.touches[0]);
-      }
-    }
-
-    // --- Mouse (Pointer Events, mouse only) ---
-    function handlePointerEnter(event: PointerEvent) {
-      if (event.pointerType !== "mouse") return;
-      if (s.mouseLocked) return;
-      const [px, py] = d3.pointer(event, svgNode);
-      updateSelection(px, py, s.currentRadius);
-    }
-
-    function handlePointerMove(event: PointerEvent) {
-      if (event.pointerType !== "mouse") return;
-      if (s.mouseLocked) return;
-      const [px, py] = d3.pointer(event, svgNode);
-      updateSelection(px, py, s.currentRadius);
-    }
-
-    function handlePointerLeave(event: PointerEvent) {
-      if (event.pointerType !== "mouse") return;
-      if (s.mouseLocked) return;
-      ring.attr("cx", -9999).attr("cy", -9999);
-      s.currentCx = -9999;
-      s.currentCy = -9999;
-      onSelectionChangeRef.current?.([]);
-    }
-
-    function handleClick(event: MouseEvent) {
-      s.mouseLocked = !s.mouseLocked;
-      if (s.mouseLocked) {
-        // Lock: place circle at current pointer position and freeze it there
-        const [px, py] = d3.pointer(event, svgNode);
-        updateSelection(px, py, s.currentRadius);
-        ring.attr("stroke-dasharray", null).attr("stroke-width", 2.5);
-        svgNode.style.cursor = "crosshair";
-      } else {
-        // Unlock: resume following the pointer from where it is now
-        ring.attr("stroke-dasharray", "6 3").attr("stroke-width", 2);
-        svgNode.style.cursor = "";
-        const [px, py] = d3.pointer(event, svgNode);
-        updateSelection(px, py, s.currentRadius);
-      }
-    }
-
-    function handleWheel(event: WheelEvent) {
-      event.preventDefault();
-      const factor = event.deltaMode === 0 ? 0.002 : 0.06;
-      s.currentRadius = Math.max(10, Math.min(500, s.currentRadius * (1 - event.deltaY * factor)));
-      if (s.currentCx !== -9999) {
-        updateSelection(s.currentCx, s.currentCy, s.currentRadius);
-      } else {
-        ring.attr("r", s.currentRadius);
-      }
-      radiusFromGestureRef.current = true;
-      onSpotlightRadiusChangeRef.current?.(s.currentRadius);
-    }
-
-    svgNode.addEventListener("touchstart", handleTouchStart, { passive: false });
-    svgNode.addEventListener("touchmove", handleTouchMove, { passive: false });
-    svgNode.addEventListener("touchend", handleTouchEnd);
-    svgNode.addEventListener("touchcancel", handleTouchCancel);
-    svgNode.addEventListener("pointerenter", handlePointerEnter);
-    svgNode.addEventListener("pointermove", handlePointerMove);
-    svgNode.addEventListener("pointerleave", handlePointerLeave);
-    svgNode.addEventListener("click", handleClick);
-    svgNode.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      ring.remove();
-      svgNode.style.touchAction = "";
-      svgNode.style.cursor = "";
-      svgNode.removeEventListener("touchstart", handleTouchStart);
-      svgNode.removeEventListener("touchmove", handleTouchMove);
-      svgNode.removeEventListener("touchend", handleTouchEnd);
-      svgNode.removeEventListener("touchcancel", handleTouchCancel);
-      svgNode.removeEventListener("pointerenter", handlePointerEnter);
-      svgNode.removeEventListener("pointermove", handlePointerMove);
-      svgNode.removeEventListener("pointerleave", handlePointerLeave);
-      svgNode.removeEventListener("click", handleClick);
-      svgNode.removeEventListener("wheel", handleWheel);
-    };
-  }, [mode]); // callbacks + display state accessed via refs — no re-run needed when they change
-
   // --- Update colors on pointColors or palette change ---
   React.useEffect(() => {
     if (!containerRef.current) return;
     // Update colors for all circles regardless of class
     containerRef.current.selectAll("circle")
-      .attr("fill", (d: any) => {
+      .attr("fill", (d: MapPoint) => {
         const colorValue = pointColors[d.originalIndex];
         return getPointColor(colorValue);
       })
       .attr("opacity", displayMask
-        ? (d: any) => getPointOpacity(d.originalIndex)
+        ? (d: MapPoint) => getPointOpacity(d.originalIndex)
         : 1);
   }, [pointColors, palette, layerMode, getPointColor, getPointOpacity, displayMask, unpaintedColor]);
-
-  function pointInPolygon([x, y]: [number, number], vs: [number, number][]) {
-    let inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      const [xi, yi] = vs[i], [xj, yj] = vs[j];
-      const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
 
   return (
     <div className="relative w-screen h-screen">

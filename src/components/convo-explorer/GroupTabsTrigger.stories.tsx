@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { GroupTabsTrigger, type GroupTabsStyle } from './GroupTabsTrigger';
 import { Tabs, TabsList, TabsContent } from '@/components/ui/tabs';
 import { PALETTE_COLORS } from '@/constants';

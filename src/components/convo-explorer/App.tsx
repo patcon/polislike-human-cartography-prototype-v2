@@ -63,7 +63,7 @@ type AppProps = {
 
 export const App: React.FC<AppProps> = ({ testAnimation = false, kedroBaseUrl, initialPipelineId, pipelineFilter, preloadedData, onLoadFile, enableSpotlight = false }) => {
   const [dataset, setDataset] = React.useState<[string, [number, number]][]>([]);
-  const [statements, setStatements] = React.useState<any[]>([]);
+  const [statements, setStatements] = React.useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const [, setSelectedIds] = React.useState<number[]>([]);

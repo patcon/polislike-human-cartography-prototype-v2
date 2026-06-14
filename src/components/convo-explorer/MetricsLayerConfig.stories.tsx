@@ -1,5 +1,5 @@
 // MetricsLayerConfig.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MetricsLayerConfig } from "./MetricsLayerConfig";
 
 const meta: Meta<typeof MetricsLayerConfig> = {
